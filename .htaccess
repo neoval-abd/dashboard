@@ -1,0 +1,71 @@
+# Apache Security Configuration — Dashboard Eksekutif
+# File: .htaccess (Root Aplikasi)
+
+# =========================================================================
+# 1. NONAKTIFKAN DIRECTORY LISTING (Anti Directory Traversal)
+# =========================================================================
+Options -Indexes
+
+# =========================================================================
+# 2. SEMBUNYIKAN INFO SERVER (Jangan bocorkan versi Apache)
+# =========================================================================
+ServerSignature Off
+
+# =========================================================================
+# 3. BLOKIR AKSES KE FILE KONFIGURASI SENSITIF
+#    change_log.md TIDAK diblokir karena dibutuhkan oleh frontend fetch()
+# =========================================================================
+<FilesMatch "(\.antigravityrules|\.gitignore|composer\.json|composer\.lock)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Blokir akses ke semua file .htaccess dan file tersembunyi (dot-files)
+<FilesMatch "^\.">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# =========================================================================
+# 4. BLOKIR AKSES LANGSUNG KE FOLDER /config (berisi koneksi.php)
+# =========================================================================
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Blokir akses langsung ke /config/
+    RewriteRule ^config/.*$ - [F,L]
+
+    # Blokir akses langsung ke /core/ (file backend internal)
+    # Namun biarkan file yang dibutuhkan (login_process, logo, logout) tetap bisa diakses
+    RewriteCond %{REQUEST_URI} !/core/(login_process\.php|logo\.php|logout\.php)$
+    RewriteRule ^core/.*$ - [F,L]
+</IfModule>
+
+# =========================================================================
+# 5. TAMBAHKAN HTTP SECURITY HEADERS (Defense in Depth)
+#    Dikombinasikan dengan header yang sudah diset via PHP di koneksi.php
+# =========================================================================
+<IfModule mod_headers.c>
+    # Cegah Clickjacking: halaman tidak boleh di-embed di iframe domain lain
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Cegah MIME-Sniffing: browser tidak boleh nebak content type
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Kontrol informasi Referer
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Filter XSS bawaan browser (legacy support)
+    Header always set X-XSS-Protection "1; mode=block"
+
+    # Batasi akses ke fitur browser sensitif (mic, camera, gps)
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>
+
+# =========================================================================
+# 6. CEGAH BROWSING KE FILE BACKUP/TEMP
+# =========================================================================
+<FilesMatch "\.(bak|backup|log|tmp|sql|env|old)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

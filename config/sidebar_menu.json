@@ -1,0 +1,214 @@
+[
+    {
+        "id": "grp_biaya",
+        "is_group": true,
+        "title": "Kendali Biaya",
+        "is_active": true,
+        "items": [
+            {
+                "url": "kunjungan_ralan.php",
+                "title": "Billing Ralan",
+                "icon": "fas fa-walking",
+                "is_active": true
+            },
+            {
+                "url": "kunjungan_ranap.php",
+                "title": "Billing Ranap",
+                "icon": "fas fa-procedures",
+                "is_active": true
+            }
+        ]
+    },
+    {
+        "id": "grp_keuangan",
+        "is_group": true,
+        "title": "Laporan Keuangan",
+        "is_active": true,
+        "items": [
+            {
+                "url": "laporan_kas.php",
+                "title": "Laporan Kas",
+                "icon": "fas fa-wallet",
+                "is_active": true
+            },
+            {
+                "url": "laporan_billing_global.php",
+                "title": "Detail Billing",
+                "icon": "fas fa-file-invoice-dollar",
+                "is_active": true
+            },
+            {
+                "url": "laporan_piutang_detail.php",
+                "title": "Laporan Piutang",
+                "icon": "fas fa-file-invoice",
+                "is_active": true
+            },
+            {
+                "url": "laporan_detail.php",
+                "title": "Laporan Tunai",
+                "icon": "fas fa-cash-register",
+                "is_active": true
+            },
+            {
+                "url": "laporan_tindakan.php",
+                "title": "Analisa Tindakan",
+                "icon": "fas fa-stethoscope",
+                "is_active": true
+            },
+            {
+                "url": "laporan_analisa_lengkap.php",
+                "title": "Analisa Lengkap",
+                "icon": "fas fa-microscope",
+                "is_active": true
+            },
+            {
+                "url": "laporan_jasa_medis.php",
+                "title": "Jasa Medis",
+                "icon": "fas fa-user-tie",
+                "is_active": true
+            }
+        ]
+    },
+    {
+        "id": "grp_hrd",
+        "is_group": true,
+        "title": "Administrasi & HRD",
+        "is_active": true,
+        "items": [
+            {
+                "url": "laporan_absensi.php",
+                "title": "Laporan Absensi",
+                "icon": "fas fa-user-clock",
+                "is_active": true
+            }
+        ]
+    },
+    {
+        "id": "grp_stat",
+        "is_group": true,
+        "title": "Statistik & Indikator",
+        "is_active": true,
+        "items": [
+            {
+                "url": "laporan_kunjungan.php",
+                "title": "Kunjungan RS",
+                "icon": "fas fa-users",
+                "is_active": true
+            },
+            {
+                "url": "laporan_indikator_ranap.php",
+                "title": "BOR LOS TOI",
+                "icon": "fas fa-chart-line",
+                "is_active": true
+            },
+            {
+                "url": "laporan_penyakit.php",
+                "title": "Laporan Penyakit",
+                "icon": "fas fa-heartbeat",
+                "is_active": true
+            },
+            {
+                "url": "laporan_waktu_tunggu.php",
+                "title": "Waktu Tunggu (TAT)",
+                "icon": "fas fa-stopwatch",
+                "is_active": true
+            },
+            {
+                "url": "laporan_demografi.php",
+                "title": "Demografi Pasien",
+                "icon": "fas fa-map-marked-alt",
+                "is_active": true
+            },
+            {
+                "url": "laporan_satu_sehat.php",
+                "title": "Pengiriman data Satu Sehat",
+                "icon": "fas fa-satellite-dish",
+                "is_active": true
+            },
+            {
+                "url": "laporan_antrol_bpjs.php",
+                "title": "Antrean Online BPJS",
+                "icon": "fas fa-mobile-alt",
+                "is_active": true
+            }
+        ]
+    },
+    {
+        "id": "grp_kpi",
+        "is_group": true,
+        "title": "Key Performance",
+        "is_active": true,
+        "items": [
+            {
+                "url": "laporan_kinerja_dokter.php",
+                "title": "Kinerja Dokter",
+                "icon": "fas fa-user-md",
+                "is_active": true
+            },
+            {
+                "url": "laporan_operasi_view.php",
+                "title": "Laporan Operasi",
+                "icon": "fas fa-cut",
+                "is_active": true
+            }
+        ]
+    },
+    {
+        "id": "grp_farmasi",
+        "is_group": true,
+        "title": "Manajemen Farmasi",
+        "is_active": true,
+        "items": [
+            {
+                "url": "laporan_stok_farmasi.php",
+                "title": "Monitoring Stok",
+                "icon": "fas fa-capsules",
+                "is_active": true
+            },
+            {
+                "url": "laporan_stok_opname.php",
+                "title": "Stok Opname",
+                "icon": "fas fa-clipboard-check",
+                "is_active": true
+            },
+            {
+                "url": "laporan_proyeksi_keuntungan.php",
+                "title": "Profit Farmasi",
+                "icon": "fas fa-chart-pie",
+                "is_active": true
+            },
+            {
+                "url": "laporan_hutang_obat.php",
+                "title": "Hutang Obat",
+                "icon": "fas fa-file-invoice-dollar",
+                "is_active": true
+            },
+            {
+                "url": "laporan_dead_stock.php",
+                "title": "Dead Stock Obat",
+                "icon": "fas fa-skull-crossbones",
+                "is_active": true
+            }
+        ]
+    },
+    {
+        "id": "grp_erm",
+        "is_group": true,
+        "title": "Kelengkapan DATA",
+        "is_active": true,
+        "items": [
+            {
+                "url": "laporan_audit_erm_full.php",
+                "title": "Audit Kepatuhan ERM",
+                "icon": "fas fa-check-double",
+                "is_active": true
+            },
+            {
+                "url": "laporan_monitoring_klaim.php",
+                "title": "Monitoring Klaim",
+                "icon": "fas fa-file-alt",
+                "is_active": true
+            }
+        ]
+    }
+]

@@ -1,0 +1,38 @@
+# Apache Security — Folder /api/
+# File: api/.htaccess
+#
+# MEKANISME KUNCI:
+# `php_value auto_prepend_file` memaksa PHP menjalankan auth_guard.php
+# SEBELUM baris pertama dari file PHP manapun di folder ini.
+# Efeknya: SEMUA 37+ file API terlindungi sekaligus tanpa edit satu per satu.
+#
+# CATATAN PATH:
+# Path relatif (tanpa slash) akan dicari di folder yang sama dengan file yang dieksekusi.
+# Ini bekerja di Windows (XAMPP), Linux (Ubuntu), dan macOS tanpa perubahan apapun.
+
+# =========================================================================
+# 1. INJEKSI AUTH GUARD KE SEMUA FILE PHP DI FOLDER INI
+# =========================================================================
+php_value auto_prepend_file auth_guard.php
+
+# =========================================================================
+# 2. NONAKTIFKAN DIRECTORY LISTING (Lapis tambahan)
+# =========================================================================
+Options -Indexes
+
+# =========================================================================
+# 3. BLOKIR AKSES LANGSUNG KE FILE AUTH_GUARD SENDIRI
+#    (Tidak perlu diakses oleh siapapun secara langsung)
+# =========================================================================
+<Files "auth_guard.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# =========================================================================
+# 4. BLOKIR AKSES KE FILE BACKUP/TEMP DI FOLDER API
+# =========================================================================
+<FilesMatch "\.(bak|backup|bak_|_bak|php_bak|php_backup)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
