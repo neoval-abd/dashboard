@@ -78,8 +78,12 @@ $tables = [
     'penggunaan_darah_donor'=> 'obat'
 ];
 foreach ($tables as $tbl => $cat) {
-    $col = (strpos($tbl, 'periksa_') !== false || $tbl == 'penggunaan_darah_donor') ? 'biaya' : 'biaya_rawat';
-    $q = $koneksi->query("SELECT SUM($col) as val FROM $tbl WHERE no_rawat='$no_rawat'");
+    if ($tbl === 'periksa_lab') {
+        $q = $koneksi->query("SELECT SUM(CASE WHEN COALESCE(t.detail_sum,0) > 0 THEN t.detail_sum ELSE t.biaya END) as val FROM (SELECT p.no_rawat, p.kd_jenis_prw, p.tgl_periksa, p.jam, p.biaya, SUM(d.biaya_item) as detail_sum FROM periksa_lab p LEFT JOIN detail_periksa_lab d ON p.no_rawat=d.no_rawat AND p.kd_jenis_prw=d.kd_jenis_prw AND p.tgl_periksa=d.tgl_periksa AND p.jam=d.jam WHERE p.no_rawat='$no_rawat' GROUP BY p.no_rawat, p.kd_jenis_prw, p.tgl_periksa, p.jam, p.biaya) t");
+    } else {
+        $col = (strpos($tbl, 'periksa_') !== false || $tbl == 'penggunaan_darah_donor') ? 'biaya' : 'biaya_rawat';
+        $q = $koneksi->query("SELECT SUM($col) as val FROM $tbl WHERE no_rawat='$no_rawat'");
+    }
     if ($q && $r = $q->fetch_assoc()) $biaya[$cat] += (float)$r['val'];
 }
 

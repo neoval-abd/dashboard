@@ -112,7 +112,16 @@ if ($q_op) {
 $grand_total += $sum_op;
 
 // D. Tindakan (UNION Mode)
-$sql_tind = "SELECT 'lab' as grp, SUM(biaya) as tot FROM periksa_lab WHERE no_rawat='$no_rawat'
+// Lab charges can be stored as detail_periksa_lab.biaya_item for grouped lab packages.
+// Use detail_item totals when available, otherwise fall back to the raw periksa_lab.biaya value.
+$sql_tind = "SELECT 'lab' as grp, SUM(CASE WHEN COALESCE(t.detail_sum,0) > 0 THEN t.detail_sum ELSE t.biaya END) as tot
+             FROM (
+                 SELECT p.no_rawat, p.kd_jenis_prw, p.tgl_periksa, p.jam, p.biaya, SUM(d.biaya_item) as detail_sum
+                 FROM periksa_lab p
+                 LEFT JOIN detail_periksa_lab d ON p.no_rawat=d.no_rawat AND p.kd_jenis_prw=d.kd_jenis_prw AND p.tgl_periksa=d.tgl_periksa AND p.jam=d.jam
+                 WHERE p.no_rawat='$no_rawat'
+                 GROUP BY p.no_rawat, p.kd_jenis_prw, p.tgl_periksa, p.jam, p.biaya
+             ) t
              UNION ALL SELECT 'rad', SUM(biaya) FROM periksa_radiologi WHERE no_rawat='$no_rawat'
              UNION ALL SELECT 'dr_ralan', SUM(biaya_rawat) FROM rawat_jl_dr WHERE no_rawat='$no_rawat'
              UNION ALL SELECT 'pr_ralan', SUM(biaya_rawat) FROM rawat_jl_pr WHERE no_rawat='$no_rawat'

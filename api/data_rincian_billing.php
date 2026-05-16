@@ -201,7 +201,15 @@ try {
     UNION ALL SELECT 'Ranap Dokter', j.nm_perawatan, t.biaya_rawat, 1, t.biaya_rawat FROM rawat_inap_dr t JOIN jns_perawatan_inap j ON t.kd_jenis_prw=j.kd_jenis_prw WHERE t.no_rawat='$no_rawat'
     UNION ALL SELECT 'Ranap Paramedis', j.nm_perawatan, t.biaya_rawat, 1, t.biaya_rawat FROM rawat_inap_pr t JOIN jns_perawatan_inap j ON t.kd_jenis_prw=j.kd_jenis_prw WHERE t.no_rawat='$no_rawat'
     UNION ALL SELECT 'Ranap Dr+Pr', j.nm_perawatan, t.biaya_rawat, 1, t.biaya_rawat FROM rawat_inap_drpr t JOIN jns_perawatan_inap j ON t.kd_jenis_prw=j.kd_jenis_prw WHERE t.no_rawat='$no_rawat'
-    UNION ALL SELECT 'Laboratorium', j.nm_perawatan, t.biaya, 1, t.biaya FROM periksa_lab t JOIN jns_perawatan_lab j ON t.kd_jenis_prw=j.kd_jenis_prw WHERE t.no_rawat='$no_rawat'
+    UNION ALL SELECT 'Laboratorium', j.nm_perawatan, CASE WHEN COALESCE(t.detail_sum,0) > 0 THEN t.detail_sum ELSE t.biaya END as biaya, 1, CASE WHEN COALESCE(t.detail_sum,0) > 0 THEN t.detail_sum ELSE t.biaya END as total
+        FROM ( 
+            SELECT p.no_rawat, p.kd_jenis_prw, p.tgl_periksa, p.jam, p.biaya, SUM(d.biaya_item) as detail_sum 
+            FROM periksa_lab p 
+            LEFT JOIN detail_periksa_lab d ON p.no_rawat=d.no_rawat AND p.kd_jenis_prw=d.kd_jenis_prw AND p.tgl_periksa=d.tgl_periksa AND p.jam=d.jam 
+            WHERE p.no_rawat='$no_rawat' 
+            GROUP BY p.no_rawat, p.kd_jenis_prw, p.tgl_periksa, p.jam, p.biaya 
+        ) t 
+        JOIN jns_perawatan_lab j ON t.kd_jenis_prw=j.kd_jenis_prw 
     UNION ALL SELECT 'Radiologi', j.nm_perawatan, t.biaya, 1, t.biaya FROM periksa_radiologi t JOIN jns_perawatan_radiologi j ON t.kd_jenis_prw=j.kd_jenis_prw WHERE t.no_rawat='$no_rawat'";
     
     $q_tind = safe_query($koneksi, $sql_tind);
