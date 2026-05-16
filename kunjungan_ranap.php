@@ -1,13 +1,6 @@
 <?php
 /*
- * File: kunjungan_ranap.php (V2 - OPTIMIZED)
- * Perbaikan:
- *  1. Fuzzy Search INA-CBG (case-insensitive, abaikan tanda hubung)
- *  2. Dark Mode / High Contrast toggle
- *  3. Bug fix kolom Selisih (real-time update tanpa refresh)
- *  4. Debouncing pada search INA-CBG (500ms)
- *  5. Input mask otomatis format kode INA-CBG
- *  6. Auto-recalculate Selisih setelah pilih INA-CBG via AJAX
+ * File: kunjungan_ranap.php (V2)
  */
 $page_title = "Billing Rawat Inap & Audit";
 require_once('includes/header.php');
@@ -24,10 +17,9 @@ if ($res_pj) {
 ?>
 
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <style>
-/* ============================================================
-   TEMA & DARK MODE
-   ============================================================ */
 :root {
     --bg-page:        #f4f6f9;
     --bg-card:        #ffffff;
@@ -175,9 +167,6 @@ thead.table-dark th {
     border-color: var(--border-color) !important;
 }
 
-/* ============================================================
-   THEME SWITCHER BUTTON
-   ============================================================ */
 #themeSwitcher {
     position: fixed;
     top: 60px;
@@ -214,9 +203,6 @@ thead.table-dark th {
     box-shadow: 0 0 0 3px rgba(13,110,253,0.3);
 }
 
-/* ============================================================
-   SKELETON LOADER
-   ============================================================ */
 .skeleton-text {
     display: inline-block;
     width: 90px;
@@ -233,9 +219,6 @@ thead.table-dark th {
     100% { background-position:  200% 0; }
 }
 
-/* ============================================================
-   PLAFON / INA-CBG PICKER
-   ============================================================ */
 .plafon-cell {
     cursor: pointer;
     min-width: 90px;
@@ -285,7 +268,6 @@ thead.table-dark th {
     color: var(--text-muted);
 }
 
-/* Input helper text */
 .inacbg-hint {
     font-size: 0.7rem;
     color: var(--text-muted);
@@ -315,17 +297,11 @@ thead.table-dark th {
 }
 .edit-inacbg-btn:hover { background: rgba(255,255,255,.18); }
 
-/* ============================================================
-   SELISIH CELL — Progress Bar
-   ============================================================ */
 .selisih-wrapper { min-width: 110px; }
 .selisih-wrapper .progress {
     background-color: var(--progress-track) !important;
 }
 
-/* ============================================================
-   TABLE ROW HIGHLIGHTS (theme-aware)
-   ============================================================ */
 html[data-theme="dark"] .table-danger,
 html[data-theme="high-contrast"] .table-danger {
     background-color: rgba(220, 53, 69, 0.18) !important;
@@ -354,7 +330,6 @@ html[data-theme="high-contrast"] .bg-white {
     background-color: var(--bg-card) !important;
 }
 
-/* DataTables overrides */
 html[data-theme="dark"] .dataTables_wrapper .dataTables_filter input,
 html[data-theme="dark"] .dataTables_wrapper .dataTables_length select,
 html[data-theme="high-contrast"] .dataTables_wrapper .dataTables_filter input,
@@ -386,7 +361,6 @@ html[data-theme="high-contrast"] .page-item.active .page-link {
 }
 </style>
 
-<!-- Theme Switcher -->
 <div id="themeSwitcher" title="Ganti Tema">
     <button class="theme-btn active" data-theme="light" title="Light Mode">☀️</button>
     <button class="theme-btn" data-theme="dark" title="Dark Mode">🌙</button>
@@ -467,7 +441,6 @@ html[data-theme="high-contrast"] .page-item.active .page-link {
     </div>
 </div>
 
-<!-- Modal Detail Billing -->
 <div class="modal fade" id="modalDetailBilling" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -511,9 +484,7 @@ html[data-theme="high-contrast"] .page-item.active .page-link {
 
 <?php ob_start(); ?>
 <script>
-// ============================================================
-// THEME SWITCHER
-// ============================================================
+
 (function() {
     var saved = localStorage.getItem('ranap_theme') || 'light';
     applyTheme(saved);
@@ -530,7 +501,6 @@ html[data-theme="high-contrast"] .page-item.active .page-link {
 
     function applyTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme === 'light' ? '' : theme);
-        // Patch Bootstrap table-dark for dark themes
         if (theme !== 'light') {
             document.documentElement.classList.add('dark-ui');
         } else {
@@ -539,9 +509,6 @@ html[data-theme="high-contrast"] .page-item.active .page-link {
     }
 })();
 
-// ============================================================
-// UTILITIES
-// ============================================================
 var tableKunjungan;
 
 function formatRupiah(angka) {
@@ -553,17 +520,10 @@ function parseRupiahNilai(teks) {
     return parseFloat(String(teks).replace(/[^\d]/g, '')) || 0;
 }
 
-/**
- * FIX #1: Normalise INA-CBG input — strip non-alphanumeric, uppercase.
- * Allows: "a4101" → "A4101", "A-4-10-I" → "A4101"
- */
 function normaliseInacbg(str) {
     return String(str || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 }
 
-// ============================================================
-// FIX #3 + #4: Selisih cell renderer (pure function, no side effects)
-// ============================================================
 function renderSelisihHtml(estimasiRaw, plafonRaw) {
     if (estimasiRaw === null || plafonRaw === null || plafonRaw === 0) return '<span class="selisih-cell text-muted">-</span>';
     var selisih = plafonRaw - estimasiRaw;           // sisa = plafon - estimasi
@@ -582,29 +542,21 @@ function renderSelisihHtml(estimasiRaw, plafonRaw) {
            '</div><small class="text-muted" style="font-size:0.68rem;">' + pct + '% terpakai</small></div>';
 }
 
-// ============================================================
-// INA-CBG PICKER — Fuzzy / Normalised Search
-// ============================================================
 function closeInacbgPicker() {
     $('.plafon-picker-overlay').remove();
 }
 
 var _inacbgDebounce = null;
 
-/**
- * FIX #1: Search using normalised query — backend also normalises.
- * Fallback: also send raw query.
- */
 function searchInacbg(term, callback) {
     clearTimeout(_inacbgDebounce);
-    // FIX #4: Debounce 500ms
     _inacbgDebounce = setTimeout(function() {
         $.ajax({
             url: 'api/search_inacbg.php',
             type: 'GET',
             data: {
                 q: term,
-                qn: normaliseInacbg(term)   // kirim versi normalised
+                qn: normaliseInacbg(term)   
             },
             dataType: 'json',
             success: function(res) { callback(res.data || []); },
@@ -640,10 +592,6 @@ function buildInacbgResultRow(item, rowData) {
            '</div>';
 }
 
-/**
- * FIX #3: After saving INA-CBG, immediately fetch estimasi and recalculate selisih via AJAX.
- * No page refresh needed.
- */
 function saveInacbgAndRefreshSelisih(payload, row, $tr, callback) {
     $.ajax({
         url: 'api/save_inacbg_selection.php',
@@ -653,7 +601,6 @@ function saveInacbgAndRefreshSelisih(payload, row, $tr, callback) {
         success: function(res) {
             if (!res.success) { callback(false, res.message || 'Gagal menyimpan pilihan INA-CBG.'); return; }
 
-            // FIX #3: Immediately re-fetch estimasi for this no_rawat to recalculate selisih
             var rowData = row.data() || {};
             var kd_pj  = rowData.kd_pj || '-';
 
@@ -664,16 +611,13 @@ function saveInacbgAndRefreshSelisih(payload, row, $tr, callback) {
                 data: { no_rawat: payload.no_rawat, kd_pj: kd_pj },
                 dataType: 'json',
                 success: function(est) {
-                    // Update selisih cell directly
                     var $selisih = $tr.find('.selisih-cell, .selisih-wrapper').closest('td');
                     $selisih.html(renderSelisihHtml(est.estimasi_raw, payload.tarif));
 
-                    // Update estimasi cell if skeleton
                     $tr.find('[data-col="estimasi"]').each(function() {
                         $(this).replaceWith('<span class="fw-bold text-primary">Rp ' + (est.estimasi || '0') + '</span>');
                     });
 
-                    // Update row highlight
                     $tr.removeClass('table-danger');
                     if (payload.tarif > 0 && est.estimasi_raw > payload.tarif) {
                         $tr.addClass('table-danger');
@@ -681,7 +625,6 @@ function saveInacbgAndRefreshSelisih(payload, row, $tr, callback) {
                     callback(true, res);
                 },
                 error: function() {
-                    // Still call success even if re-fetch fails — data was saved
                     callback(true, res);
                 }
             });
@@ -698,7 +641,6 @@ function openInacbgPicker(cell) {
     var rowData  = row.data() || {};
 
     var picker = $('<div class="plafon-picker-overlay">' +
-        '<span class="inacbg-hint"><i class="fas fa-info-circle me-1"></i>Ketik kode (mis. <code>a410</code> atau <code>A-4-10-I</code>) atau nama diagnosa. Hasil muncul otomatis.</span>' +
         '<input type="search" class="form-control form-control-sm inacbg-search" placeholder="Cari: a410 / a-4-10-i / septikemia..." autocomplete="off">' +
         '<div class="plafon-picker-results"><div class="text-muted small p-2">Ketik minimal 2 karakter untuk mencari.</div></div>' +
         '</div>');
@@ -731,16 +673,13 @@ function openInacbgPicker(cell) {
         selectResultItem(0);
     }
 
-    // FIX #1: Input mask — auto-format as user types (show formatted hint below input)
     $input.on('input', function() {
         var raw = $(this).val().trim();
         if (raw.length < 2) {
             $results.html('<div class="text-muted small p-2">Ketik minimal 2 karakter untuk mencari.</div>');
             return;
         }
-        // Show loading indicator
         $results.html('<div class="text-muted small p-2"><i class="fas fa-spinner fa-spin me-1"></i>Mencari...</div>');
-        // FIX #4: debounced search via searchInacbg()
         searchInacbg(raw, renderResults);
     });
 
@@ -761,7 +700,6 @@ function openInacbgPicker(cell) {
         }
     });
 
-    // FIX #3: On rate button click — save then immediately recalculate selisih
     $results.on('click', '.select-inacbg-rate', function(e) {
         e.stopPropagation();
         var tarif    = parseFloat($(this).data('tarif')) || 0;
@@ -777,13 +715,11 @@ function openInacbgPicker(cell) {
             tarif: tarif
         };
 
-        // Optimistic UI update
         var $inacbgCell = $cell;
         var $plafonCell = $cell.closest('tr').find('.plafon-cell').first();
         $inacbgCell.html('<div><strong>' + kode + '</strong><i class="fas fa-edit edit-inacbg-icon" title="Ubah INA-CBG"></i></div><div><small class="text-muted">' + deskripsi + '</small></div>');
         $plafonCell.html(formatRupiah(tarif));
 
-        // Update DataTable row data
         var data = row.data() || {};
         data.selected_inacbg_code  = kode;
         data.selected_inacbg_desc  = deskripsi;
@@ -794,7 +730,6 @@ function openInacbgPicker(cell) {
 
         closeInacbgPicker();
 
-        // FIX #3: Save + recalculate selisih immediately
         saveInacbgAndRefreshSelisih(payload, row, $tr, function(ok, res) {
             if (!ok) { alert(res || 'Gagal menyimpan pilihan INA-CBG.'); }
         });
@@ -816,11 +751,8 @@ function openInacbgPicker(cell) {
     $input.focus();
 }
 
-// ============================================================
 // DATATABLES INIT
-// ============================================================
 $(document).ready(function() {
-    // Audit mode toggle
     $('#chk_audit').change(function() {
         var checked = $(this).is(':checked');
         $('#tgl_awal, #tgl_akhir').prop('disabled', !checked).toggleClass('bg-light', !checked);
@@ -846,29 +778,14 @@ $(document).ready(function() {
         lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'Semua']],
         dom: 'Bfrtip',
         buttons: [
-            {
-                extend: 'excelHtml5',
-                text: '<i class="fas fa-file-excel me-1"></i> Export Excel',
-                className: 'btn btn-success btn-sm mb-3',
-                title: 'Laporan Billing Rawat Inap',
-                exportOptions: {
-                    columns: ':visible:not(:last-child)',
-                    format: {
-                        body: function(data, row, column) {
-                            var str = (data === null || data === undefined) ? '' : String(data);
-                            if (column === 7 || column === 8 || column === 9) {
-                                return str.replace(/[^\d,-]/g, '').replace(',', '.');
-                            }
-                            if (str.indexOf('<') > -1) {
-                                return str.replace(/<br\s*\/?>/gi, ' - ').replace(/<[^>]+>/g, '').trim();
-                            }
-                            return data;
-                        }
-                    }
-                }
-            },
-            { extend: 'pageLength', className: 'btn btn-secondary btn-sm mb-3' }
-        ],
+                {
+                    text: '<i class="fas fa-file-excel me-1"></i> Export Excel',
+                    className: 'btn btn-success btn-sm mb-3',
+                    id: 'btnExportExcel',
+                    action: function() { exportToExcel(); }
+                },
+                { extend: 'pageLength', className: 'btn btn-secondary btn-sm mb-3' }
+            ],
         order: [],
         createdRow: function(row, data) {
             if (data.is_over === true) $(row).addClass('table-danger');
@@ -910,7 +827,8 @@ $(document).ready(function() {
                 render: function(data, type, row) {
                     var displayClass = row.bpjs_kelas ? 'Kelas ' + row.bpjs_kelas : (row.room_kelas || '-');
                     var html = '<strong>' + displayClass + '</strong>';
-                    if (row.penjamin && row.penjamin.toLowerCase().includes('bpjs') && row.bpjs_kelas && row.room_kelas) {
+                    var isSpecialWard = /HCU|PERINA|PERINATOLOGI|NICU|PICU|ICU|ISOLASI/i.test(String(row.kamar || ''));
+                    if (row.penjamin && row.penjamin.toLowerCase().includes('bpjs') && row.bpjs_kelas && row.room_kelas && !isSpecialWard) {
                         function w(c) { var l = String(c||'').toLowerCase(); if(l.includes('vip'))return 0; if(l.includes('1')||l==='1')return 1; if(l.includes('2')||l==='2')return 2; if(l.includes('3')||l==='3')return 3; return 999; }
                         if (w(row.room_kelas) < w(row.bpjs_kelas)) html += '<br/><span class="badge bg-danger text-white" style="font-size:0.72rem;">Naik Kelas</span>';
                     }
@@ -935,6 +853,11 @@ $(document).ready(function() {
                 className: 'text-end fw-bold',
                 createdCell: function(td) { $(td).css('position', 'relative'); },
                 render: function(data, type, row) {
+                    if (type === 'export') {
+                        var tarif = row.selected_inacbg_tarif || 0;
+                        if (tarif > 0) return tarif;
+                        return (data === null || data === undefined) ? '' : String(data).replace(/[^\d-]/g, '');
+                    }
                     if (data === null) return '<span class="skeleton-cell" data-norawat="' + row.no_rawat + '" data-col="plafon"><span class="skeleton-text"></span></span>';
                     var displayValue = row.selected_inacbg_tarif ? formatRupiah(parseFloat(row.selected_inacbg_tarif)) : data;
                     return '<span class="plafon-cell" data-norawat="' + row.no_rawat + '">' + displayValue + '</span>';
@@ -944,15 +867,21 @@ $(document).ready(function() {
                 data: 'estimasi',
                 className: 'text-end fw-bold text-primary',
                 render: function(data, type, row) {
+                    if (type === 'export') {
+                        return (data === null || data === undefined) ? '' : String(data).replace(/[^\d,-]/g, '').replace(',', '.');
+                    }
                     if (data === null) return '<span class="skeleton-cell" data-norawat="' + row.no_rawat + '" data-col="estimasi"><span class="skeleton-text"></span></span>';
                     return data;
                 }
             },
             {
-                // FIX #3: Selisih rendered server-side OR via lazy load
                 data: 'selisih',
                 className: 'text-end fw-bold',
                 render: function(data, type, row) {
+                    if (type === 'export') {
+                        if (data === null || data === undefined || data === '-') return '';
+                        return String(data).replace(/[^\d,-]/g, '').replace(',', '.');
+                    }
                     if (data === null) return '<span class="skeleton-cell" data-norawat="' + row.no_rawat + '" data-col="selisih"><span class="skeleton-text"></span></span>';
                     if (!data || data === '-') return '<span class="selisih-cell text-muted">-</span>';
                     return row.is_over
@@ -963,7 +892,8 @@ $(document).ready(function() {
             {
                 data: 'status_pulang',
                 className: 'text-center',
-                render: function(data) {
+                render: function(data, type) {
+                    if (type === 'export') return data;
                     return (data === 'Masih Dirawat' || data === '-')
                         ? '<span class="badge bg-info text-dark">Aktif</span>'
                         : '<span class="badge bg-warning text-dark">' + data + '</span>';
@@ -980,7 +910,7 @@ $(document).ready(function() {
         drawCallback: function() { loadBillingAsync(); }
     });
 
-    // INA-CBG picker triggers
+    // INA-CBG 
     $('#tableKunjungan tbody').on('dblclick', '.inacbg-cell', function(e) {
         e.stopPropagation(); openInacbgPicker(this);
     });
@@ -991,12 +921,10 @@ $(document).ready(function() {
 
 function reloadTable() { tableKunjungan.ajax.reload(); }
 
-// ============================================================
-// LAZY BILLING LOADER
-// ============================================================
 var _billingQueue   = [];
 var _billingRunning = 0;
 var _billingConcurrency = 3;
+var _billingCache   = {};
 
 function loadBillingAsync() {
     var cells = document.querySelectorAll('.skeleton-cell');
@@ -1027,6 +955,7 @@ function _fetchOneBilling(item) {
         dataType: 'json',
         success: function(res) {
             var nr = res.no_rawat;
+            _billingCache[nr] = res;
 
             // Estimasi
             document.querySelectorAll('.skeleton-cell[data-norawat="' + nr + '"][data-col="estimasi"]').forEach(function(el) {
@@ -1038,7 +967,7 @@ function _fetchOneBilling(item) {
                 el.outerHTML = res.plafon || '-';
             });
 
-            // FIX #3: Selisih — rendered via unified renderSelisihHtml()
+            // FIX #3: Selisih 
             document.querySelectorAll('.skeleton-cell[data-norawat="' + nr + '"][data-col="selisih"]').forEach(function(el) {
                 el.outerHTML = renderSelisihHtml(res.estimasi_raw, res.plafon_raw);
             });
@@ -1062,9 +991,7 @@ function _fetchOneBilling(item) {
     });
 }
 
-// ============================================================
 // DETAIL BILLING MODAL
-// ============================================================
 function showDetailBilling(noRawat, namaPasien) {
     $('#lbl-pasien').text(namaPasien);
     $('#lbl-norawat').text(noRawat);
@@ -1099,6 +1026,158 @@ function showDetailBilling(noRawat, namaPasien) {
             $('#lbl-total').text(res.total_rupiah);
         }
     });
+}
+
+
+// ================================================================
+// EXPORT EXCEL — dengan fetch data billing terlebih dahulu
+// ================================================================
+function exportToExcel() {
+    var allRows = tableKunjungan.rows({ search: 'applied' }).data().toArray();
+    if (allRows.length === 0) { alert('Tidak ada data untuk diekspor.'); return; }
+
+    // Cek baris mana yang belum di-cache
+    var toFetch = allRows.filter(function(r) { return !_billingCache[r.no_rawat]; });
+
+    if (toFetch.length > 0) {
+        var btn = document.querySelector('.dt-button.btn-success');
+        if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Menyiapkan data...';
+
+        var done = 0;
+        var concurrency = 5;
+        var queue = toFetch.slice();
+
+        function fetchNext() {
+            if (queue.length === 0) return;
+            var item = queue.shift();
+            $.ajax({
+                url: 'api/hitung_estimasi_ranap.php',
+                type: 'GET',
+                global: false,
+                data: { no_rawat: item.no_rawat, kd_pj: item.kd_pj || '-' },
+                dataType: 'json',
+                success: function(res) { _billingCache[res.no_rawat] = res; },
+                complete: function() {
+                    done++;
+                    if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> ' + done + '/' + toFetch.length + ' data...';
+                    fetchNext();
+                    if (done === toFetch.length) {
+                        if (btn) btn.innerHTML = '<i class="fas fa-file-excel me-1"></i> Export Excel';
+                        _doExport(allRows);
+                    }
+                }
+            });
+        }
+
+        for (var i = 0; i < Math.min(concurrency, toFetch.length); i++) fetchNext();
+    } else {
+        _doExport(allRows);
+    }
+}
+
+function _doExport(rows) {
+    var headers = ['Tgl Masuk', 'No. Rawat', 'Pasien', 'RM', 'DPJP Ranap',
+                   'Kamar', 'Penjamin', 'Kelas', 'INA-CBG', 'Deskripsi INA-CBG',
+                   'Plafon', 'Est. Biaya', 'Selisih', 'Status'];
+
+    var wsData = [headers];
+    var overRows = []; 
+
+    rows.forEach(function(r) {
+        var cache  = _billingCache[r.no_rawat] || {};
+        var plafon = r.selected_inacbg_tarif ? parseFloat(r.selected_inacbg_tarif) :
+                     (cache.plafon_raw ? parseFloat(cache.plafon_raw) : '');
+        var estimasi = cache.estimasi_raw !== undefined ? parseFloat(cache.estimasi_raw) : '';
+        var selisih  = '';
+        var isOver   = false;
+
+        if (plafon !== '' && estimasi !== '') {
+            selisih = plafon - estimasi;
+            isOver  = estimasi > plafon;
+        }
+
+        var displaySelisih = '';
+        if (selisih !== '') {
+            displaySelisih = isOver
+                ? '+' + Math.abs(selisih).toLocaleString('id-ID') + ' (OVER)'
+                : 'Sisa: ' + selisih.toLocaleString('id-ID');
+        }
+
+        var kelas = r.bpjs_kelas ? 'Kelas ' + r.bpjs_kelas : (r.room_kelas || '-');
+        var naik  = '';
+        var isSpecialWard = /HCU|PERINA|PERINATOLOGI|NICU|PICU|ICU|ISOLASI/i.test(String(r.kamar || ''));
+        if (r.penjamin && r.penjamin.toLowerCase().includes('bpjs') && r.bpjs_kelas && r.room_kelas && !isSpecialWard) {
+            function w(c) { var l = String(c||'').toLowerCase(); if(l.includes('vip'))return 0; if(l.includes('1'))return 1; if(l.includes('2'))return 2; if(l.includes('3'))return 3; return 999; }
+            if (w(r.room_kelas) < w(r.bpjs_kelas)) naik = ' (Naik Kelas)';
+        }
+
+        var rowArr = [
+            r.waktu || '',
+            r.no_rawat || '',
+            r.pasien || '',
+            r.rm || '',
+            r.dpjp || (cache.dpjp || '-'),
+            r.kamar || '',
+            r.penjamin || '',
+            kelas + naik,
+            r.selected_inacbg_code || '',
+            r.selected_inacbg_desc || '',
+            plafon !== '' ? plafon : '',
+            estimasi !== '' ? estimasi : '',
+            displaySelisih,
+            r.status_pulang || ''
+        ];
+
+        if (isOver) overRows.push(wsData.length); 
+        wsData.push(rowArr);
+    });
+
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    var numCols = [10, 11]; 
+    var range = XLSX.utils.decode_range(ws['!ref']);
+
+    for (var R = 1; R <= range.e.r; R++) {
+        numCols.forEach(function(C) {
+            var addr = XLSX.utils.encode_cell({ r: R, c: C });
+            if (ws[addr] && ws[addr].v !== '') {
+                ws[addr].t = 'n';
+                ws[addr].z = '#,##0';
+            }
+        });
+    }
+
+    overRows.forEach(function(rowIdx) {
+        var addr = XLSX.utils.encode_cell({ r: rowIdx, c: 12 }); // kolom Selisih
+        if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+        if (!ws[addr].s) ws[addr].s = {};
+        ws[addr].s = {
+            font: { color: { rgb: 'FF0000' }, bold: true },
+            fill: { fgColor: { rgb: 'FFCCCC' } }
+        };
+    });
+
+    ws['!cols'] = [
+        { wch: 12 }, { wch: 22 }, { wch: 24 }, { wch: 12 }, { wch: 26 },
+        { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 40 },
+        { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 14 }
+    ];
+
+    for (var C = 0; C <= 13; C++) {
+        var hAddr = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws[hAddr]) continue;
+        ws[hAddr].s = {
+            font: { bold: true, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '212529' } },
+            alignment: { horizontal: 'center' }
+        };
+    }
+
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Billing Ranap');
+
+    var tgl = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    XLSX.writeFile(wb, 'Billing_Ranap_' + tgl + '.xlsx', { cellStyles: true });
 }
 </script>
 <?php $page_js = ob_get_clean(); ?>

@@ -48,6 +48,9 @@ if($q_sp) $service_piutang = $q_sp->fetch_assoc();
 $draw   = isset($_GET['draw']) ? intval($_GET['draw']) : 0;
 $start  = isset($_GET['start']) ? intval($_GET['start']) : 0;
 $length = isset($_GET['length']) ? intval($_GET['length']) : 10;
+if ($length < 0) {
+    $length = 0; // DataTables uses -1 for "All"; treat as no limit
+}
 $search = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
 $mode   = isset($_GET['mode']) ? $_GET['mode'] : 'active';
 $tgl1   = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
@@ -106,9 +109,12 @@ $sql_data = "SELECT ki.no_rawat, ki.tgl_masuk, ki.jam_masuk, ki.stts_pulang,
              LEFT JOIN ranap_inacbg_selection s ON ki.no_rawat = s.no_rawat
              $where
              GROUP BY ki.no_rawat
-             ORDER BY ki.tgl_masuk DESC, ki.jam_masuk DESC
-             LIMIT $start, $length";
+             ORDER BY ki.tgl_masuk DESC, ki.jam_masuk DESC";
 
+if ($length > 0) {
+    $sql_data .= " LIMIT $start, $length";
+}
+    
 $q_data = $koneksi->query($sql_data);
 
 if (!$q_data) {
