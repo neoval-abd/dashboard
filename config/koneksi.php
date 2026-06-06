@@ -66,6 +66,11 @@ define('DB_PASS', 'clientpass');
 define('DB_NAME', 'sikadella2026');
 define('DB_PORT', '3306'); 
 
+define('BPJS_CONS_ID',  '20642');
+define('BPJS_USER_KEY', 'b1659fea6083cb46fa4ee381cddf0ecc');
+define('BPJS_SECRET',   'aRr221z8mB');
+define('BPJS_API_URL',  'https://apijkn.bpjs-kesehatan.go.id/antreanrs');
+
 // 5. Buat Koneksi menggunakan MySQLi
 $koneksi = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
 

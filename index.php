@@ -270,7 +270,7 @@ if (isset($koneksi)) {
 
     <!-- Credit Footer Login -->
     <div class="login-credit">
-        Dikembangkan oleh <a href="https://saweria.co/ichsanleonhart" target="_blank" rel="noopener">Ichsan Leonhart</a><br>
+        Dikembangkan oleh <a href="https://saweria.co/ichsanleonhart" target="_blank" rel="noopener">IT RSU ADELLA SLAWI</a><br>
         <a href="https://wa.me/6285726123777" target="_blank" rel="noopener"><i class="fab fa-whatsapp me-1"></i>6285726123777</a>
         &nbsp;|&nbsp;
         <a href="https://t.me/IchsanLeonhart" target="_blank" rel="noopener"><i class="fab fa-telegram me-1"></i>@IchsanLeonhart</a>

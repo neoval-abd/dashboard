@@ -13,67 +13,12 @@ include 'includes/header.php';
 $tgl1 = isset($_GET['tgl1']) ? $_GET['tgl1'] : date('Y-m-d', strtotime('-7 days'));
 $tgl2 = isset($_GET['tgl2']) ? $_GET['tgl2'] : date('Y-m-d');
 
-// Metrik
-$metrics = [
-    'total_encounter' => 0,
-    'total_resep' => 0,
-    't3_sent' => 0,
-    't4_sent' => 0,
-    't5_sent' => 0,
-    't6_sent' => 0,
-    't7_sent' => 0,
-    'complete_journey' => 0,
-    'incomplete_journey' => 0
-];
-
-$tableRows = "";
-$tableRowsRaw = "";
-
-function renderRawCell($erm, $bpjs) {
-    // Cleaning ERM Time
-    $erm = (empty($erm) || $erm == ' ') ? '-' : $erm;
-    $erm_t = ($erm !== '-' && strlen($erm) > 10) ? substr($erm, 11, 8) : $erm;
-    
-    // Cleaning BPJS Time
-    $bpjs = (strpos($bpjs, ':') === false) ? '-' : $bpjs;
-    $bpjs_t = ($bpjs !== '-' && strlen($bpjs) > 10) ? substr($bpjs, 11, 8) : $bpjs;
-
-    $out_erm = "<div class='small text-truncate' style='max-width: 140px;'><span class='text-secondary'>ERM RS:</span> <b>$erm_t</b></div>";
-    $out_bpjs = "<div class='small text-truncate' style='max-width: 140px;'><span class='text-primary fw-bold'>BPJS:</span> $bpjs_t</div>";
-
-    $flags = "";
-    
-    // Skenario 1: ERM kosong tapi BPJS jalan (Bot menambal kelalaian PPA/User)
-    if ($erm === '-' && $bpjs !== '-') {
-        $flags .= "<div class='mt-1'><span class='badge shadow-sm text-dark' style='background-color:#fd7e14; font-size: 0.65rem;' title='Petugas tidak mengisi di SIMRS, tetapi Bot mem-bypass validasi dan menambal task ID ke server BPJS'><i class='fas fa-robot'></i> Ditambal Bot</span></div>";
-    }
-    
-    // Skenario 2: ERM terisi, BPJS kosong (Gagal bridging). Beri red flag menyala.
-    if ($erm !== '-' && $bpjs === '-') {
-        $flags .= "<div class='mt-1'><span class='badge bg-danger shadow-sm' style='font-size: 0.65rem;' title='Aktivitas tercatat baik di SIMRS, namun SIMRS gagal mem-bridging ke BPJS (Bisa karena Timeout/Error API)'><i class='fas fa-exclamation-triangle'></i> Gagal Bridging</span></div>";
-    }
-    
-    // Skenario 3: Keduanya jalan, tapi selisih > 20 menit (Bot delay push)
-    if ($erm !== '-' && $bpjs !== '-') {
-         $et = strtotime("1970-01-01 " . $erm_t);
-         $bt = strtotime("1970-01-01 " . $bpjs_t);
-         
-         if ($et && $bt) {
-             $diff_mins = ($bt - $et) / 60;
-             if ($diff_mins > 20) {
-                 $flags .= "<div class='mt-1'><span class='badge bg-warning text-dark shadow-sm' style='font-size: 0.65rem;' title='Terdapat selisih waktu " . round($diff_mins) . " Menit. Injeksi Task ID susulan dieksekusi oleh Bot.'>Selisih ".round($diff_mins)."m <i class='fas fa-robot'></i></span></div>";
-             }
-         }
-    }
-    
-    // Jika keduanya murni kosong (Misal: Px tidak diresepkan obat farmasi)
-    if ($erm === '-' && $bpjs === '-') {
-        return "<div class='text-muted small text-center w-100'>-</div>";
-    }
-
-    return $out_erm . $out_bpjs . $flags;
-}
-
+// ============================================================
+// Query DB Lokal — HANYA untuk mendapatkan daftar pasien.
+// Task ID TIDAK lagi dibaca dari tabel lokal sebagai penentu
+// status. Status final akan ditentukan oleh API BPJS (live).
+// Kolom log TID_x di sini hanya sebagai fallback/referensi.
+// ============================================================
 $sql = "SELECT 
     rp.no_rawat,
     rmj.nobooking,
@@ -83,30 +28,29 @@ $sql = "SELECT
     pj.png_jawab,
     d.nm_dokter,
     mpb.nm_poli_bpjs AS `Poliklinik`,
-    IFNULL(rmj.status, 'On Site') AS `Status Checkin MJKN`,    
-    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '1' THEN rmjt.waktu END), '%H:%i:%s') AS `log TID_1`,
-    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '2' THEN rmjt.waktu END), '%H:%i:%s') AS `log TID_2`,    
-    COALESCE((CASE WHEN rp.stts = 'Batal' THEN rp.stts END), '-') AS `Cancel`,		
+    IFNULL(rmj.status, 'On Site') AS `Status Checkin MJKN`,
+    COALESCE((CASE WHEN rp.stts = 'Batal' THEN rp.stts END), '-') AS `Cancel`,
     rmj.status AS `status_mjkn`,
     rmb.statuskirim AS `statuskirim_batal`,
     rmb.keterangan AS `ket_batal`,
     (SELECT no_sep FROM bridging_sep WHERE no_rawat = rp.no_rawat LIMIT 1) AS `no_sep`,
-    CONCAT(rp.tgl_registrasi, ' ', rp.jam_reg) AS `Jam Registrasi`,		
-    rmj.validasi AS `Jam Checkin`,		    
-    COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '3' THEN rmjt.waktu END), '%H:%i:%s'), 'SEP tdk Bridging / telat checkin') AS `log TID_3`,
+    CONCAT(rp.tgl_registrasi, ' ', rp.jam_reg) AS `Jam Registrasi`,
+    rmj.validasi AS `Jam Checkin`,
+    -- Kolom lokal: hanya dipakai untuk Raw/IT tab & fallback
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '3' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_3`,
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '4' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_4`,
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '5' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_5`,
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '6' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_6`,
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '7' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_7`,
+    -- Referensi ERM (untuk tab Raw/IT)
     (SELECT CONCAT(pr.tgl_perawatan, ' ', pr.jam_rawat)
-     FROM pemeriksaan_ralan pr
-     INNER JOIN dokter d2 ON pr.nip = d2.kd_dokter
-     WHERE pr.no_rawat = rp.no_rawat
-     ORDER BY pr.tgl_perawatan, pr.jam_rawat
-     LIMIT 1) AS `TID 4 input CPPT`,
-     COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '4' THEN rmjt.waktu END), '%H:%i:%s'), 'tdk isi cppt') AS `log TID_4`,
-    mb.kembali AS `TID 5 set status SUDAH`,
-    COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '5' THEN rmjt.waktu END), '%H:%i:%s'), 'tdk klik yes di cppt') AS `log TID_5`,
-    CONCAT(ro.tgl_perawatan, ' ', ro.jam) AS `TID 6 validasi resep`,
-    COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '6' THEN rmjt.waktu END), '%H:%i:%s'), 'Apt tdk validasi') AS `log TID_6`,
-    CONCAT(ro.tgl_penyerahan, ' ', ro.jam_penyerahan) AS `TID 7 penyerahan resep`,
-    COALESCE(DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '7' THEN rmjt.waktu END), '%H:%i:%s'), 'Apt tdk penyerahan obt') AS `log TID_7`
+     FROM pemeriksaan_ralan pr INNER JOIN dokter d2 ON pr.nip = d2.kd_dokter
+     WHERE pr.no_rawat = rp.no_rawat ORDER BY pr.tgl_perawatan, pr.jam_rawat LIMIT 1) AS `ERM_TID4`,
+    mb.kembali AS `ERM_TID5`,
+    CONCAT(ro.tgl_perawatan, ' ', ro.jam) AS `ERM_TID6`,
+    CONCAT(ro.tgl_penyerahan, ' ', ro.jam_penyerahan) AS `ERM_TID7`,
+    -- Apakah pasien punya resep? (dari ERM lokal)
+    (ro.no_rawat IS NOT NULL) AS `has_resep`
 FROM reg_periksa rp
 LEFT JOIN penjab pj ON rp.kd_pj = pj.kd_pj
 LEFT JOIN pasien ps ON rp.no_rkm_medis = ps.no_rkm_medis
@@ -123,155 +67,86 @@ WHERE rp.tgl_registrasi BETWEEN ? AND ?
 GROUP BY rp.no_rawat
 ORDER BY rp.no_rawat ASC";
 
+// Kumpulkan daftar pasien ke array PHP (bukan langsung render HTML)
+// agar bisa dikirim ke frontend sebagai JSON untuk proses AJAX live.
+$patients = [];
+
 if ($stmt = $koneksi->prepare($sql)) {
     $stmt->bind_param("ss", $tgl1, $tgl2);
     if ($stmt->execute()) {
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
-            $t3 = (strpos($row['log TID_3'], ':') !== false);
+            $is_batal_rs   = ($row['Cancel'] === 'Batal');
+            $has_local_t3  = !empty($row['local_TID_3']);
 
-            $is_batal_rs = ($row['Cancel'] === 'Batal');
+            // Cek anomali batal (sama seperti versi lama)
             $is_anomaly_batal = false;
-            
-            if ($is_batal_rs && $t3) {
+            if ($is_batal_rs && $has_local_t3) {
                 if ($row['status_mjkn'] !== 'Batal' || $row['statuskirim_batal'] !== 'Sudah') {
                     $is_anomaly_batal = true;
                 }
             }
+            if ($is_batal_rs && !$is_anomaly_batal) continue;
 
-            if ($is_batal_rs && !$is_anomaly_batal) continue; // Lewati pasien batal normal
-
-            if (!$is_anomaly_batal) {
-                $metrics['total_encounter']++;
-            }
-            
-            $t4 = (strpos($row['log TID_4'], ':') !== false);
-            $t5 = (strpos($row['log TID_5'], ':') !== false);
-            $t6 = (strpos($row['log TID_6'], ':') !== false);
-            $t7 = (strpos($row['log TID_7'], ':') !== false);
-            
-            $has_resep = (isset($row['TID 6 validasi resep']) && trim($row['TID 6 validasi resep']) !== '');
-            $is_complete = false;
-
-            if (!$is_anomaly_batal) {
-                if ($has_resep) {
-                    $metrics['total_resep']++;
-                }
-
-                if ($t3) $metrics['t3_sent']++;
-                if ($t4) $metrics['t4_sent']++;
-                if ($t5) $metrics['t5_sent']++;
-                if ($has_resep && $t6) $metrics['t6_sent']++;
-                if ($has_resep && $t7) $metrics['t7_sent']++;
-
-                if ($has_resep) {
-                    if ($t3 && $t4 && $t5 && $t6 && $t7) $is_complete = true;
-                } else {
-                    if ($t3 && $t4 && $t5) $is_complete = true;
-                }
-
-                if ($is_complete) {
-                    $metrics['complete_journey']++;
-                } else {
-                    $metrics['incomplete_journey']++;
-                }
-            }
-
-            // Eksekutif Table Badges
-            $b3 = $t3 ? "<span class='badge bg-success' title='Sent: {$row['log TID_3']}'><i class='fas fa-check'></i> {$row['log TID_3']}</span>" : "<span class='badge bg-danger' title='Belum terkirim'><i class='fas fa-times'></i> Gagal</span>";
-            $b4 = $t4 ? "<span class='badge bg-success' title='Sent: {$row['log TID_4']}'><i class='fas fa-check'></i> {$row['log TID_4']}</span>" : "<span class='badge bg-danger' title='Belum terkirim'><i class='fas fa-times'></i> Gagal</span>";
-            $b5 = $t5 ? "<span class='badge bg-success' title='Sent: {$row['log TID_5']}'><i class='fas fa-check'></i> {$row['log TID_5']}</span>" : "<span class='badge bg-danger' title='Belum terkirim'><i class='fas fa-times'></i> Gagal</span>";
-            
-            if ($has_resep) {
-                $b6 = $t6 ? "<span class='badge bg-success' title='Sent: {$row['log TID_6']}'><i class='fas fa-check'></i> {$row['log TID_6']}</span>" : "<span class='badge bg-danger' title='Belum terkirim'><i class='fas fa-times'></i> Gagal</span>";
-                $b7 = $t7 ? "<span class='badge bg-success' title='Sent: {$row['log TID_7']}'><i class='fas fa-check'></i> {$row['log TID_7']}</span>" : "<span class='badge bg-danger' title='Belum terkirim'><i class='fas fa-times'></i> Gagal</span>";
-            } else {
-                $b6 = "<span class='badge bg-secondary' title='Tidak diresepkan obat'>N/A</span>";
-                $b7 = "<span class='badge bg-secondary' title='Tidak diresepkan obat'>N/A</span>";
-            }
-            
-            if ($is_anomaly_batal) {
-                $ket = (!empty($row['ket_batal'])) ? htmlspecialchars($row['ket_batal']) : "Task 99 BPJS belum terkirim";
-                $journey_badge = "<div class='badge bg-danger shadow-sm text-wrap' style='max-width: 140px; font-size: 0.75rem;'><i class='fas fa-bomb'></i> ANOMALI BATAL:<br><small class='fw-normal'>$ket</small></div>";
-            } else {
-                $journey_badge = $is_complete ? "<span class='badge bg-primary'><i class='fas fa-certificate'></i> LENGKAP</span>" : "<span class='badge bg-dark'><i class='fas fa-exclamation-triangle'></i> BOCOR</span>";
-            }
-
-            $mjkn_badge = !empty($row['nobooking']) ? "<br><span class='badge shadow-sm mt-1' style='background-color: #0dcaf0; color: #000; font-size: 0.70rem;'><i class='fas fa-mobile-alt me-1'></i> MJKN: {$row['nobooking']}</span>" : "";
-            $sep_badge = !empty($row['no_sep']) ? "<br><span class='badge mt-1 text-dark shadow-sm' style='background-color: #ffc107; font-size: 0.70rem;'><i class='fas fa-file-medical-alt me-1'></i> SEP: {$row['no_sep']}</span>" : "";
-            
-            $mjkn_badge .= $sep_badge;
-
-            if ($is_anomaly_batal) {
-                $mjkn_badge .= "<br><span class='badge bg-danger mt-1' style='font-size: 0.70rem;'><i class='fas fa-exclamation-triangle'></i> Anomali Batal</span>";
-            }
-
-            $tableRows .= "<tr>
-                <td>{$row['tgl_registrasi']}</td>
-                <td><strong>{$row['no_rawat']}</strong> {$mjkn_badge}</td>
-                <td>{$row['nm_pasien']}<br><small class='text-muted'>{$row['nm_dokter']}</small></td>
-                <td>{$row['Poliklinik']}</td>
-                <td>$b3</td>
-                <td>$b4</td>
-                <td>$b5</td>
-                <td>$b6</td>
-                <td>$b7</td>
-                <td>$journey_badge</td>
-            </tr>";
-            
-            // Raw Data Analytics
-            $jam_checkin_t3 = (!empty($row['Jam Checkin']) && $row['Jam Checkin'] !== '-') ? $row['Jam Checkin'] : $row['Jam Registrasi'];
-            $c3 = renderRawCell($jam_checkin_t3, $row['log TID_3']);
-            $c4 = renderRawCell($row['TID 4 input CPPT'], $row['log TID_4']);
-            $c5 = renderRawCell($row['TID 5 set status SUDAH'], $row['log TID_5']);
-            $c6 = renderRawCell($row['TID 6 validasi resep'], $row['log TID_6']);
-            $c7 = renderRawCell($row['TID 7 penyerahan resep'], $row['log TID_7']);
-
-            $tableRowsRaw .= "<tr>
-                <td><strong>{$row['no_rawat']}</strong> {$mjkn_badge}</td>
-                <td>{$row['nm_pasien']}</td>
-                <td>$c3</td>
-                <td>$c4</td>
-                <td>$c5</td>
-                <td>$c6</td>
-                <td>$c7</td>
-            </tr>";
+            $patients[] = [
+                'no_rawat'         => $row['no_rawat'],
+                'nobooking'        => $row['nobooking'] ?? '',
+                'tgl_registrasi'   => $row['tgl_registrasi'],
+                'nm_pasien'        => $row['nm_pasien'],
+                'nm_dokter'        => $row['nm_dokter'],
+                'Poliklinik'       => $row['Poliklinik'],
+                'no_sep'           => $row['no_sep'] ?? '',
+                'has_resep'        => (bool)$row['has_resep'],
+                'is_anomaly_batal' => $is_anomaly_batal,
+                'ket_batal'        => $row['ket_batal'] ?? '',
+                'Jam_Registrasi'   => $row['Jam Registrasi'],
+                'Jam_Checkin'      => $row['Jam Checkin'] ?? '',
+                // Data lokal (untuk tab Raw/IT — hanya referensi SIMRS)
+                'local' => [
+                    'TID3' => $row['local_TID_3'] ?? '',
+                    'TID4' => $row['local_TID_4'] ?? '',
+                    'TID5' => $row['local_TID_5'] ?? '',
+                    'TID6' => $row['local_TID_6'] ?? '',
+                    'TID7' => $row['local_TID_7'] ?? '',
+                ],
+                'erm' => [
+                    'TID3' => $row['Jam Checkin'] ?: $row['Jam Registrasi'],
+                    'TID4' => $row['ERM_TID4'] ?? '',
+                    'TID5' => $row['ERM_TID5'] ?? '',
+                    'TID6' => $row['ERM_TID6'] ?? '',
+                    'TID7' => $row['ERM_TID7'] ?? '',
+                ],
+            ];
         }
     }
 }
-
-function prc($sent, $total) {
-    if ($total == 0) return 0;
-    return round(($sent / $total) * 100, 1);
-}
-
-$pct3 = prc($metrics['t3_sent'], $metrics['total_encounter']);
-$pct4 = prc($metrics['t4_sent'], $metrics['total_encounter']);
-$pct5 = prc($metrics['t5_sent'], $metrics['total_encounter']);
-$pct6 = prc($metrics['t6_sent'], $metrics['total_resep']);
-$pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
 ?>
 
 <style>
-    .glass-card { background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(255,255,255,0.4); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+    .glass-card { background: rgba(255,255,255,0.95); border: 1px solid rgba(255,255,255,0.4); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
     .scorecard { padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #e9ecef; background: #fff; transition: transform 0.2s; }
     .scorecard:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
     .scorecard h5 { font-size: 0.8rem; color: #6c757d; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
-    .scorecard h2 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0px; }
+    .scorecard h2 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0; }
     .text-danger-score { color: #dc3545; }
     .text-success-score { color: #198754; }
     .table-container { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top-left-radius: 0; }
-    
-    /* Toggle Switch Styles */
     .view-toggle { display: inline-flex; background: #f8f9fa; border-radius: 20px; padding: 3px; border: 1px solid #dee2e6; }
     .view-toggle .btn { border-radius: 17px; padding: 4px 15px; font-size: 0.85rem; font-weight: 600; border: none; }
-    .view-toggle .btn.active { background: #0d6efd; color: white; box-shadow: 0 2px 5px rgba(13, 110, 253, 0.3); }
+    .view-toggle .btn.active { background: #0d6efd; color: white; box-shadow: 0 2px 5px rgba(13,110,253,0.3); }
     .view-toggle .btn:not(.active) { color: #6c757d; }
-
-    /* Nav Tabs */
     .nav-tabs .nav-link { font-size: 0.95rem; font-weight: 600; color: #6c757d; border-radius: 10px 10px 0 0; border: none; padding: 12px 20px; margin-right: 5px; }
     .nav-tabs .nav-link.active { background-color: #fff; border: 1px solid rgba(0,0,0,0.08); border-bottom-color: transparent; box-shadow: 0 -3px 10px rgba(0,0,0,0.03); }
     .nav-tabs { border-bottom: 2px solid rgba(0,0,0,0.05); }
+
+    /* Progress bar loading BPJS */
+    #bpjsLoadBar { transition: width 0.3s ease; }
+    .bpjs-loading-row td { background: #fffbe6 !important; }
+    .badge-bpjs { font-size: 0.68rem; }
+
+    /* Indikator sumber data */
+    .src-bpjs  { color: #0d6efd; font-size: 0.6rem; font-weight: 700; }
+    .src-local { color: #fd7e14; font-size: 0.6rem; font-weight: 700; }
 </style>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
@@ -287,53 +162,65 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
     </form>
 </div>
 
-<!-- SCORECARDS -->
-<div class="row mb-4 g-3">
+<!-- Progress BPJS Live Fetch -->
+<div class="alert alert-info py-2 mb-3" id="bpjsProgressBox">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <span><i class="fas fa-satellite-dish me-1"></i> <strong>Sedang mengambil data live dari server BPJS...</strong></span>
+        <span id="bpjsProgressText" class="fw-bold">0 / <?php echo count($patients); ?></span>
+    </div>
+    <div class="progress" style="height: 6px;">
+        <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" id="bpjsLoadBar" style="width:0%"></div>
+    </div>
+    <div class="mt-1 small text-muted" id="bpjsProgressNote">Data ditampilkan bertahap saat setiap pasien selesai diambil dari API BPJS.</div>
+</div>
+
+<!-- SCORECARDS (diisi dinamis oleh JS) -->
+<div class="row mb-4 g-3" id="scorecardRow">
     <div class="col-md-2 col-6">
         <div class="scorecard bg-light border-0">
             <h5>Pendaftaran BPJS</h5>
-            <h2 class="text-dark"><?php echo number_format($metrics['total_encounter'], 0, ',', '.'); ?></h2>
-            <small class="text-muted text-truncate w-100 d-inline-block">Px dengan resep: <?php echo number_format($metrics['total_resep'], 0, ',', '.'); ?></small>
+            <h2 class="text-dark" id="sc_total">-</h2>
+            <small class="text-muted" id="sc_resep">Px dengan resep: -</small>
         </div>
     </div>
     <div class="col-md-2 col-6">
         <div class="scorecard border-top-0 border-end-0 border-bottom-0 border-4 border-primary">
             <h5>Task 3 (Admisi)</h5>
-            <h2 class="<?php echo ($pct3 < 90) ? 'text-danger-score' : 'text-success-score'; ?>"><?php echo $pct3; ?>%</h2>
-            <small class="text-muted"><?php echo number_format($metrics['t3_sent'],0,',','.'); ?> terkirim</small>
+            <h2 id="sc_t3_pct">-</h2>
+            <small class="text-muted" id="sc_t3_n">- terkirim</small>
         </div>
     </div>
     <div class="col-md-2 col-6">
         <div class="scorecard border-top-0 border-end-0 border-bottom-0 border-4 border-info">
             <h5>Task 4 (Layan Dok)</h5>
-            <h2 class="<?php echo ($pct4 < 90) ? 'text-danger-score' : 'text-success-score'; ?>"><?php echo $pct4; ?>%</h2>
-            <small class="text-muted"><?php echo number_format($metrics['t4_sent'],0,',','.'); ?> terkirim</small>
+            <h2 id="sc_t4_pct">-</h2>
+            <small class="text-muted" id="sc_t4_n">- terkirim</small>
         </div>
     </div>
     <div class="col-md-2 col-6">
         <div class="scorecard border-top-0 border-end-0 border-bottom-0 border-4 border-success">
             <h5>Task 5 (Usai Poli)</h5>
-            <h2 class="<?php echo ($pct5 < 90) ? 'text-danger-score' : 'text-success-score'; ?>"><?php echo $pct5; ?>%</h2>
-            <small class="text-muted"><?php echo number_format($metrics['t5_sent'],0,',','.'); ?> terkirim</small>
+            <h2 id="sc_t5_pct">-</h2>
+            <small class="text-muted" id="sc_t5_n">- terkirim</small>
         </div>
     </div>
     <div class="col-md-2 col-6">
         <div class="scorecard border-top-0 border-end-0 border-bottom-0 border-4 border-warning">
             <h5>Task 6 (Apotek Val)</h5>
-            <h2 class="<?php echo ($pct6 < 90) ? 'text-danger-score' : 'text-success-score'; ?>"><?php echo $pct6; ?>%</h2>
-            <small class="text-muted text-truncate w-100 d-inline-block">Dihitung dari: <?php echo number_format($metrics['total_resep'], 0, ',', '.'); ?> Resep</small>
+            <h2 id="sc_t6_pct">-</h2>
+            <small class="text-muted" id="sc_t6_n">- Resep</small>
         </div>
     </div>
     <div class="col-md-2 col-6">
         <div class="scorecard border-top-0 border-end-0 border-bottom-0 border-4 border-danger">
             <h5>Task 7 (Ambil Obat)</h5>
-            <h2 class="<?php echo ($pct7 < 90) ? 'text-danger-score' : 'text-success-score'; ?>"><?php echo $pct7; ?>%</h2>
-            <small class="text-muted text-truncate w-100 d-inline-block">Dihitung dari: <?php echo number_format($metrics['total_resep'], 0, ',', '.'); ?> Resep</small>
+            <h2 id="sc_t7_pct">-</h2>
+            <small class="text-muted" id="sc_t7_n">- Resep</small>
         </div>
     </div>
 </div>
 
-<!-- CHARTS ROW -->
+<!-- CHARTS -->
 <div class="row mb-4 g-4">
     <div class="col-lg-4">
         <div class="glass-card p-3 h-100 d-flex flex-column">
@@ -343,12 +230,11 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
                 <canvas id="doughnutChart"></canvas>
             </div>
             <div class="text-center mt-3">
-                <span class="badge bg-success me-2">Lengkap: <?php echo $metrics['complete_journey']; ?></span>
-                <span class="badge bg-danger">Bocor: <?php echo $metrics['incomplete_journey']; ?></span>
+                <span class="badge bg-success me-2">Lengkap: <span id="leg_complete">0</span></span>
+                <span class="badge bg-danger">Bocor: <span id="leg_bocor">0</span></span>
             </div>
         </div>
     </div>
-    
     <div class="col-lg-8">
         <div class="glass-card p-3 h-100 d-flex flex-column">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -368,20 +254,23 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
     </div>
 </div>
 
-<!-- TABS DATA -->
+<!-- TABS -->
 <ul class="nav nav-tabs border-0 mt-5" id="antrolTabs" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active text-success" id="matrix-tab" data-bs-toggle="tab" data-bs-target="#matrix-pane" type="button" role="tab" aria-controls="matrix-pane" aria-selected="true"><i class="fas fa-tasks me-2"></i>Matrix Keparipurnaan (Eksekutif)</button>
+        <button class="nav-link active text-success" id="matrix-tab" data-bs-toggle="tab" data-bs-target="#matrix-pane" type="button"><i class="fas fa-tasks me-2"></i>Matrix Keparipurnaan (Eksekutif)</button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link text-primary" id="raw-tab" data-bs-toggle="tab" data-bs-target="#raw-pane" type="button" role="tab" aria-controls="raw-pane" aria-selected="false"><i class="fas fa-code-branch me-2"></i>Data Timestamp & AI Bot (IT)</button>
+        <button class="nav-link text-primary" id="raw-tab" data-bs-toggle="tab" data-bs-target="#raw-pane" type="button"><i class="fas fa-code-branch me-2"></i>Data Timestamp & AI Bot (IT)</button>
     </li>
 </ul>
 
 <div class="tab-content" id="antrolTabsContent">
-    <div class="tab-pane fade show active" id="matrix-pane" role="tabpanel" aria-labelledby="matrix-tab" tabindex="0">
+    <!-- TAB 1: Eksekutif -->
+    <div class="tab-pane fade show active" id="matrix-pane" role="tabpanel" tabindex="0">
         <div class="table-container pt-4 border border-top-0">
-            <h5 class="fw-bold mb-3"><i class="fas fa-shield-alt text-success me-2"></i>Laporan Validasi Antrol Standard</h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0"><i class="fas fa-shield-alt text-success me-2"></i>Laporan Validasi Antrol Standard <span class="badge bg-info text-dark ms-2" style="font-size:0.7rem;"><i class="fas fa-satellite-dish"></i> Sumber: BPJS Live API</span></h5>
+            </div>
             <div class="table-responsive">
                 <table id="antrolTable" class="table table-striped table-hover align-middle w-100" style="font-size: 0.82rem;">
                     <thead class="table-dark">
@@ -398,20 +287,22 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
                             <th class="text-center">Status Journey</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <?php echo $tableRows; ?>
+                    <tbody id="antrolTableBody">
+                        <!-- Diisi oleh JS setelah BPJS live fetch -->
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- TAB 2: IT RAW DATA / BOT ANALYTICS -->
-    <div class="tab-pane fade" id="raw-pane" role="tabpanel" aria-labelledby="raw-tab" tabindex="0">
+    <!-- TAB 2: IT Raw -->
+    <div class="tab-pane fade" id="raw-pane" role="tabpanel" tabindex="0">
         <div class="table-container pt-4 border border-top-0">
             <h5 class="fw-bold mb-3"><i class="fas fa-laptop-code text-primary me-2"></i>Analisis Timestamp (Bot IT)</h5>
             <div class="alert alert-info py-2 small mb-3">
-                <i class="fas fa-info-circle me-1"></i> Data menyandingkan jejak ERM RS vs BPJS. <b>Orange Flag</b> mendandakan Bot IT menambal kekosongan input petugas, sedangkan <b>Red Flag</b> (Merah Menyala) secara eksklusif membuktikan SIMRS gagal melakukan <i>push/bridging</i> padahal petugas sudah entri data di sistem.
+                <i class="fas fa-info-circle me-1"></i>
+                Kolom <b>ERM RS</b> = jejak dari SIMRS lokal. Kolom <b>BPJS Live</b> = data aktual dari server BPJS.
+                <b>Orange Flag</b> = Bot menambal, <b>Red Flag</b> = SIMRS gagal bridging, <b>Blue Flag</b> = data hanya ada di BPJS (dikirim dari luar SIMRS).
             </div>
             <div class="table-responsive">
                 <table id="rawTable" class="table table-bordered table-hover align-middle w-100" style="font-size: 0.82rem;">
@@ -426,8 +317,8 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
                             <th>Task 7 (Penyerahan)</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <?php echo $tableRowsRaw; ?>
+                    <tbody id="rawTableBody">
+                        <!-- Diisi oleh JS -->
                     </tbody>
                 </table>
             </div>
@@ -435,6 +326,9 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- JS: Semua logika live fetch + render dinamis                 -->
+<!-- ============================================================ -->
 <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
@@ -445,68 +339,320 @@ $pct7 = prc($metrics['t7_sent'], $metrics['total_resep']);
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+// ============================================================
+// Data pasien dari PHP (daftar) — Task ID BELUM ada di sini.
+// Task ID akan diambil live dari BPJS via AJAX per-pasien.
+// ============================================================
+const PATIENTS = <?php echo json_encode($patients, JSON_UNESCAPED_UNICODE); ?>;
+const TOTAL    = PATIENTS.length;
+const TGL1     = '<?php echo $tgl1; ?>';
+const TGL2     = '<?php echo $tgl2; ?>';
+
+// Metrics (dihitung ulang seiring data masuk)
+let metrics = {
+    total: 0, resep: 0,
+    t3: 0, t4: 0, t5: 0, t6: 0, t7: 0,
+    complete: 0, incomplete: 0
+};
+
+let dtExec = null;  // DataTable instance (eksekutif)
+let dtRaw  = null;  // DataTable instance (raw)
+let doughnutChart = null;
 let pipelineChartInst = null;
+
+// ============================================================
+// Utilitas
+// ============================================================
+function extractTime(dtStr) {
+    // Ambil HH:mm:ss dari "YYYY-MM-DD HH:mm:ss" atau "HH:mm:ss"
+    if (!dtStr || dtStr.trim() === '' || dtStr.trim() === '-') return null;
+    const m = dtStr.match(/(\d{2}:\d{2}:\d{2})/);
+    return m ? m[1] : null;
+}
+
+function fmtTime(t) { return t || '-'; }
+
+function prc(sent, total) {
+    if (total === 0) return '0.0';
+    return ((sent / total) * 100).toFixed(1);
+}
+
+// ============================================================
+// Build badge eksekutif dari waktu BPJS
+// ============================================================
+function buildBadgeExec(bpjsTime, taskid) {
+    if (bpjsTime) {
+        const t = extractTime(bpjsTime) || bpjsTime;
+        return `<span class='badge bg-success badge-bpjs' title='BPJS Live [T${taskid}]: ${t}'><i class='fas fa-check'></i> ${t}</span>`;
+    }
+    return `<span class='badge bg-danger badge-bpjs'><i class='fas fa-times'></i> Gagal</span>`;
+}
+
+// ============================================================
+// Build cell Raw/IT: bandingkan ERM vs BPJS
+// ============================================================
+function buildRawCell(erm, bpjs) {
+    const erm_t  = extractTime(erm);
+    const bpjs_t = bpjs ? (extractTime(bpjs) || bpjs) : null;
+
+    const out_erm  = erm_t
+        ? `<div class='small text-truncate' style='max-width:140px'><span class='text-secondary'>ERM RS:</span> <b>${erm_t}</b></div>`
+        : '';
+    const out_bpjs = bpjs_t
+        ? `<div class='small text-truncate' style='max-width:140px'><span class='text-primary fw-bold'>BPJS:</span> ${bpjs_t}</div>`
+        : '';
+
+    let flags = '';
+
+    // Orange: ERM kosong tapi BPJS ada (dikirim dari luar SIMRS / Bot tambal)
+    if (!erm_t && bpjs_t) {
+        flags += `<div class='mt-1'><span class='badge shadow-sm text-dark' style='background-color:#fd7e14;font-size:0.65rem;' title='Tidak ada jejak di SIMRS, tetapi Task ID sudah terkirim ke BPJS (via luar SIMRS / Bot)'><i class='fas fa-robot'></i> Dari Luar SIMRS</span></div>`;
+    }
+    // Red: ERM ada tapi BPJS kosong (gagal bridging)
+    if (erm_t && !bpjs_t) {
+        flags += `<div class='mt-1'><span class='badge bg-danger shadow-sm' style='font-size:0.65rem;' title='Aktivitas di SIMRS ada, namun tidak sampai ke server BPJS'><i class='fas fa-exclamation-triangle'></i> Gagal Bridging</span></div>`;
+    }
+    // Yellow: Keduanya ada, selisih > 20 menit
+    if (erm_t && bpjs_t) {
+        const et = new Date('1970-01-01T' + erm_t);
+        const bt = new Date('1970-01-01T' + bpjs_t);
+        const diff = (bt - et) / 60000;
+        if (diff > 20) {
+            flags += `<div class='mt-1'><span class='badge bg-warning text-dark shadow-sm' style='font-size:0.65rem;'>Selisih ${Math.round(diff)}m <i class='fas fa-robot'></i></span></div>`;
+        }
+    }
+
+    if (!erm_t && !bpjs_t) return `<div class='text-muted small text-center w-100'>-</div>`;
+    return out_erm + out_bpjs + flags;
+}
+
+// ============================================================
+// Render satu baris ke tabel setelah data BPJS datang
+// ============================================================
+function renderRow(p, bpjsTasks) {
+    // bpjsTasks: array dari API BPJS: [{taskid, taskname, waktu, wakturs}, ...]
+    // Kita gunakan sebagai sumber kebenaran.
+
+    // Buat map taskid -> waktu (BPJS server time)
+    const bpjsMap = {};
+    (bpjsTasks || []).forEach(t => {
+        bpjsMap[String(t.taskid)] = t.waktu || t.wakturs || '';
+    });
+
+    const t3 = bpjsMap['3'] || null;
+    const t4 = bpjsMap['4'] || null;
+    const t5 = bpjsMap['5'] || null;
+    const t6 = bpjsMap['6'] || null;
+    const t7 = bpjsMap['7'] || null;
+
+    // has_resep: cek dari ERM lokal ATAU dari keberadaan T6/T7 di BPJS
+    const has_resep = p.has_resep || !!t6 || !!t7;
+
+    // Update metrics
+    if (!p.is_anomaly_batal) {
+        metrics.total++;
+        if (has_resep) metrics.resep++;
+        if (t3) metrics.t3++;
+        if (t4) metrics.t4++;
+        if (t5) metrics.t5++;
+        if (has_resep && t6) metrics.t6++;
+        if (has_resep && t7) metrics.t7++;
+
+        const complete = has_resep
+            ? (t3 && t4 && t5 && t6 && t7)
+            : (t3 && t4 && t5);
+
+        if (complete) metrics.complete++; else metrics.incomplete++;
+    }
+
+    // Badge eksekutif
+    const b3 = buildBadgeExec(t3, 3);
+    const b4 = buildBadgeExec(t4, 4);
+    const b5 = buildBadgeExec(t5, 5);
+    const b6 = has_resep ? buildBadgeExec(t6, 6) : "<span class='badge bg-secondary badge-bpjs'>N/A</span>";
+    const b7 = has_resep ? buildBadgeExec(t7, 7) : "<span class='badge bg-secondary badge-bpjs'>N/A</span>";
+
+    // Journey badge
+    let journey_badge;
+    if (p.is_anomaly_batal) {
+        const ket = p.ket_batal || 'Task 99 BPJS belum terkirim';
+        journey_badge = `<div class='badge bg-danger shadow-sm text-wrap' style='max-width:140px;font-size:0.75rem;'><i class='fas fa-bomb'></i> ANOMALI BATAL:<br><small class='fw-normal'>${ket}</small></div>`;
+    } else {
+        const complete = has_resep ? (t3&&t4&&t5&&t6&&t7) : (t3&&t4&&t5);
+        journey_badge = complete
+            ? "<span class='badge bg-primary'><i class='fas fa-certificate'></i> LENGKAP</span>"
+            : "<span class='badge bg-dark'><i class='fas fa-exclamation-triangle'></i> BOCOR</span>";
+    }
+
+    // Sub-badges
+    let mjkn_badge = p.nobooking
+        ? `<br><span class='badge shadow-sm mt-1' style='background-color:#0dcaf0;color:#000;font-size:0.70rem;'><i class='fas fa-mobile-alt me-1'></i> MJKN: ${p.nobooking}</span>` : '';
+    if (p.no_sep)
+        mjkn_badge += `<br><span class='badge mt-1 text-dark shadow-sm' style='background-color:#ffc107;font-size:0.70rem;'><i class='fas fa-file-medical-alt me-1'></i> SEP: ${p.no_sep}</span>`;
+    if (p.is_anomaly_batal)
+        mjkn_badge += `<br><span class='badge bg-danger mt-1' style='font-size:0.70rem;'><i class='fas fa-exclamation-triangle'></i> Anomali Batal</span>`;
+
+    const execRow = [
+        p.tgl_registrasi,
+        `<strong>${p.no_rawat}</strong>${mjkn_badge}`,
+        `${p.nm_pasien}<br><small class='text-muted'>${p.nm_dokter}</small>`,
+        p.Poliklinik,
+        b3, b4, b5, b6, b7,
+        journey_badge
+    ];
+
+    // Raw/IT row — bandingkan ERM vs BPJS
+    const c3 = buildRawCell(p.erm.TID3, t3);
+    const c4 = buildRawCell(p.erm.TID4, t4);
+    const c5 = buildRawCell(p.erm.TID5, t5);
+    const c6 = buildRawCell(p.erm.TID6, t6);
+    const c7 = buildRawCell(p.erm.TID7, t7);
+
+    const rawRow = [
+        `<strong>${p.no_rawat}</strong>${mjkn_badge}`,
+        p.nm_pasien,
+        c3, c4, c5, c6, c7
+    ];
+
+    return { execRow, rawRow };
+}
+
+// ============================================================
+// Update semua widget scorecard + chart (dipanggil berkala)
+// ============================================================
+function updateWidgets() {
+    // Scorecard teks
+    const pct = (n, d) => d === 0 ? '0.0%' : ((n/d)*100).toFixed(1) + '%';
+    const cls = (v) => parseFloat(v) < 90 ? 'text-danger-score' : 'text-success-score';
+
+    $('#sc_total').text(metrics.total);
+    $('#sc_resep').text('Px dengan resep: ' + metrics.resep);
+
+    ['t3','t4','t5'].forEach(k => {
+        const val = pct(metrics[k], metrics.total);
+        $(`#sc_${k}_pct`).text(val).attr('class', cls(val));
+        $(`#sc_${k}_n`).text(metrics[k] + ' terkirim');
+    });
+    ['t6','t7'].forEach(k => {
+        const val = pct(metrics[k], metrics.resep);
+        $(`#sc_${k}_pct`).text(val).attr('class', cls(val));
+        $(`#sc_${k}_n`).text('dari ' + metrics.resep + ' Resep');
+    });
+
+    // Legend doughnut
+    $('#leg_complete').text(metrics.complete);
+    $('#leg_bocor').text(metrics.incomplete);
+
+    // Update doughnut data
+    if (doughnutChart) {
+        doughnutChart.data.datasets[0].data = [metrics.complete, metrics.incomplete];
+        doughnutChart.update();
+    }
+
+    // Update pipeline/bar data
+    if (pipelineChartInst) {
+        pipelineChartInst.data.datasets[0].data = [metrics.t3, metrics.t4, metrics.t5, metrics.t6, metrics.t7];
+        pipelineChartInst.update();
+    }
+}
+
+// ============================================================
+// Inisialisasi DataTables (kosong dulu)
+// ============================================================
+function initDataTables() {
+    dtExec = $('#antrolTable').DataTable({
+        dom: '<"row mb-3"<"col-md-6"B><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+        buttons: [{
+            extend: 'excelHtml5',
+            text: '<i class="fas fa-file-excel me-1"></i> Export Eksekutif',
+            className: 'btn btn-success btn-sm',
+            title: `Matriks Data Kepatuhan Task ID BPJS (${TGL1} sd ${TGL2})`
+        }],
+        pageLength: 25,
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json' },
+        columns: [
+            {}, {}, {}, {},
+            {}, {}, {}, {}, {},
+            { className: 'text-center' }
+        ]
+    });
+
+    dtRaw = $('#rawTable').DataTable({
+        dom: '<"row mb-3"<"col-md-6"B><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+        buttons: [{
+            extend: 'excelHtml5',
+            text: '<i class="fas fa-file-excel me-1"></i> Export Data Analisis Bot',
+            className: 'btn btn-primary btn-sm',
+            title: `Raw Data Timestamp ERM vs BPJS Bot Analytics (${TGL1} sd ${TGL2})`
+        }],
+        pageLength: 25,
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json' }
+    });
+}
+
+// ============================================================
+// Inisialisasi Chart
+// ============================================================
+function initCharts() {
+    const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
+    doughnutChart = new Chart(doughnutCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Rantai Penuh (Komplit)', 'Bocor (Incomplete Journey)'],
+            datasets: [{
+                data: [0, 0],
+                backgroundColor: ['#198754', '#dc3545'],
+                borderWidth: 2, borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '65%',
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+    renderBarChart();
+}
+
+let pipelineChartMode = 'bar';
 const ctxPipeline = document.getElementById('pipelineChart').getContext('2d');
 
-const barData = {
-    labels: ['Task 3 (Admisi)', 'Task 4 (CPPT Dokter)', 'Task 5 (Selesai Poli)', 'Task 6 (Apotek Val)', 'Task 7 (Penyerahan Obat)'],
-    datasets: [{
-        label: 'Volume Berhasil Terkirim ke BPJS',
-        data: [
-            <?php echo $metrics['t3_sent']; ?>, 
-            <?php echo $metrics['t4_sent']; ?>, 
-            <?php echo $metrics['t5_sent']; ?>, 
-            <?php echo $metrics['t6_sent']; ?>, 
-            <?php echo $metrics['t7_sent']; ?>
-        ],
-        backgroundColor: ['#0d6efd', '#0dcaf0', '#198754', '#ffc107', '#dc3545'],
-        borderRadius: 6
-    }]
-};
-
-const funnelData = {
-    labels: ['Task 3 (Masuk)', 'Task 4 (Lolos)', 'Task 5 (Lolos)', 'Task 6 (Sub-Farmasi)', 'Task 7 (Sub-Farmasi)'],
-    datasets: [{
-        axis: 'y',
-        label: 'Volume Melewati Titik',
-        data: [
-            <?php echo $metrics['t3_sent']; ?>, 
-            <?php echo $metrics['t4_sent']; ?>, 
-            <?php echo $metrics['t5_sent']; ?>, 
-            <?php echo $metrics['t6_sent']; ?>, 
-            <?php echo $metrics['t7_sent']; ?>
-        ],
-        fill: false,
-        backgroundColor: 'rgba(25, 135, 84, 0.7)',
-        borderColor: '#198754',
-        borderWidth: 1,
-        borderRadius: 4
-    }]
-};
-
 function renderBarChart() {
-    if(pipelineChartInst) pipelineChartInst.destroy();
+    if (pipelineChartInst) pipelineChartInst.destroy();
     pipelineChartInst = new Chart(ctxPipeline, {
         type: 'bar',
-        data: barData,
+        data: {
+            labels: ['Task 3 (Admisi)', 'Task 4 (CPPT Dokter)', 'Task 5 (Selesai Poli)', 'Task 6 (Apotek Val)', 'Task 7 (Penyerahan Obat)'],
+            datasets: [{
+                label: 'Volume Berhasil Terkirim ke BPJS',
+                data: [0, 0, 0, 0, 0],
+                backgroundColor: ['#0d6efd', '#0dcaf0', '#198754', '#ffc107', '#dc3545'],
+                borderRadius: 6
+            }]
+        },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: { y: { beginAtZero: true } }
-        }
+        } 
     });
 }
 
 function renderFunnelChart() {
-    if(pipelineChartInst) pipelineChartInst.destroy();
+    if (pipelineChartInst) pipelineChartInst.destroy();
     pipelineChartInst = new Chart(ctxPipeline, {
         type: 'bar',
-        data: funnelData,
+        data: {
+            labels: ['Task 3 (Masuk)', 'Task 4 (Lolos)', 'Task 5 (Lolos)', 'Task 6 (Sub-Farmasi)', 'Task 7 (Sub-Farmasi)'],
+            datasets: [{
+                axis: 'y',
+                label: 'Volume Melewati Titik',
+                data: [metrics.t3, metrics.t4, metrics.t5, metrics.t6, metrics.t7],
+                backgroundColor: 'rgba(25,135,84,0.7)',
+                borderColor: '#198754', borderWidth: 1, borderRadius: 4
+            }]
+        },
         options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: { x: { beginAtZero: true } }
         }
@@ -515,61 +661,92 @@ function renderFunnelChart() {
 
 function switchChart(type) {
     $('.view-toggle .btn').removeClass('active');
-    if(type === 'bar') {
-        $('#btnBar').addClass('active');
-        renderBarChart();
-    } else {
-        $('#btnFunnel').addClass('active');
-        renderFunnelChart();
-    }
+    if (type === 'bar') { $('#btnBar').addClass('active'); renderBarChart(); }
+    else                { $('#btnFunnel').addClass('active'); renderFunnelChart(); }
+    pipelineChartMode = type;
 }
 
-$(document).ready(function() {
-    renderBarChart();
-    
-    const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
-    new Chart(doughnutCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Rantai Penuh (Komplit)', 'Bocor (Incomplete Journey)'],
-            datasets: [{
-                data: [<?php echo $metrics['complete_journey']; ?>, <?php echo $metrics['incomplete_journey']; ?>],
-                backgroundColor: ['#198754', '#dc3545'],
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '65%',
-            plugins: { legend: { position: 'bottom' } }
-        }
-    });
-    
-    $('#antrolTable').DataTable({
-        dom: '<"row mb-3"<"col-md-6"B><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
-        buttons: [{
-            extend: 'excelHtml5',
-            text: '<i class="fas fa-file-excel me-1"></i> Export Eksekutif',
-            className: 'btn btn-success btn-sm',
-            title: 'Matriks Data Kepatuhan Task ID BPJS (<?php echo $tgl1; ?> sd <?php echo $tgl2; ?>)'
-        }],
-        pageLength: 25,
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json' }
-    });
+// ============================================================
+// Main: Live fetch per-pasien secara berurutan (seperti Java)
+// ============================================================
+async function fetchAllBPJS() {
+    if (TOTAL === 0) {
+        $('#bpjsProgressBox').html('<span class="text-muted"><i class="fas fa-info-circle"></i> Tidak ada data pasien pada rentang tanggal ini.</span>');
+        return;
+    }
 
-    $('#rawTable').DataTable({
-        dom: '<"row mb-3"<"col-md-6"B><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
-        buttons: [{
-            extend: 'excelHtml5',
-            text: '<i class="fas fa-file-excel me-1"></i> Export Data Analisis Bot',
-            className: 'btn btn-primary btn-sm',
-            title: 'Raw Data Timestamp ERM vs BPJS Bot Analytics (<?php echo $tgl1; ?> sd <?php echo $tgl2; ?>)'
-        }],
-        pageLength: 25,
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json' }
-    });
+    initDataTables();
+    initCharts();
+
+    let done = 0;
+
+    for (const p of PATIENTS) {
+        // Tampilkan placeholder row "loading" di tabel
+        const placeholderId = 'row_' + p.no_rawat.replace(/\//g, '_').replace(/ /g, '_');
+
+        dtExec.row.add([
+            p.tgl_registrasi,
+            `<strong>${p.no_rawat}</strong>`,
+            `${p.nm_pasien}<br><small class='text-muted'>${p.nm_dokter}</small>`,
+            p.Poliklinik,
+            `<span class='spinner-border spinner-border-sm text-secondary' style='width:12px;height:12px'></span>`,
+            `<span class='text-muted small'>...</span>`,
+            `<span class='text-muted small'>...</span>`,
+            `<span class='text-muted small'>...</span>`,
+            `<span class='text-muted small'>...</span>`,
+            `<span class='badge bg-secondary'>Loading...</span>`
+        ]).draw(false);
+
+        // Fetch BPJS live
+        let bpjsTasks = [];
+        try {
+            const qs = new URLSearchParams({
+                no_rawat:  p.no_rawat,
+                nobooking: p.nobooking || ''
+            });
+            const resp = await fetch('api/api_bpjs_taskid.php?' + qs.toString());
+            if (resp.ok) {
+                const json = await resp.json();
+                if (json.success) bpjsTasks = json.tasks || [];
+            }
+        } catch (e) {
+            console.warn('Fetch error for', p.no_rawat, e);
+        }
+
+        // Render baris dengan data BPJS
+        const { execRow, rawRow } = renderRow(p, bpjsTasks);
+
+        // Update baris terakhir yang baru ditambahkan (placeholder) dengan data real
+        // Karena DataTables tidak punya row-by-id mudah, kita hapus row terakhir dan tambah yang benar
+        const allRows = dtExec.rows().nodes();
+        const lastRow = allRows[allRows.length - 1];
+        const rowIdx  = dtExec.row(lastRow).index();
+        dtExec.row(rowIdx).data(execRow).draw(false);
+
+        // Raw table
+        dtRaw.row.add(rawRow).draw(false);
+
+        done++;
+
+        // Update progress bar
+        const pct = Math.round((done / TOTAL) * 100);
+        $('#bpjsLoadBar').css('width', pct + '%');
+        $('#bpjsProgressText').text(done + ' / ' + TOTAL);
+
+        // Update widget scorecard & chart bertahap
+        updateWidgets();
+    }
+
+    // Selesai
+    $('#bpjsProgressBox').removeClass('alert-info').addClass('alert-success')
+        .html(`<i class='fas fa-check-circle me-1'></i> <strong>Selesai!</strong> ${TOTAL} pasien berhasil diverifikasi langsung dari server BPJS.`);
+}
+
+// ============================================================
+// Jalankan saat DOM siap
+// ============================================================
+$(document).ready(function () {
+    fetchAllBPJS();
 });
 </script>
 

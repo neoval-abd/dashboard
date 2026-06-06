@@ -302,6 +302,12 @@ thead.table-dark th {
     background-color: var(--progress-track) !important;
 }
 
+.selisih-cell {
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+}
+
 html[data-theme="dark"] .table-danger,
 html[data-theme="high-contrast"] .table-danger {
     background-color: rgba(220, 53, 69, 0.18) !important;
@@ -421,15 +427,15 @@ html[data-theme="high-contrast"] .page-item.active .page-link {
                 <table class="table table-bordered table-hover align-middle table-sm" id="tableKunjungan" width="100%" cellspacing="0">
                     <thead class="table-dark">
                         <tr>
-                            <th width="10%">Tgl Masuk</th>
-                            <th width="15%">No. Rawat / Pasien</th>
-                            <th width="15%">DPJP Ranap</th>
-                            <th width="14%">Kamar / Penjamin</th>
-                            <th width="8%">Kelas</th>
-                            <th width="12%">INA-CBG</th>
-                            <th width="10%" class="text-end bg-secondary">Plafon</th>
-                            <th width="10%" class="text-end bg-warning text-dark">Est. Biaya</th>
-                            <th width="10%" class="text-end">Selisih</th>
+                            <th width="8%">Tgl Masuk</th>
+                            <th width="17%">No. Rawat / Pasien</th>
+                            <th width="14%">DPJP Ranap</th>
+                            <th width="10%">Kamar / Penjamin</th>
+                            <th width="6%">Kelas</th>
+                            <th width="16%">INA-CBG</th>
+                            <th width="10%" class="text-center bg-secondary">Plafon</th>
+                            <th width="10%" class="text-center bg-warning text-dark">Est. Biaya</th>
+                            <th width="14%" class="text-center">Selisih</th>
                             <th width="5%" class="text-center">Status</th>
                             <th width="5%" class="text-center">Aksi</th>
                         </tr>
@@ -527,19 +533,11 @@ function normaliseInacbg(str) {
 function renderSelisihHtml(estimasiRaw, plafonRaw) {
     if (estimasiRaw === null || plafonRaw === null || plafonRaw === 0) return '<span class="selisih-cell text-muted">-</span>';
     var selisih = plafonRaw - estimasiRaw;           // sisa = plafon - estimasi
-    var pct    = Math.min(100, Math.round((estimasiRaw / plafonRaw) * 100));
     var isOver = estimasiRaw > plafonRaw;
-    var barColor = isOver ? 'bg-danger' : (pct >= 80 ? 'bg-warning' : 'bg-success');
-    var label;
     if (isOver) {
-        label = '<span class="text-danger fw-bold">+' + formatRupiah(Math.abs(selisih)) + ' (OVER)</span>';
-    } else {
-        label = '<span class="text-success fw-bold">Sisa: ' + formatRupiah(selisih) + '</span>';
+        return '<span class="selisih-cell text-danger fw-bold">-' + formatRupiah(Math.abs(selisih)) + '</span>';
     }
-    return '<div class="selisih-wrapper">' + label +
-           '<div class="progress mt-1" style="height:5px;" title="' + pct + '% dari plafon">' +
-           '<div class="progress-bar ' + barColor + '" style="width:' + pct + '%;"></div>' +
-           '</div><small class="text-muted" style="font-size:0.68rem;">' + pct + '% terpakai</small></div>';
+    return '<span class="selisih-cell text-success fw-bold">Sisa: ' + formatRupiah(selisih) + '</span>';
 }
 
 function closeInacbgPicker() {
@@ -850,7 +848,7 @@ $(document).ready(function() {
             },
             {
                 data: 'plafon',
-                className: 'text-end fw-bold',
+                className: 'text-center fw-bold',
                 createdCell: function(td) { $(td).css('position', 'relative'); },
                 render: function(data, type, row) {
                     if (type === 'export') {
@@ -865,7 +863,7 @@ $(document).ready(function() {
             },
             {
                 data: 'estimasi',
-                className: 'text-end fw-bold text-primary',
+                className: 'text-center fw-bold text-primary',
                 render: function(data, type, row) {
                     if (type === 'export') {
                         return (data === null || data === undefined) ? '' : String(data).replace(/[^\d,-]/g, '').replace(',', '.');
@@ -876,7 +874,7 @@ $(document).ready(function() {
             },
             {
                 data: 'selisih',
-                className: 'text-end fw-bold',
+                className: 'text-center fw-bold',
                 render: function(data, type, row) {
                     if (type === 'export') {
                         if (data === null || data === undefined || data === '-') return '';
@@ -885,7 +883,7 @@ $(document).ready(function() {
                     if (data === null) return '<span class="skeleton-cell" data-norawat="' + row.no_rawat + '" data-col="selisih"><span class="skeleton-text"></span></span>';
                     if (!data || data === '-') return '<span class="selisih-cell text-muted">-</span>';
                     return row.is_over
-                        ? '<span class="selisih-cell text-danger">+' + data + ' (OVER)</span>'
+                        ? '<span class="selisih-cell text-danger">-' + data.trim() + '</span>'
                         : '<span class="selisih-cell text-success">Sisa: ' + data + '</span>';
                 }
             },
@@ -1099,7 +1097,7 @@ function _doExport(rows) {
         var displaySelisih = '';
         if (selisih !== '') {
             displaySelisih = isOver
-                ? '+' + Math.abs(selisih).toLocaleString('id-ID') + ' (OVER)'
+                ? '-' + Math.abs(selisih).toLocaleString('id-ID') + ''
                 : 'Sisa: ' + selisih.toLocaleString('id-ID');
         }
 

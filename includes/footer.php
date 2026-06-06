@@ -46,7 +46,7 @@
            class="dev-link-btn dev-link-tg"
            title="Hubungi via Telegram: @IchsanLeonhart">
             <i class="fab fa-telegram"></i>
-            <span>@IchsanLeonhart</span>
+            <span>@RSU ADELLA</span>
         </a>
 
     </div>
