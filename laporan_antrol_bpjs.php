@@ -14,10 +14,8 @@ $tgl1 = isset($_GET['tgl1']) ? $_GET['tgl1'] : date('Y-m-d', strtotime('-7 days'
 $tgl2 = isset($_GET['tgl2']) ? $_GET['tgl2'] : date('Y-m-d');
 
 // ============================================================
-// Query DB Lokal — HANYA untuk mendapatkan daftar pasien.
-// Task ID TIDAK lagi dibaca dari tabel lokal sebagai penentu
-// status. Status final akan ditentukan oleh API BPJS (live).
-// Kolom log TID_x di sini hanya sebagai fallback/referensi.
+// Query DB Lokal — data pasien + Task ID dari tabel bpjs_taskid_live
+// (hasil sync SIMRS Khanza → BPJS). Tidak perlu fetch live lagi.
 // ============================================================
 $sql = "SELECT 
     rp.no_rawat,
@@ -36,12 +34,12 @@ $sql = "SELECT
     (SELECT no_sep FROM bridging_sep WHERE no_rawat = rp.no_rawat LIMIT 1) AS `no_sep`,
     CONCAT(rp.tgl_registrasi, ' ', rp.jam_reg) AS `Jam Registrasi`,
     rmj.validasi AS `Jam Checkin`,
-    -- Kolom lokal: hanya dipakai untuk Raw/IT tab & fallback
-    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '3' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_3`,
-    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '4' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_4`,
-    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '5' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_5`,
-    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '6' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_6`,
-    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '7' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `local_TID_7`,
+    -- Task ID dari bpjs_taskid_live (sync SIMRS → BPJS)
+    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '3' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_3`,
+    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '4' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_4`,
+    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '5' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_5`,
+    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '6' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_6`,
+    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '7' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_7`,
     -- Referensi ERM (untuk tab Raw/IT)
     (SELECT CONCAT(pr.tgl_perawatan, ' ', pr.jam_rawat)
      FROM pemeriksaan_ralan pr INNER JOIN dokter d2 ON pr.nip = d2.kd_dokter
@@ -56,7 +54,7 @@ LEFT JOIN penjab pj ON rp.kd_pj = pj.kd_pj
 LEFT JOIN pasien ps ON rp.no_rkm_medis = ps.no_rkm_medis
 LEFT JOIN dokter d ON rp.kd_dokter = d.kd_dokter
 LEFT JOIN maping_poli_bpjs mpb ON rp.kd_poli = mpb.kd_poli_rs
-LEFT JOIN referensi_mobilejkn_bpjs_taskid rmjt ON rp.no_rawat = rmjt.no_rawat
+LEFT JOIN bpjs_taskid_live btl ON rp.no_rawat = btl.no_rawat
 LEFT JOIN referensi_mobilejkn_bpjs rmj ON rp.no_rawat = rmj.no_rawat
 LEFT JOIN mutasi_berkas mb ON rp.no_rawat = mb.no_rawat
 LEFT JOIN resep_obat ro ON rp.no_rawat = ro.no_rawat
@@ -67,8 +65,7 @@ WHERE rp.tgl_registrasi BETWEEN ? AND ?
 GROUP BY rp.no_rawat
 ORDER BY rp.no_rawat ASC";
 
-// Kumpulkan daftar pasien ke array PHP (bukan langsung render HTML)
-// agar bisa dikirim ke frontend sebagai JSON untuk proses AJAX live.
+// Kumpulkan daftar pasien ke array PHP (termasuk data BPJS Task ID)
 $patients = [];
 
 if ($stmt = $koneksi->prepare($sql)) {
@@ -77,11 +74,11 @@ if ($stmt = $koneksi->prepare($sql)) {
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
             $is_batal_rs   = ($row['Cancel'] === 'Batal');
-            $has_local_t3  = !empty($row['local_TID_3']);
+            $has_bpjs_t3   = !empty($row['bpjs_TID_3']);
 
-            // Cek anomali batal (sama seperti versi lama)
+            // Cek anomali batal
             $is_anomaly_batal = false;
-            if ($is_batal_rs && $has_local_t3) {
+            if ($is_batal_rs && $has_bpjs_t3) {
                 if ($row['status_mjkn'] !== 'Batal' || $row['statuskirim_batal'] !== 'Sudah') {
                     $is_anomaly_batal = true;
                 }
@@ -101,14 +98,15 @@ if ($stmt = $koneksi->prepare($sql)) {
                 'ket_batal'        => $row['ket_batal'] ?? '',
                 'Jam_Registrasi'   => $row['Jam Registrasi'],
                 'Jam_Checkin'      => $row['Jam Checkin'] ?? '',
-                // Data lokal (untuk tab Raw/IT — hanya referensi SIMRS)
-                'local' => [
-                    'TID3' => $row['local_TID_3'] ?? '',
-                    'TID4' => $row['local_TID_4'] ?? '',
-                    'TID5' => $row['local_TID_5'] ?? '',
-                    'TID6' => $row['local_TID_6'] ?? '',
-                    'TID7' => $row['local_TID_7'] ?? '',
+                // Data BPJS dari bpjs_taskid_live (sumber utama)
+                'bpjs' => [
+                    'TID3' => $row['bpjs_TID_3'] ?? '',
+                    'TID4' => $row['bpjs_TID_4'] ?? '',
+                    'TID5' => $row['bpjs_TID_5'] ?? '',
+                    'TID6' => $row['bpjs_TID_6'] ?? '',
+                    'TID7' => $row['bpjs_TID_7'] ?? '',
                 ],
+                // Data ERM lokal (untuk perbandingan di tab IT)
                 'erm' => [
                     'TID3' => $row['Jam Checkin'] ?: $row['Jam Registrasi'],
                     'TID4' => $row['ERM_TID4'] ?? '',
@@ -139,9 +137,6 @@ if ($stmt = $koneksi->prepare($sql)) {
     .nav-tabs .nav-link.active { background-color: #fff; border: 1px solid rgba(0,0,0,0.08); border-bottom-color: transparent; box-shadow: 0 -3px 10px rgba(0,0,0,0.03); }
     .nav-tabs { border-bottom: 2px solid rgba(0,0,0,0.05); }
 
-    /* Progress bar loading BPJS */
-    #bpjsLoadBar { transition: width 0.3s ease; }
-    .bpjs-loading-row td { background: #fffbe6 !important; }
     .badge-bpjs { font-size: 0.68rem; }
 
     /* Indikator sumber data */
@@ -160,18 +155,6 @@ if ($stmt = $koneksi->prepare($sql)) {
             <button class="btn btn-success" type="submit"><i class="fas fa-filter me-1"></i> Render Data</button>
         </div>
     </form>
-</div>
-
-<!-- Progress BPJS Live Fetch -->
-<div class="alert alert-info py-2 mb-3" id="bpjsProgressBox">
-    <div class="d-flex justify-content-between align-items-center mb-1">
-        <span><i class="fas fa-satellite-dish me-1"></i> <strong>Sedang mengambil data live dari server BPJS...</strong></span>
-        <span id="bpjsProgressText" class="fw-bold">0 / <?php echo count($patients); ?></span>
-    </div>
-    <div class="progress" style="height: 6px;">
-        <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" id="bpjsLoadBar" style="width:0%"></div>
-    </div>
-    <div class="mt-1 small text-muted" id="bpjsProgressNote">Data ditampilkan bertahap saat setiap pasien selesai diambil dari API BPJS.</div>
 </div>
 
 <!-- SCORECARDS (diisi dinamis oleh JS) -->
@@ -269,7 +252,7 @@ if ($stmt = $koneksi->prepare($sql)) {
     <div class="tab-pane fade show active" id="matrix-pane" role="tabpanel" tabindex="0">
         <div class="table-container pt-4 border border-top-0">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0"><i class="fas fa-shield-alt text-success me-2"></i>Laporan Validasi Antrol Standard <span class="badge bg-info text-dark ms-2" style="font-size:0.7rem;"><i class="fas fa-satellite-dish"></i> Sumber: BPJS Live API</span></h5>
+                <h5 class="fw-bold mb-0"><i class="fas fa-shield-alt text-success me-2"></i>Laporan Validasi Antrol Standard <span class="badge bg-success text-white ms-2" style="font-size:0.7rem;"><i class="fas fa-database"></i> Sumber: bpjs_taskid_live (SIMRS Sync)</span></h5>
             </div>
             <div class="table-responsive">
                 <table id="antrolTable" class="table table-striped table-hover align-middle w-100" style="font-size: 0.82rem;">
@@ -326,22 +309,10 @@ if ($stmt = $koneksi->prepare($sql)) {
     </div>
 </div>
 
-<!-- ============================================================ -->
-<!-- JS: Semua logika live fetch + render dinamis                 -->
-<!-- ============================================================ -->
-<script src="https://code.jquery.com/jquery-3.7.0.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+<?php ob_start(); ?>
 <script>
 // ============================================================
-// Data pasien dari PHP (daftar) — Task ID BELUM ada di sini.
-// Task ID akan diambil live dari BPJS via AJAX per-pasien.
+// Data pasien dari PHP (termasuk Task ID dari bpjs_taskid_live)
 // ============================================================
 const PATIENTS = <?php echo json_encode($patients, JSON_UNESCAPED_UNICODE); ?>;
 const TOTAL    = PATIENTS.length;
@@ -427,23 +398,15 @@ function buildRawCell(erm, bpjs) {
 }
 
 // ============================================================
-// Render satu baris ke tabel setelah data BPJS datang
+// Render satu baris dari data PHP (bpjs_taskid_live)
 // ============================================================
-function renderRow(p, bpjsTasks) {
-    // bpjsTasks: array dari API BPJS: [{taskid, taskname, waktu, wakturs}, ...]
-    // Kita gunakan sebagai sumber kebenaran.
-
-    // Buat map taskid -> waktu (BPJS server time)
-    const bpjsMap = {};
-    (bpjsTasks || []).forEach(t => {
-        bpjsMap[String(t.taskid)] = t.waktu || t.wakturs || '';
-    });
-
-    const t3 = bpjsMap['3'] || null;
-    const t4 = bpjsMap['4'] || null;
-    const t5 = bpjsMap['5'] || null;
-    const t6 = bpjsMap['6'] || null;
-    const t7 = bpjsMap['7'] || null;
+function renderRow(p) {
+    // Data BPJS langsung dari PHP (bpjs_taskid_live)
+    const t3 = p.bpjs.TID3 || null;
+    const t4 = p.bpjs.TID4 || null;
+    const t5 = p.bpjs.TID5 || null;
+    const t6 = p.bpjs.TID6 || null;
+    const t7 = p.bpjs.TID7 || null;
 
     // has_resep: cek dari ERM lokal ATAU dari keberadaan T6/T7 di BPJS
     const has_resep = p.has_resep || !!t6 || !!t7;
@@ -569,7 +532,11 @@ function initDataTables() {
             title: `Matriks Data Kepatuhan Task ID BPJS (${TGL1} sd ${TGL2})`
         }],
         pageLength: 25,
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json' },
+        language: {
+            search: 'Cari:', lengthMenu: 'Tampilkan _MENU_ data', info: 'Menampilkan _START_ s/d _END_ dari _TOTAL_ data',
+            infoEmpty: 'Tidak ada data', infoFiltered: '(difilter dari _MAX_ total data)', zeroRecords: 'Data tidak ditemukan',
+            paginate: { first: 'Awal', last: 'Akhir', next: 'Selanjutnya', previous: 'Sebelumnya' }
+        },
         columns: [
             {}, {}, {}, {},
             {}, {}, {}, {}, {},
@@ -586,7 +553,11 @@ function initDataTables() {
             title: `Raw Data Timestamp ERM vs BPJS Bot Analytics (${TGL1} sd ${TGL2})`
         }],
         pageLength: 25,
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json' }
+        language: {
+            search: 'Cari:', lengthMenu: 'Tampilkan _MENU_ data', info: 'Menampilkan _START_ s/d _END_ dari _TOTAL_ data',
+            infoEmpty: 'Tidak ada data', infoFiltered: '(difilter dari _MAX_ total data)', zeroRecords: 'Data tidak ditemukan',
+            paginate: { first: 'Awal', last: 'Akhir', next: 'Selanjutnya', previous: 'Sebelumnya' }
+        }
     });
 }
 
@@ -667,87 +638,34 @@ function switchChart(type) {
 }
 
 // ============================================================
-// Main: Live fetch per-pasien secara berurutan (seperti Java)
+// Render semua data sekaligus (tidak ada lagi fetch live)
 // ============================================================
-async function fetchAllBPJS() {
+function renderAll() {
     if (TOTAL === 0) {
-        $('#bpjsProgressBox').html('<span class="text-muted"><i class="fas fa-info-circle"></i> Tidak ada data pasien pada rentang tanggal ini.</span>');
         return;
     }
 
     initDataTables();
     initCharts();
 
-    let done = 0;
-
     for (const p of PATIENTS) {
-        // Tampilkan placeholder row "loading" di tabel
-        const placeholderId = 'row_' + p.no_rawat.replace(/\//g, '_').replace(/ /g, '_');
-
-        dtExec.row.add([
-            p.tgl_registrasi,
-            `<strong>${p.no_rawat}</strong>`,
-            `${p.nm_pasien}<br><small class='text-muted'>${p.nm_dokter}</small>`,
-            p.Poliklinik,
-            `<span class='spinner-border spinner-border-sm text-secondary' style='width:12px;height:12px'></span>`,
-            `<span class='text-muted small'>...</span>`,
-            `<span class='text-muted small'>...</span>`,
-            `<span class='text-muted small'>...</span>`,
-            `<span class='text-muted small'>...</span>`,
-            `<span class='badge bg-secondary'>Loading...</span>`
-        ]).draw(false);
-
-        // Fetch BPJS live
-        let bpjsTasks = [];
-        try {
-            const qs = new URLSearchParams({
-                no_rawat:  p.no_rawat,
-                nobooking: p.nobooking || ''
-            });
-            const resp = await fetch('api/api_bpjs_taskid.php?' + qs.toString());
-            if (resp.ok) {
-                const json = await resp.json();
-                if (json.success) bpjsTasks = json.tasks || [];
-            }
-        } catch (e) {
-            console.warn('Fetch error for', p.no_rawat, e);
-        }
-
-        // Render baris dengan data BPJS
-        const { execRow, rawRow } = renderRow(p, bpjsTasks);
-
-        // Update baris terakhir yang baru ditambahkan (placeholder) dengan data real
-        // Karena DataTables tidak punya row-by-id mudah, kita hapus row terakhir dan tambah yang benar
-        const allRows = dtExec.rows().nodes();
-        const lastRow = allRows[allRows.length - 1];
-        const rowIdx  = dtExec.row(lastRow).index();
-        dtExec.row(rowIdx).data(execRow).draw(false);
-
-        // Raw table
-        dtRaw.row.add(rawRow).draw(false);
-
-        done++;
-
-        // Update progress bar
-        const pct = Math.round((done / TOTAL) * 100);
-        $('#bpjsLoadBar').css('width', pct + '%');
-        $('#bpjsProgressText').text(done + ' / ' + TOTAL);
-
-        // Update widget scorecard & chart bertahap
-        updateWidgets();
+        const { execRow, rawRow } = renderRow(p);
+        dtExec.row.add(execRow);
+        dtRaw.row.add(rawRow);
     }
 
-    // Selesai
-    $('#bpjsProgressBox').removeClass('alert-info').addClass('alert-success')
-        .html(`<i class='fas fa-check-circle me-1'></i> <strong>Selesai!</strong> ${TOTAL} pasien berhasil diverifikasi langsung dari server BPJS.`);
+    dtExec.draw();
+    dtRaw.draw();
+    updateWidgets();
 }
 
 // ============================================================
 // Jalankan saat DOM siap
 // ============================================================
 $(document).ready(function () {
-    fetchAllBPJS();
+    renderAll();
 });
 </script>
+<?php $page_js = ob_get_clean(); ?>
 
 <?php include 'includes/footer.php'; ?>

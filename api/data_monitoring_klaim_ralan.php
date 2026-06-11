@@ -1,8 +1,8 @@
 <?php
 /*
- * File: api/data_rekap_reklasifikasi_ranap.php
- * Fungsi: Mengambil data reklasifikasi ranap pasien BPJS
- *         (versi efisien - hanya DU, DS1 dan prosedur utama)
+ * File: api/data_monitoring_klaim_ralan.php
+ * Fungsi: Mengambil data monitoring klaim ralan pasien BPJS
+ *         (rawat jalan dengan SEP dan tarif INA-CBG)
  * Author: Dashboard System
  */
 
@@ -11,57 +11,44 @@ header('Content-Type: application/json');
 require_once(dirname(__DIR__) . '/config/koneksi.php');
 
 // ─── Parameter Filter ────────────────────────────────────────────────────────
-$tgl_awal     = isset($_GET['tgl_awal'])     ? $_GET['tgl_awal']     : date('Y-m-01');
-$tgl_akhir    = isset($_GET['tgl_akhir'])    ? $_GET['tgl_akhir']    : date('Y-m-d');
-$kd_pj        = isset($_GET['kd_pj'])        ? $_GET['kd_pj']        : [];
-$kelas_rawat  = isset($_GET['kelas_rawat'])  ? $_GET['kelas_rawat']  : [];
-$stts_pulang  = isset($_GET['stts_pulang'])  ? $_GET['stts_pulang']  : [];
+$tgl_awal    = isset($_GET['tgl_awal'])    ? $_GET['tgl_awal']    : date('Y-m-01');
+$tgl_akhir   = isset($_GET['tgl_akhir'])   ? $_GET['tgl_akhir']   : date('Y-m-d');
+$kd_pj       = isset($_GET['kd_pj'])       ? $_GET['kd_pj']       : '';
 
-function normalize_filter_values($value) {
-    if (is_array($value)) {
-        return array_values(array_filter($value, function($v) { return $v !== null && $v !== ''; }));
-    }
-    return ($value === '' || $value === null) ? [] : [$value];
+// ─── Helper: Summary kosong ──────────────────────────────────────────────────
+function getSummaryEmpty() {
+    return [
+        'total_pasien'   => 0,
+        'total_biaya_rs' => 0.0,
+        'total_tarif_cbg'=> 0.0,
+        'total_selisih'  => 0.0,
+        'cnt_untung'     => 0,
+        'cnt_rugi'       => 0
+    ];
 }
 
-$kd_pj       = normalize_filter_values($kd_pj);
-$kelas_rawat = normalize_filter_values($kelas_rawat);
-$stts_pulang = normalize_filter_values($stts_pulang);
-
-// ─── Helper: ambil total billing per kategori ────────────────────────────────
-// Menggunakan satu query GROUP BY agar tidak N+1 query per baris
-// Query utama: pasien rawat inap BPJS yang sudah pulang (bukan Pindah Kamar / '-')
+// ─── Query utama: pasien ralan BPJS dengan SEP ──────────────────────────────
 $sql_main = "
     SELECT
-        ki.no_rawat,
+        rp.no_rawat,
         rp.no_rkm_medis,
         p.nm_pasien,
         pj.png_jawab,
         pj.kd_pj,
-        CONCAT(ki.tgl_masuk, ' ', ki.jam_masuk) AS waktu_masuk,
-        CONCAT(ki.tgl_keluar, ' ', ki.jam_keluar) AS waktu_keluar,
-        ki.lama                                   AS los,
+        rp.kd_dokter,
+        d.nm_dokter,
+        rp.tgl_registrasi,
+        rp.jam_reg,
         COALESCE(
             (SELECT bs.no_sep FROM bridging_sep bs WHERE bs.no_rawat = rp.no_rawat LIMIT 1),
             (SELECT bsi.no_sep FROM bridging_sep_internal bsi WHERE bsi.no_rawat = rp.no_rawat LIMIT 1)
-        ) AS no_sep,
-        COALESCE(
-            (SELECT d.nm_dokter FROM dpjp_ranap dr
-             INNER JOIN dokter d ON dr.kd_dokter = d.kd_dokter
-             WHERE dr.no_rawat = rp.no_rawat
-             LIMIT 1),
-            (SELECT d2.nm_dokter FROM dokter d2 WHERE d2.kd_dokter = rp.kd_dokter LIMIT 1)
-        ) AS dpjp,
-        ki.stts_pulang
-    FROM kamar_inap ki
-    INNER JOIN reg_periksa rp  ON ki.no_rawat    = rp.no_rawat
+        ) AS no_sep
+    FROM reg_periksa rp
     INNER JOIN pasien      p   ON rp.no_rkm_medis = p.no_rkm_medis
     INNER JOIN penjab      pj  ON rp.kd_pj        = pj.kd_pj
-    INNER JOIN kamar       km  ON ki.kd_kamar      = km.kd_kamar
-    INNER JOIN nota_inap   ni  ON rp.no_rawat      = ni.no_rawat
-    WHERE ki.tgl_keluar BETWEEN ? AND ?
-      AND ki.stts_pulang != '-'
-      AND ki.stts_pulang != 'Pindah Kamar'
+    LEFT JOIN dokter       d   ON rp.kd_dokter    = d.kd_dokter
+    WHERE rp.status_lanjut = 'Ralan'
+      AND rp.tgl_registrasi BETWEEN ? AND ?
       AND LOWER(pj.png_jawab) LIKE '%bpjs%'
       AND (
             EXISTS (SELECT 1 FROM bridging_sep bs WHERE bs.no_rawat = rp.no_rawat AND bs.no_sep <> '')
@@ -73,25 +60,12 @@ $params = [$tgl_awal, $tgl_akhir];
 $types  = "ss";
 
 if (!empty($kd_pj)) {
-    $placeholders = implode(',', array_fill(0, count($kd_pj), '?'));
-    $sql_main .= " AND rp.kd_pj IN ($placeholders) ";
-    $params = array_merge($params, $kd_pj);
-    $types .= str_repeat('s', count($kd_pj));
-}
-if (!empty($kelas_rawat)) {
-    $placeholders = implode(',', array_fill(0, count($kelas_rawat), '?'));
-    $sql_main .= " AND km.kelas IN ($placeholders) ";
-    $params = array_merge($params, $kelas_rawat);
-    $types .= str_repeat('s', count($kelas_rawat));
-}
-if (!empty($stts_pulang)) {
-    $placeholders = implode(',', array_fill(0, count($stts_pulang), '?'));
-    $sql_main .= " AND ki.stts_pulang IN ($placeholders) ";
-    $params = array_merge($params, $stts_pulang);
-    $types .= str_repeat('s', count($stts_pulang));
+    $sql_main .= " AND rp.kd_pj = ? ";
+    $params[] = $kd_pj;
+    $types  .= "s";
 }
 
-$sql_main .= " ORDER BY ki.tgl_keluar, ki.jam_keluar ";
+$sql_main .= " ORDER BY rp.tgl_registrasi DESC, rp.jam_reg DESC ";
 
 $stmt = $koneksi->prepare($sql_main);
 if (!$stmt) {
@@ -142,12 +116,12 @@ while ($b = $res2->fetch_assoc()) {
 }
 $stmt2->close();
 
-// ─── Batch query: diagnosa (ambil DU & DS1 saja, status Ranap) ───────────────
+// ─── Batch query: diagnosa (ambil DU & DS1 saja, status Ralan) ───────────────
 $sql_dx = "
     SELECT no_rawat, kd_penyakit, prioritas
     FROM diagnosa_pasien
     WHERE no_rawat IN ($in_place)
-      AND status = 'Ranap'
+      AND status = 'Ralan'
       AND prioritas IN (1, 2)
     ORDER BY prioritas
 ";
@@ -167,7 +141,7 @@ $sql_pr = "
     SELECT no_rawat, kode, prioritas
     FROM prosedur_pasien
     WHERE no_rawat IN ($in_place)
-      AND status = 'Ranap'
+      AND status = 'Ralan'
       AND prioritas = 1
 ";
 $stmt4 = $koneksi->prepare($sql_pr);
@@ -224,7 +198,6 @@ while ($cbg = $res5->fetch_assoc()) {
         $cbg_map[$nr] = ['code' => $cbg['code_cbg'], 'tarif' => 0.0];
     }
     $cbg_map[$nr]['tarif'] += (float)$cbg['tarif'];
-    // gabung kode CBG jika ada lebih dari 1 (stage1 + internal)
     if (!empty($cbg['code_cbg']) && $cbg_map[$nr]['code'] !== $cbg['code_cbg']) {
         $cbg_map[$nr]['code'] = trim($cbg_map[$nr]['code'] . ' ' . $cbg['code_cbg']);
     }
@@ -239,13 +212,11 @@ $ttl_selisih= 0;
 $cnt_untung = 0;
 $cnt_rugi   = 0;
 
-// Kategori billing yang masuk ke Total Tarif RS
+// Kategori billing yang masuk ke Total Tarif RS (untuk ralan)
 $kategori_total = [
     'Laborat','Radiologi','Operasi','Obat',
-    'Ranap Dokter','Ranap Dokter Paramedis','Ranap Paramedis',
     'Ralan Dokter','Ralan Dokter Paramedis','Ralan Paramedis',
-    'Tambahan','Potongan','Kamar','Registrasi','Harian',
-    'Retur Obat','Resep Pulang','Service'
+    'Tambahan','Potongan','Registrasi','Service'
 ];
 
 foreach ($rows as $r) {
@@ -279,49 +250,35 @@ foreach ($rows as $r) {
     if ($selisih >= 0) $cnt_untung++; else $cnt_rugi++;
 
     $data[] = [
-        'no_rawat'    => $nr,
-        'no_rkm_medis'=> $r['no_rkm_medis'],
-        'nm_pasien'   => $r['nm_pasien'],
-        'png_jawab'   => $r['png_jawab'],
-        'kd_pj'       => $r['kd_pj'],
-        'waktu_masuk' => $r['waktu_masuk'],
-        'waktu_keluar'=> $r['waktu_keluar'],
-        'los'         => $r['los'],
-        'no_sep'      => $r['no_sep'],
-        'dpjp'        => $r['dpjp'],
-        'stts_pulang' => $r['stts_pulang'],
-        'du'          => $du,
-        'ds1'         => $ds1,
-        'p1'          => $p1,
-        'kode_cbg'    => $kode_cbg,
-        'total_rs'    => $total_rs,
-        'tarif_cbg'   => $tarif_cbg,
-        'selisih'     => $selisih,
+        'no_rawat'       => $nr,
+        'no_rkm_medis'   => $r['no_rkm_medis'],
+        'nm_pasien'      => $r['nm_pasien'],
+        'png_jawab'      => $r['png_jawab'],
+        'kd_pj'          => $r['kd_pj'],
+        'kd_dokter_jaga' => $r['nm_dokter'] ?? '-',
+        'tgl_registrasi' => $r['tgl_registrasi'] . ' ' . $r['jam_reg'],
+        'no_sep'         => $r['no_sep'],
+        'du'             => $du,
+        'ds1'            => $ds1,
+        'p1'             => $p1,
+        'kode_cbg'       => $kode_cbg,
+        'total_rs'       => $total_rs,
+        'tarif_cbg'      => $tarif_cbg,
+        'selisih'        => $selisih,
     ];
 }
 
-// ─── Response ─────────────────────────────────────────────────────────────────
-echo json_encode([
-    'data'    => $data,
+// ─── Return response ──────────────────────────────────────────────────────────
+$response = [
+    'data' => $data,
     'summary' => [
-        'total_pasien'  => count($data),
-        'total_biaya_rs'=> $ttl_biaya,
-        'total_tarif_cbg'=> $ttl_tarif,
-        'total_selisih' => $ttl_selisih,
-        'cnt_untung'    => $cnt_untung,
-        'cnt_rugi'      => $cnt_rugi,
+        'total_pasien'    => count($data),
+        'total_biaya_rs'  => $ttl_biaya,
+        'total_tarif_cbg' => $ttl_tarif,
+        'total_selisih'   => $ttl_selisih,
+        'cnt_untung'      => $cnt_untung,
+        'cnt_rugi'        => $cnt_rugi
     ]
-]);
+];
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-function getSummaryEmpty() {
-    return [
-        'total_pasien'   => 0,
-        'total_biaya_rs' => 0,
-        'total_tarif_cbg'=> 0,
-        'total_selisih'  => 0,
-        'cnt_untung'     => 0,
-        'cnt_rugi'       => 0,
-    ];
-}
-?>
+echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);

@@ -715,6 +715,39 @@ function get_arrow_class($pages, $current) {
       });
     </script>
 
+        <!-- Fallback: enable theme dropdown toggle if Bootstrap JS hasn't initialized yet -->
+        <script>
+            (function(){
+                var ddToggle = document.getElementById('themeDropdown');
+                if (!ddToggle) return;
+                var ddMenu = ddToggle.nextElementSibling;
+                if (!ddMenu) return;
+
+                // If Bootstrap's Dropdown is available, do nothing (it will manage opening)
+                if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) return;
+
+                ddToggle.addEventListener('click', function(e){
+                    e.preventDefault();
+                    var isShown = ddMenu.classList.contains('show');
+                    if (isShown) {
+                        ddMenu.classList.remove('show');
+                        ddToggle.setAttribute('aria-expanded','false');
+                    } else {
+                        ddMenu.classList.add('show');
+                        ddToggle.setAttribute('aria-expanded','true');
+                    }
+                });
+
+                // Close when clicking outside
+                document.addEventListener('click', function(ev){
+                    if (!ddToggle.contains(ev.target) && !ddMenu.contains(ev.target)) {
+                        ddMenu.classList.remove('show');
+                        ddToggle.setAttribute('aria-expanded','false');
+                    }
+                });
+            })();
+        </script>
+
     <div class="nav-item text-nowrap">
       <span class="nav-link px-3 text-white small">Halo, <?php echo htmlspecialchars($_SESSION['nama_user']); ?></span>
     </div>

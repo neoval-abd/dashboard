@@ -1,10 +1,10 @@
 <?php
 /*
- * Deskripsi: Rekap Monitoring Klaim Ranap - Data pasien BPJS rawat inap
+ * Deskripsi: Rekap Monitoring Klaim Ralan - Data pasien BPJS rawat jalan
  *            beserta diagnosa, prosedur, tarif RS vs INA-CBG, dan selisih
  */
 
-$page_title = "Rekap Monitoring Klaim Ranap";
+$page_title = "Rekap Monitoring Klaim Ralan";
 require_once('includes/header.php');
 require_once('includes/functions.php');
 
@@ -12,11 +12,10 @@ require_once('includes/functions.php');
 $tgl_awal    = isset($_GET['tgl_awal'])    ? htmlspecialchars($_GET['tgl_awal'])    : date('Y-m-01');
 $tgl_akhir   = isset($_GET['tgl_akhir'])  ? htmlspecialchars($_GET['tgl_akhir'])   : date('Y-m-d');
 $kd_pj       = isset($_GET['kd_pj'])      ? htmlspecialchars($_GET['kd_pj'])       : '';
-$kelas_rawat = isset($_GET['kelas_rawat'])? htmlspecialchars($_GET['kelas_rawat']) : '';
 $stts_pulang = isset($_GET['stts_pulang'])? htmlspecialchars($_GET['stts_pulang']) : '';
 $action      = isset($_GET['action'])     ? $_GET['action'] : '';
 
-// Ambil daftar penjab BPJS untuk dropdown
+// Ambil daftar penjab BPJS untuk dipilih sebagai BPJS Kesehatan
 $q_pj = $koneksi->query(
     "SELECT kd_pj, png_jawab FROM penjab
      WHERE LOWER(png_jawab) LIKE '%bpjs%'
@@ -26,13 +25,15 @@ $penjab_bpjs = [];
 while ($row = $q_pj->fetch_assoc()) {
     $penjab_bpjs[] = $row;
 }
-
 if ($kd_pj === '') {
     foreach ($penjab_bpjs as $pj) {
         if (strpos(strtolower($pj['png_jawab']), 'bpjs kesehatan') !== false) {
             $kd_pj = $pj['kd_pj'];
             break;
         }
+    }
+    if ($kd_pj === '' && !empty($penjab_bpjs)) {
+        $kd_pj = $penjab_bpjs[0]['kd_pj'];
     }
 }
 ?>
@@ -132,7 +133,7 @@ if ($kd_pj === '') {
     <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h4 class="mb-1"><i class="fas fa-clipboard-list me-2 text-primary"></i>Rekap Monitoring Klaim Ranap</h4>
+            <h4 class="mb-1"><i class="fas fa-clipboard-list me-2 text-primary"></i>Rekap Monitoring Klaim Ralan</h4>
             <span class="text-muted small">Data Pasien BPJS – Diagnosa, Prosedur, Tarif RS vs INA-CBG</span>
         </div>
     </div>
@@ -144,41 +145,21 @@ if ($kd_pj === '') {
             <form id="frmFilter">
                 <div class="row g-3 align-items-end">
                     <div class="col-lg-2 col-md-4">
-                        <label class="form-label">Tgl Keluar Awal</label>
+                        <label class="form-label">Tgl Kunjungan Awal</label>
                         <input type="date" id="tgl_awal" name="tgl_awal" class="form-control"
                                value="<?php echo htmlspecialchars($tgl_awal); ?>" required>
                     </div>
                     <div class="col-lg-2 col-md-4">
-                        <label class="form-label">Tgl Keluar Akhir</label>
+                        <label class="form-label">Tgl Kunjungan Akhir</label>
                         <input type="date" id="tgl_akhir" name="tgl_akhir" class="form-control"
                                value="<?php echo htmlspecialchars($tgl_akhir); ?>" required>
                     </div>
-                    <div class="col-lg-2 col-md-4">
+                    <div class="col-lg-3 col-md-4">
                         <label class="form-label">Penjamin</label>
                         <input type="text" class="form-control" value="BPJS Kesehatan" disabled>
                         <input type="hidden" id="kd_pj" name="kd_pj" value="<?php echo htmlspecialchars($kd_pj); ?>">
                     </div>
-                    <div class="col-lg-2 col-md-4">
-                        <label class="form-label">Kelas Rawat</label>
-                        <select id="kelas_rawat" name="kelas_rawat" class="form-select">
-                            <option value="">-- Semua Kelas --</option>
-                            <option value="Kelas 1"    <?php echo ($kelas_rawat=='Kelas 1')   ? 'selected':''; ?>>Kelas 1</option>
-                            <option value="Kelas 2"    <?php echo ($kelas_rawat=='Kelas 2')   ? 'selected':''; ?>>Kelas 2</option>
-                            <option value="Kelas 3"    <?php echo ($kelas_rawat=='Kelas 3')   ? 'selected':''; ?>>Kelas 3</option>
-                            <option value="Kelas VIP"  <?php echo ($kelas_rawat=='Kelas VIP') ? 'selected':''; ?>>Kelas VIP</option>
-                        </select>
-                    </div>
-                    <div class="col-lg-2 col-md-4">
-                        <label class="form-label">Status Pulang</label>
-                        <select id="stts_pulang" name="stts_pulang" class="form-select">
-                            <option value="">-- Semua Status --</option>
-                            <option value="Atas Persetujuan Dokter" <?php echo ($stts_pulang=='Atas Persetujuan Dokter') ? 'selected':''; ?>>Atas Persetujuan Dokter</option>
-                            <option value="Atas Permintaan Sendiri" <?php echo ($stts_pulang=='Atas Permintaan Sendiri') ? 'selected':''; ?>>Atas Permintaan Sendiri</option>
-                            <option value="Meninggal"               <?php echo ($stts_pulang=='Meninggal')               ? 'selected':''; ?>>Meninggal</option>
-                            <option value="Dirujuk"                 <?php echo ($stts_pulang=='Dirujuk')                 ? 'selected':''; ?>>Dirujuk</option>
-                        </select>
-                    </div>
-                    <div class="col-lg-2 col-md-4 d-flex gap-2">
+                    <div class="col-lg-3 col-md-4 d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-fill">
                             <i class="fas fa-search me-1"></i>Cari
                         </button>
@@ -218,13 +199,13 @@ if ($kd_pj === '') {
     <!-- Loading -->
     <div id="loadingArea">
         <div class="spinner-border text-primary mb-3" role="status"></div>
-        <p class="text-muted">Memuat data monitoring klaim...</p>
+        <p class="text-muted">Memuat data monitoring klaim ralan...</p>
     </div>
 
     <!-- Table -->
     <div class="card shadow mb-4" id="tableSection" style="display:none;">
         <div class="card-header py-3 d-flex align-items-center justify-content-between">
-            <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-table me-2"></i>Data Monitoring Klaim Ranap</h6>
+            <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-table me-2"></i>Data Monitoring Klaim Ralan</h6>
             <small id="infoRange" class="text-muted"></small>
         </div>
         <div class="card-body p-2">
@@ -237,12 +218,9 @@ if ($kd_pj === '') {
                             <th>SEP</th>
                             <th>No RM</th>
                             <th>Nama Pasien</th>
-                            <th>DPJP Ranap</th>
+                            <th>Dokter DPJP</th>
                             <th>Penjamin</th>
-                            <th>Waktu Masuk</th>
-                            <th>Waktu Keluar</th>
-                            <th style="width:42px">LOS</th>
-                            <th>Stts Pulang</th>
+                            <th>Tanggal Kunjungan</th>
                             <th>DU</th>
                             <th>DS 1</th>
                             <th>P 1</th>
@@ -255,7 +233,9 @@ if ($kd_pj === '') {
                     <tbody></tbody>
                     <tfoot>
                         <tr class="fw-bold">
-                            <td colspan="15">Total</td>
+                            <td colspan="12" style="text-align:right; padding-right:12px;">
+                                <strong>TOTAL</strong>
+                            </td>
                             <td class="num" id="tblTotalRS">Rp 0</td>
                             <td class="num" id="tblTotalCBG">Rp 0</td>
                             <td class="num" id="tblTotalSelisih">Rp 0</td>
@@ -296,7 +276,7 @@ function getTable() {
                     extend: 'excelHtml5',
                     text: '<i class="fas fa-file-excel me-1"></i>Export Excel',
                     className: 'btn btn-success btn-sm',
-                    title: 'Rekap_Monitoring_Klaim_Ranap',
+                    title: 'Rekap_Monitoring_Klaim_Ralan',
                     footer: true,
                     exportOptions: { columns: ':visible' }
                 },
@@ -316,7 +296,7 @@ function getTable() {
             autoWidth: false,
             columnDefs: [
                 { orderable: false, targets: [0] },
-                { className: 'num', targets: [14, 15, 16] }
+                { className: 'num', targets: [12, 13, 14] }
             ]
         });
     }
@@ -324,7 +304,7 @@ function getTable() {
 }
 
 // ── Populate Table ────────────────────────────────────────────────────────────
-function populateTable(data, respSummary) {
+function populateTable(data) {
     const table = getTable();
     table.clear();
 
@@ -348,12 +328,9 @@ function populateTable(data, respSummary) {
             escHtml(r.no_sep) ? escHtml(r.no_sep) : '–',
             escHtml(r.no_rkm_medis),
             escHtml(r.nm_pasien),
-            escHtml(r.dpjp),
+            escHtml(r.kd_dokter_jaga),
             escHtml(r.png_jawab),
-            escHtml(r.waktu_masuk),
-            escHtml(r.waktu_keluar),
-            r.los,
-            escHtml(r.stts_pulang),
+            escHtml(r.tgl_registrasi),
             r.du  ? '<span class="badge-dx text-info">' + escHtml(r.du) + '</span>'  : '–',
             r.ds1 ? '<span class="badge-dx text-info">' + escHtml(r.ds1) + '</span>' : '–',
             r.p1  ? '<span class="badge-dx text-info">' + escHtml(r.p1) + '</span>'  : '–',
@@ -365,7 +342,6 @@ function populateTable(data, respSummary) {
     });
 
     table.draw();
-    updateFooter(respSummary);
 }
 
 function updateFooter(summary) {
@@ -382,7 +358,6 @@ function updateStats(summary, tgl_awal, tgl_akhir) {
     $('#stSelisih').text(fmtRp(summary.total_selisih));
     updateFooter(summary);
 
-    // warnai card selisih
     const sc = document.getElementById('stCardSelisih');
     sc.className = 'card shadow-sm stat-card ' + (summary.total_selisih >= 0 ? 'c-green' : 'c-red');
 
@@ -395,9 +370,7 @@ function loadData() {
     const params = {
         tgl_awal    : $('#tgl_awal').val(),
         tgl_akhir   : $('#tgl_akhir').val(),
-        kd_pj       : $('#kd_pj').val(),
-        kelas_rawat : $('#kelas_rawat').val(),
-        stts_pulang : $('#stts_pulang').val()
+        kd_pj       : $('#kd_pj').val()
     };
 
     $('#loadingArea').addClass('show');
@@ -406,7 +379,7 @@ function loadData() {
     $('.alert').remove();
 
     $.ajax({
-        url      : 'api/data_monitoring_klaim.php',
+        url      : 'api/data_monitoring_klaim_ralan.php',
         type     : 'GET',
         dataType : 'json',
         data     : params,
@@ -421,7 +394,7 @@ function loadData() {
                 updateFooter({ total_biaya_rs: 0, total_tarif_cbg: 0, total_selisih: 0 });
                 return;
             }
-            populateTable(resp.data, resp.summary);
+            populateTable(resp.data);
             updateStats(resp.summary, params.tgl_awal, params.tgl_akhir);
             $('#tableSection').show();
         },
@@ -460,8 +433,6 @@ $(document).ready(function() {
         const d   = String(now.getDate()).padStart(2, '0');
         $('#tgl_awal').val(y + '-' + m + '-01');
         $('#tgl_akhir').val(y + '-' + m + '-' + d);
-        $('#kelas_rawat').val('');
-        $('#stts_pulang').val('');
         $('#statGrid').hide();
         $('#tableSection').hide();
     });

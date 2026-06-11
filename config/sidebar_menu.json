@@ -205,8 +205,42 @@
             },
             {
                 "url": "laporan_monitoring_klaim.php",
-                "title": "Monitoring Klaim",
+                "title": "Monitoring Klaim Ranap",
                 "icon": "fas fa-file-alt",
+                "is_active": true
+            },
+            {
+                "url": "laporan_monitoring_klaim_ralan.php",
+                "title": "Monitoring Klaim Ralan",
+                "icon": "fas fa-file-medical-alt",
+                "is_active": true
+            }
+        ]
+    },
+    {
+        "id": "grp_kelola_rm",
+        "is_group": true,
+        "title": "KELOLA DATA RM",
+        "is_active": true,
+        "items": [
+            {
+                "url": "kelola_data_rm.php",
+                "title": "Laporan RL",
+                "icon": "fas fa-file-alt",
+                "is_active": true
+            }
+        ]
+    },
+    {
+        "id": "grp_patient_engage",
+        "is_group": true,
+        "title": "Patient Engagement",
+        "is_active": true,
+        "items": [
+            {
+                "url": "laporan_ulang_tahun.php",
+                "title": "Ucapan Ulang Tahun",
+                "icon": "fas fa-birthday-cake",
                 "is_active": true
             }
         ]

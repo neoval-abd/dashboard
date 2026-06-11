@@ -3,9 +3,14 @@
  * api_bpjs_taskid.php
  * Endpoint AJAX: Ambil list task dari server BPJS langsung (live).
  * Signature mengikuti standar resmi BPJS MobileJKN (sama dengan Java).
+ * 
+ * v2: Task ID yang berhasil diambil otomatis disimpan ke tabel lokal
+ *     referensi_mobilejkn_bpjs_taskid (agar local_TID_3..7 terisi).
  */
-session_start();
-require_once 'config/koneksi.php';
+
+// auth_guard.php (auto-prepend) sudah load koneksi.php + cek session.
+// require_once di bawah hanya fallback jika dipanggil tanpa prepend.
+require_once dirname(__DIR__) . '/config/koneksi.php';
 
 header('Content-Type: application/json');
 
@@ -150,6 +155,61 @@ function getListTask(string $kodeBooking, string $baseUrl, string $consId, strin
 }
 
 // ============================================================
+// Simpan Task ID ke database lokal (referensi_mobilejkn_bpjs_taskid)
+// Sama seperti BPJSTaskIDMobileJKN.java di SIMRS Khanza:
+//   - waktu dari BPJS = Unix milidetik → konversi ke DATETIME MySQL
+//   - INSERT ... ON DUPLICATE KEY UPDATE agar idempotent
+// ============================================================
+function saveTasksToLocalDB($conn, string $noRawat, array $tasks): array {
+    $saved  = 0;
+    $errors = [];
+
+    // Validasi koneksi MySQLi
+    if (!($conn instanceof mysqli)) {
+        return ['saved' => 0, 'errors' => ['Invalid DB connection']];
+    }
+
+    // Hanya simpan taskid 3-7 (sesuai kolom di laporan antrol)
+    $validTaskIds = ['3', '4', '5', '6', '7'];
+
+    foreach ($tasks as $task) {
+        $taskId = (string)($task['taskid'] ?? '');
+        if (!in_array($taskId, $validTaskIds)) continue;
+
+        // Konversi waktu dari Unix milidetik → MySQL DATETIME
+        $waktuRaw = $task['waktu'] ?? '';
+        $waktuMs  = is_numeric($waktuRaw) ? (int)$waktuRaw : 0;
+        if ($waktuMs <= 0) continue;
+
+        // BPJS kirim dalam milidetik, PHP date() butuh detik
+        $waktuDt = date('Y-m-d H:i:s', (int)($waktuMs / 1000));
+
+        try {
+            $sql = "INSERT INTO referensi_mobilejkn_bpjs_taskid (no_rawat, taskid, waktu) 
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE waktu = VALUES(waktu)";
+
+            $stmt = @$conn->prepare($sql);
+            if (!$stmt) {
+                $errors[] = "Prepare (taskid=$taskId): " . $conn->error;
+                continue;
+            }
+            $stmt->bind_param("sss", $noRawat, $taskId, $waktuDt);
+            if ($stmt->execute()) {
+                $saved++;
+            } else {
+                $errors[] = "Execute (taskid=$taskId): " . $stmt->error;
+            }
+            $stmt->close();
+        } catch (\Throwable $e) {
+            $errors[] = "Exception (taskid=$taskId): " . $e->getMessage();
+        }
+    }
+
+    return ['saved' => $saved, 'errors' => $errors];
+}
+
+// ============================================================
 // Eksekusi: coba no_rawat dulu, fallback ke nobooking MJKN
 // ============================================================
 $result = getListTask($no_rawat, $BASE_URL, $CONS_ID, $USER_KEY, $SECRET);
@@ -158,6 +218,26 @@ if ((!$result['success'] || empty($result['tasks'])) && !empty($nobooking)) {
     $result2 = getListTask($nobooking, $BASE_URL, $CONS_ID, $USER_KEY, $SECRET);
     if (!empty($result2['tasks'])) {
         $result = $result2;
+    }
+}
+
+// ============================================================
+// Simpan ke database lokal jika berhasil ambil task dari BPJS
+// Dibungkus try-catch + ob agar JSON response SELALU bersih
+// meskipun terjadi error di sisi DB (misal tabel belum ada).
+// ============================================================
+if ($result['success'] && !empty($result['tasks'])) {
+    ob_start();
+    try {
+        $saveResult = saveTasksToLocalDB($koneksi, $no_rawat, $result['tasks']);
+        $result['db_save'] = $saveResult;
+    } catch (\Throwable $e) {
+        $result['db_save'] = ['saved' => 0, 'errors' => [$e->getMessage()]];
+    }
+    // Buang output liar (PHP warning/notice yang bocor)
+    $stray = ob_get_clean();
+    if (!empty($stray)) {
+        error_log('[api_bpjs_taskid] Stray output caught: ' . substr($stray, 0, 200));
     }
 }
 
