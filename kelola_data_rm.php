@@ -314,6 +314,7 @@ require_once('includes/header.php');
 
         <!-- RL 3.13 - Kesehatan Rujukan -->
         <div class="col-xl-3 col-md-6 mb-4">
+            <a href="laporan_rujukan.php" class="text-decoration-none">
             <div class="card shadow rl-card rv-kegiatan">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
@@ -324,9 +325,10 @@ require_once('includes/header.php');
                         </div>
                     </div>
                     <p class="small mb-2">Data rujukan masuk dan keluar antar fasilitas kesehatan.</p>
-                    <span class="badge-coming"><i class="fas fa-clock me-1"></i>Segera hadir</span>
+                    <span class="badge bg-success"><i class="fas fa-check me-1"></i>Tersedia</span>
                 </div>
             </div>
+            </a>
         </div>
 
         <!-- RL 3.14 - Laboratorium -->

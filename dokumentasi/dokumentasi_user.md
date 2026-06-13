@@ -148,6 +148,4 @@ Buat bang admin IT yang baru pasang:
 ---
 
 *Tertanda,*
-*Ichsan Leonhart (Developer & Teman Curhat Sistem)*
-
 > *"Data itu kayak perasaan, kalo gak dirawat bisa ilang pelan-pelan."*

@@ -188,6 +188,12 @@
                 "title": "Dead Stock Obat",
                 "icon": "fas fa-skull-crossbones",
                 "is_active": true
+            },
+            {
+                "url": "laporan_ringkasan_obat.php",
+                "title": "Ringkasan Penerimaan Obat",
+                "icon": "fas fa-boxes",
+                "is_active": true
             }
         ]
     },
@@ -227,6 +233,12 @@
                 "url": "kelola_data_rm.php",
                 "title": "Laporan RL",
                 "icon": "fas fa-file-alt",
+                "is_active": true
+            },
+            {
+                "url": "laporan_rujukan.php",
+                "title": "Rujukan (RL 3.13)",
+                "icon": "fas fa-exchange-alt",
                 "is_active": true
             }
         ]

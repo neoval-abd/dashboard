@@ -7,7 +7,7 @@
     <a href="#" class="dev-credit-brand text-decoration-none" data-bs-toggle="modal" data-bs-target="#devMessageModal" title="Pesan dari Developer">
         <img class="dev-avatar" src="assets/images/logo.png" alt="Developer Foto" style="object-fit: cover;">
         <div>            
-            <div class="dev-name">RSU ADELLA</div>
+            <div class="dev-name">IT RSU ADELLA</div>
             <div class="dev-role">Developer &amp; Designer <i class="fas fa-info-circle ms-1 small"></i></div>
         </div>
     </a>
@@ -46,7 +46,7 @@
            class="dev-link-btn dev-link-tg"
            title="Hubungi via Telegram: @IchsanLeonhart">
             <i class="fab fa-telegram"></i>
-            <span>@RSU ADELLA</span>
+            <span>@IT RSU ADELLA</span>
         </a>
 
     </div>
@@ -182,27 +182,27 @@ if (isset($page_js)) {
       </div>
       <div class="modal-body p-4">
         <div class="text-center mb-4">
-            <img src="https://raw.githubusercontent.com/ichsanleonhart/add-ons_webapps_khanza/main/ichsan.jpg" alt="Ichsan Leonhart" class="rounded-circle shadow" style="width: 80px; height: 80px; border: 4px solid #fff; object-fit: cover;">
-            <h6 class="mt-3 fw-bold mb-0">Ichsan Leonhart</h6>
+            <img src="assets/images/logo.png" alt="IT RSU Adella" class="rounded-circle shadow" style="width: 80px; height: 80px; border: 4px solid #fff; object-fit: cover;">
+            <h6 class="mt-3 fw-bold mb-0">IT RSU Adella</h6>
         </div>
         
         <p class="small mb-3" style="text-align: justify;">
             <strong>Salam hormat,</strong><br><br>
-            Saya sangat bersyukur aplikasi <strong>Dashboard Eksekutif</strong> ini dapat membantu mempermudah pimpinan dan manajemen dalam pengambilan keputusan strategis di Rumah Sakit Anda. Setiap baris kode, animasi, dan lapisan keamanan dalam sistem ini saya tulis secara mandiri dengan dedikasi penuh di luar jam kerja utama, dengan komitmen menghadirkan kualitas setara standar <em>enterprise</em>.
+            Kami dari tim <strong>IT RSU Adella</strong> sangat bersyukur aplikasi <strong>Dashboard Eksekutif</strong> ini dapat membantu mempermudah pimpinan dan manajemen dalam pengambilan keputusan strategis di Rumah Sakit. Setiap baris kode, animasi, dan lapisan keamanan dalam sistem ini kami kembangkan dengan dedikasi penuh, dengan komitmen menghadirkan kualitas setara standar <em>enterprise</em>.
         </p>
 
         <p class="small mb-3" style="text-align: justify;">
-            Pengembangan sistem yang responsif, stabil, dan amat aman dari peretas membutuhkan investasi waktu berjam-jam riset dan tenaga ekstra. Apabila pemikiran di balik aplikasi ini memberikan dampak dan <em>value</em> nyata bagi kemajuan instansi Anda, saya dengan rendah hati sangat mengapresiasi segala bentuk <strong>dukungan atau kado donasi sukarela</strong>. 
+            Pengembangan sistem yang responsif, stabil, dan aman membutuhkan investasi waktu dan tenaga yang tidak sedikit. Apabila aplikasi ini memberikan dampak dan <em>value</em> nyata bagi kemajuan instansi, kami sangat mengapresiasi segala bentuk <strong>dukungan</strong> untuk kelangsungan inovasi ini.
         </p>
 
         <p class="small mb-4" style="text-align: justify;">
-            Dukungan pimpinan sangat berarti bagi kelangsungan inovasi ini — membantu saya menutupi biaya operasional infrastruktur <em>testing</em>, biaya kopi larut malam, dan yang terpenting, menyambung nafas semangat saya untuk terus berkarya di tengah berbagai keterbatasan.
+            Dukungan pimpinan sangat berarti bagi kami — membantu menutupi biaya operasional infrastruktur, serta menyambung semangat tim IT untuk terus berkarya di tengah berbagai keterbatasan.
         </p>
 
         <div class="alert alert-info py-2 px-3 mb-0 border-0" style="border-radius: 10px;">
             <h6 class="fw-bold mb-1 border-bottom border-info pb-2 text-primary" style="font-size: 0.85rem;"><i class="fas fa-lightbulb me-2"></i>Diskusi Fitur Khusus (Custom Request)</h6>
             <p class="small mb-2 mt-2" style="font-size: 0.75rem;">
-                Apakah RS / Instansi Anda membutuhkan modul tambahan yang belum ada di versi ini? Misalnya <em>Custom Report</em> spesifik, penyesuaian logika tata kelola, atau interkoneksi Bridging lainnya? Hubungi saya via WA / Telegram untuk merancang kolaborasi pengembangan tingkat lanjut _(Freelance Project)_.
+                Apakah RS / Instansi membutuhkan modul tambahan yang belum ada di versi ini? Misalnya <em>Custom Report</em> spesifik, penyesuaian logika tata kelola, atau interkoneksi Bridging lainnya? Hubungi tim IT via WA / Telegram untuk merancang kolaborasi pengembangan tingkat lanjut.
             </p>
             <div class="d-flex gap-2 mb-1 mt-2">
                 <a href="https://wa.me/6285726123777" target="_blank" class="btn btn-sm btn-success d-inline-flex align-items-center" style="border-radius: 12px; font-size: 0.75rem; border:none;"><i class="fab fa-whatsapp me-2"></i>WhatsApp</a>

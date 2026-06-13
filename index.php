@@ -4,7 +4,6 @@
  * - TAMBAHAN: Generate CSRF Token (sekali per load halaman)
  * - TAMBAHAN: Tampilkan pesan lockout dengan countdown jika brute-force terdeteksi
  * - TAMBAHAN: Tampilkan sisa percobaan login
- * - Credit footer Ichsan Leonhart (diperlukan agar terlihat bahkan di halaman login)
  */
 
 // Require koneksi.php untuk session dan nama instansi
@@ -270,10 +269,10 @@ if (isset($koneksi)) {
 
     <!-- Credit Footer Login -->
     <div class="login-credit">
-        Dikembangkan oleh <a href="https://saweria.co/ichsanleonhart" target="_blank" rel="noopener">IT RSU ADELLA SLAWI</a><br>
-        <a href="https://wa.me/6285726123777" target="_blank" rel="noopener"><i class="fab fa-whatsapp me-1"></i>6285726123777</a>
+        Dikembangkan oleh <a href="https://saweria.co/" target="_blank" rel="noopener">IT RSU ADELLA SLAWI</a><br>
+        <a href="https://wa.me/085959420216" target="_blank" rel="noopener"><i class="fab fa-whatsapp me-1"></i>085959420216</a>
         &nbsp;|&nbsp;
-        <a href="https://t.me/IchsanLeonhart" target="_blank" rel="noopener"><i class="fab fa-telegram me-1"></i>@IchsanLeonhart</a>
+        <a href="https://t.me/RsuAdellaSlawi" target="_blank" rel="noopener"><i class="fab fa-telegram me-1"></i>@RsuAdellaSlawi</a>
     </div>
 </div>
 

@@ -17,11 +17,11 @@ function sanitize_output_buffer($buffer) {
     // (Sekali di Bar Footer, sekali di Modal Developer)
     // Jika salah satu dicurangi/dihapus/dirubah → return "" (BLANK PAGE)
     $signatures = [
-        base64_decode('SWNoc2FuIExlb25oYXJ0'),                    // Ichsan Leonhart (Nama)
-        base64_decode('c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA=='),   // saweria.co/ichsanleonhart
-        base64_decode('NjI4NTcyNjEyMzc3Nw=='),                    // 6285726123777 (WA)
-        base64_decode('QEljaHNhbkxlb25oYXJ0'),                    // @IchsanLeonhart (Telegram)
-        base64_decode('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ljaHNhbmxlb25oYXJ0L2FkZC1vbnNfd2ViYXBwc19raGFuemEvbWFpbi9xcmlzLWljaHNhbi5wbmc='), // QRIS URL
+        base64_decode('SWNoc2FuIExlb25oYXJ0'),                   
+        base64_decode('c2F3ZXJpYS5jby9pY2hzYW5sZW9uaGFydA=='),   
+        base64_decode('NjI4NTcyNjEyMzc3Nw=='),                   
+        base64_decode('QEljaHNhbkxlb25oYXJ0'),                   
+        base64_decode('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ljaHNhbmxlb25oYXJ0L2FkZC1vbnNfd2ViYXBwc19raGFuemEvbWFpbi9xcmlzLWljaHNhbi5wbmc='), 
     ];
 
     foreach ($signatures as $sig) {

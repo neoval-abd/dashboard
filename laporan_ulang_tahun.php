@@ -26,7 +26,9 @@ WHERE MONTH(p.tgl_lahir) = ?
 ORDER BY p.nm_pasien ASC";
 
 $five_years_ago = date('Y-m-d', strtotime('-5 years'));
+$one_year_ago  = date('Y-m-d', strtotime('-1 year'));
 $active_count = 0;
+$one_year_count = 0;
 
 $birthday_patients = [];
 if ($stmt = $koneksi->prepare($sql)) {
@@ -34,8 +36,10 @@ if ($stmt = $koneksi->prepare($sql)) {
     if ($stmt->execute()) {
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
-            $row['is_active'] = (!empty($row['last_visit']) && $row['last_visit'] >= $five_years_ago) ? 1 : 0;
-            if ($row['is_active']) $active_count++;
+            $row['is_active']    = (!empty($row['last_visit']) && $row['last_visit'] >= $five_years_ago) ? 1 : 0;
+            $row['is_active_1y'] = (!empty($row['last_visit']) && $row['last_visit'] >= $one_year_ago) ? 1 : 0;
+            if ($row['is_active'])    $active_count++;
+            if ($row['is_active_1y']) $one_year_count++;
             $birthday_patients[] = $row;
         }
     }
@@ -218,8 +222,11 @@ $total = count($birthday_patients);
 <!-- Filter Bar -->
 <div class="filter-bar mb-4">
     <span class="fw-bold text-muted"><i class="fas fa-filter me-1"></i> Filter:</span>
+    <button class="filter-btn" data-filter="1y" id="btnFilter1y">
+        <i class="fas fa-hourglass-half me-1"></i> 1 Tahun Terakhir <span class="badge bg-light text-dark ms-1"><?php echo $one_year_count; ?></span>
+    </button>
     <button class="filter-btn active" data-filter="active" id="btnFilterActive">
-        <i class="fas fa-clock me-1"></i> Kunjungan 5 Tahun Terakhir <span class="badge bg-light text-dark ms-1"><?php echo $active_count; ?></span>
+        <i class="fas fa-clock me-1"></i> 5 Tahun Terakhir <span class="badge bg-light text-dark ms-1"><?php echo $active_count; ?></span>
     </button>
     <button class="filter-btn" data-filter="all" id="btnFilterAll">
         <i class="fas fa-list me-1"></i> Semua Pasien <span class="badge bg-light text-dark ms-1"><?php echo $total; ?></span>
@@ -259,7 +266,7 @@ $total = count($birthday_patients);
                 $nm = htmlspecialchars($p['nm_pasien']);
                 $tgl = !empty($p['tgl_lahir']) ? date('d-m-Y', strtotime($p['tgl_lahir'])) : '-';
             ?>
-            <div class="col-lg-4 col-md-6 bday-col" data-active="<?php echo $p['is_active']; ?>" data-name="<?php echo strtolower($p['nm_pasien']); ?>">
+            <div class="col-lg-4 col-md-6 bday-col" data-active="<?php echo $p['is_active']; ?>" data-active-1y="<?php echo $p['is_active_1y']; ?>" data-name="<?php echo strtolower($p['nm_pasien']); ?>">
                 <div class="bday-card" data-idx="<?php echo $i; ?>">
                     <div class="bday-header">
                         <div class="bday-avatar">
@@ -273,7 +280,7 @@ $total = count($birthday_patients);
                     <div class="bday-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="bday-age-badge"><i class="fas fa-star me-1"></i> Usia ke-<?php echo $usia; ?></span>
-                            <small class="text-muted"><i class="fas fa-calendar me-1"></i> <?php echo $tgl; ?></small>
+                            <small class="text-muted fs-6"><i class="fas fa-calendar me-1"></i> <?php echo $tgl; ?></small>
                         </div>
                         <div class="bday-info mt-2">
                             <div><span class="label"><i class="fas fa-phone me-1"></i> No. HP</span>: 
@@ -351,6 +358,7 @@ $total = count($birthday_patients);
 $(document).ready(function() {
     const TOTAL = <?php echo $total; ?>;
     const ACTIVE_COUNT = <?php echo $active_count; ?>;
+    const ONE_YEAR_COUNT = <?php echo $one_year_count; ?>;
     let currentFilter = 'active'; // default: 5 tahun terakhir
     let sentCount = 0;
 
@@ -368,10 +376,12 @@ $(document).ready(function() {
 
         $('.bday-col').each(function() {
             const isActive = $(this).data('active');
+            const isActive1y = $(this).data('active-1y');
             const name = $(this).data('name') || '';
             const nameMatch = !q || name.indexOf(q) !== -1;
             let show = nameMatch;
             if (filter === 'active') show = show && (isActive == 1);
+            if (filter === '1y')     show = show && (isActive1y == 1);
 
             if (show) {
                 $(this).removeClass('hidden-card');
@@ -387,6 +397,12 @@ $(document).ready(function() {
     // Filter button clicks
     $('#btnFilterActive').on('click', function() {
         currentFilter = 'active';
+        $('.filter-btn').removeClass('active');
+        $(this).addClass('active');
+        applyFilterAndSearch();
+    });
+    $('#btnFilter1y').on('click', function() {
+        currentFilter = '1y';
         $('.filter-btn').removeClass('active');
         $(this).addClass('active');
         applyFilterAndSearch();
