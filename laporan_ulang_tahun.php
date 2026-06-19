@@ -81,6 +81,7 @@ $total = count($birthday_patients);
     .bday-body { padding: 18px 20px; }
     .bday-info { font-size: 0.85rem; color: #555; }
     .bday-info .label { font-weight: 600; color: #333; min-width: 90px; display: inline-block; }
+        .bday-date { color: #6c757d; font-size: 0.875rem; }
     .bday-age-badge {
         display: inline-block;
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -280,7 +281,7 @@ $total = count($birthday_patients);
                     <div class="bday-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="bday-age-badge"><i class="fas fa-star me-1"></i> Usia ke-<?php echo $usia; ?></span>
-                            <small class="text-muted fs-6"><i class="fas fa-calendar me-1"></i> <?php echo $tgl; ?></small>
+                            <small class="bday-date fs-6"><i class="fas fa-calendar me-1"></i> <?php echo $tgl; ?></small>
                         </div>
                         <div class="bday-info mt-2">
                             <div><span class="label"><i class="fas fa-phone me-1"></i> No. HP</span>: 
@@ -345,7 +346,7 @@ $total = count($birthday_patients);
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <a id="btnSendWA" href="#" target="_blank" class="btn-wa text-decoration-none" style="padding:10px 24px;">
+                <a id="btnSendWA" href="#" class="btn-wa text-decoration-none" style="padding:10px 24px;" role="button">
                     <i class="fab fa-whatsapp me-1"></i> Buka WhatsApp
                 </a>
             </div>
@@ -361,6 +362,27 @@ $(document).ready(function() {
     const ONE_YEAR_COUNT = <?php echo $one_year_count; ?>;
     let currentFilter = 'active'; // default: 5 tahun terakhir
     let sentCount = 0;
+
+    // Load sent status from DB on page load
+    function loadSentStatus() {
+        $.getJSON('api/ucapan_ulang_tahun.php', function(res) {
+            const sentList = res.sent || [];
+            const sentRMs = sentList.map(s => s.no_rkm_medis);
+            
+            // Mark buttons as sent for those in DB
+            $('.btn-send-wa').each(function() {
+                const rm = $(this).data('rm');
+                if (sentRMs.includes(String(rm))) {
+                    $(this).html('<i class="fas fa-check"></i> Terkirim')
+                           .prop('disabled', true)
+                           .css({background: '#6c757d', cursor: 'default'});
+                    sentCount++;
+                }
+            });
+            $('#sentCount').text(sentCount);
+        });
+    }
+    loadSentStatus();
 
     // Count visible phone buttons
     function updatePhoneCount() {
@@ -439,8 +461,8 @@ $(document).ready(function() {
         $('#msgRecipient').html(`<strong>${name}</strong> <span class="text-muted">(${rm})</span> <i class="fab fa-whatsapp text-success ms-1"></i> ${phone}`);
         $('#msgText').val(getDefaultMsg(name, age));
         
-        // Store phone for send button
-        $('#btnSendWA').data('phone', phone).data('card-btn', this);
+        // Store phone and rm for send button
+        $('#btnSendWA').data('phone', phone).data('card-btn', this).data('rm', rm);
         
         new bootstrap.Modal(document.getElementById('msgModal')).show();
     });
@@ -452,11 +474,27 @@ $(document).ready(function() {
         alert(getDefaultMsg(name, age));
     });
 
-    // Update WA link when sending
+    // Store WA window reference to reuse same tab
+    let waWindow = null;
+
+    // Update WA link when sending — reuse same tab
     $('#btnSendWA').on('click', function(e) {
+        e.preventDefault();
         const phone = $(this).data('phone');
+        const rm    = $(this).data('rm');
         const msg   = encodeURIComponent($('#msgText').val());
-        $(this).attr('href', `https://wa.me/${phone}?text=${msg}`);
+        const url   = `https://web.whatsapp.com/send?phone=${phone}&text=${msg}`;
+        
+        // First send: open new window; subsequent sends: navigate same window
+        if (!waWindow || waWindow.closed) {
+            waWindow = window.open(url, 'whatsapp_bday');
+        } else {
+            waWindow.location.href = url;
+            waWindow.focus();
+        }
+        
+        // Close the modal
+        bootstrap.Modal.getInstance(document.getElementById('msgModal'))?.hide();
         
         // Mark card as sent
         const cardBtn = $(this).data('card-btn');
@@ -466,6 +504,9 @@ $(document).ready(function() {
             sentCount++;
             $('#sentCount').text(sentCount);
         }
+        
+        // Save to DB
+        $.post('api/ucapan_ulang_tahun.php', { no_rkm_medis: rm, pengirim: '' });
     });
 });
 </script>
