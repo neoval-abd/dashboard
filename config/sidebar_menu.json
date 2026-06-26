@@ -254,6 +254,12 @@
                 "title": "Ucapan Ulang Tahun",
                 "icon": "fas fa-birthday-cake",
                 "is_active": true
+            },
+            {
+                "url": "laporan_reminder_kontrol.php",
+                "title": "Reminder Kontrol",
+                "icon": "fas fa-calendar-check",
+                "is_active": true
             }
         ]
     }
