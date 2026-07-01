@@ -248,6 +248,12 @@
                 "is_active": true
             },
             {
+                "url": "laporan_rl38_lab.php",
+                "title": "Lab (RL 3.8)",
+                "icon": "fas fa-flask",
+                "is_active": true
+            },
+            {
                 "url": "laporan_data_bbl.php",
                 "title": "Data BBL",
                 "icon": "fas fa-baby",

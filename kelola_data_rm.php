@@ -229,21 +229,23 @@ require_once('includes/header.php');
             </div>
         </div>
 
-        <!-- RL 3.8 - Kesehatan Gigi -->
+        <!-- RL 3.8 - Laboratorium -->
         <div class="col-xl-3 col-md-6 mb-4">
+            <a href="laporan_rl38_lab.php" class="text-decoration-none">
             <div class="card shadow rl-card rv-khusus">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <div class="rl-icon bg-khusus me-3"><i class="fas fa-tooth"></i></div>
+                        <div class="rl-icon bg-khusus me-3"><i class="fas fa-flask"></i></div>
                         <div>
                             <h6 class="mb-0 fw-bold">RL 3.8</h6>
-                            <small class="text-muted">Kesehatan Gigi</small>
+                            <small class="text-muted">Rekapitulasi Kegiatan Pelayanan Laboratorium</small>
                         </div>
                     </div>
-                    <p class="small mb-2">Data pelayanan kesehatan gigi dan mulut yang dilakukan di RS.</p>
-                    <span class="badge-coming"><i class="fas fa-clock me-1"></i>Segera hadir</span>
+                    <p class="small mb-2">Data pelayanan laboratorium per jenis pemeriksaan</p>
+                    <span class="badge bg-success"><i class="fas fa-check me-1"></i>Tersedia</span>
                 </div>
             </div>
+            </a>
         </div>
 
         <!-- RL 3.9 - Kesehatan Kerja -->
