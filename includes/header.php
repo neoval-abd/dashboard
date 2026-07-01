@@ -102,6 +102,9 @@ function get_arrow_class($pages, $current) {
             --sidebar-bg: #f8f9fa;
             --primary-color: #0d6efd;
             --credit-bar-height: 46px; /* Tinggi credit bar bawah */
+            --sidebar-scroll-thumb: rgba(108, 117, 125, 0.35);
+            --sidebar-scroll-thumb-hover: rgba(13, 110, 253, 0.65);
+            --sidebar-scroll-track: transparent;
         }
 
         body {
@@ -154,6 +157,8 @@ function get_arrow_class($pages, $current) {
             --input-border: #475569;
             --primary-light: #38bdf8;
             --modal-bg: #1e293b;
+            --sidebar-scroll-thumb: rgba(203, 213, 225, 0.26);
+            --sidebar-scroll-thumb-hover: rgba(56, 189, 248, 0.62);
         }
 
         /* Apply Overrides & Blur Effects */
@@ -399,6 +404,28 @@ function get_arrow_class($pages, $current) {
             border-right: 1px solid #dee2e6;
             transition: transform var(--transition-speed) ease-in-out;
             overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: var(--sidebar-scroll-thumb) var(--sidebar-scroll-track);
+            scrollbar-gutter: stable;
+        }
+        .sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: var(--sidebar-scroll-track);
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background-color: var(--sidebar-scroll-thumb);
+            border: 2px solid transparent;
+            border-radius: 999px;
+            background-clip: padding-box;
+        }
+        .sidebar:hover::-webkit-scrollbar-thumb {
+            background-color: var(--sidebar-scroll-thumb-hover);
+        }
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background-color: var(--sidebar-scroll-thumb-hover);
         }
 
         /* --- MAIN CONTENT (DYNAMIC WIDTH) --- */

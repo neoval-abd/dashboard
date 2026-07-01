@@ -191,7 +191,7 @@
             },
             {
                 "url": "laporan_ringkasan_obat.php",
-                "title": "Ringkasan Penerimaan Obat",
+                "title": "Penerimaan Obat",
                 "icon": "fas fa-boxes",
                 "is_active": true
             }
@@ -239,6 +239,18 @@
                 "url": "laporan_rujukan.php",
                 "title": "Rujukan (RL 3.13)",
                 "icon": "fas fa-exchange-alt",
+                "is_active": true
+            },
+            {
+                "url": "laporan_triase_igd.php",
+                "title": "Triase IGD (RL 3.3)",
+                "icon": "fas fa-heartbeat",
+                "is_active": true
+            },
+            {
+                "url": "laporan_data_bbl.php",
+                "title": "Data BBL",
+                "icon": "fas fa-baby",
                 "is_active": true
             }
         ]

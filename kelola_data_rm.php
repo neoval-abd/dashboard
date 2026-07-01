@@ -142,21 +142,23 @@ require_once('includes/header.php');
             </div>
         </div>
 
-        <!-- RL 3.3 - Penyakit Tidak Menular -->
+        <!-- RL 3.3 - Kegiatan Pelayanan Rawat Darurat -->
         <div class="col-xl-3 col-md-6 mb-4">
+            <a href="laporan_triase_igd.php" class="text-decoration-none">
             <div class="card shadow rl-card rv-khusus">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
                         <div class="rl-icon bg-khusus me-3"><i class="fas fa-heartbeat"></i></div>
                         <div>
                             <h6 class="mb-0 fw-bold">RL 3.3</h6>
-                            <small class="text-muted">Penyakit Tidak Menular</small>
+                            <small class="text-muted">Kegiatan Pelayanan Rawat Darurat</small>
                         </div>
                     </div>
-                    <p class="small mb-2">Laporan penyakit tidak menular (diabetes, hipertensi, stroke, kanker, dll).</p>
-                    <span class="badge-coming"><i class="fas fa-clock me-1"></i>Segera hadir</span>
+                    <p class="small mb-2">Formulir kunjungan rawat darurat dilaporkan bulanan dengan data bersumber dari Instalasi Gawat Darurat (IGD).</p>
+                    <span class="badge bg-success"><i class="fas fa-check me-1"></i>Tersedia</span>
                 </div>
             </div>
+            </a>
         </div>
 
         <!-- RL 3.4 - Kesehatan Jiwa -->
