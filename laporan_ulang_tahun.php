@@ -483,7 +483,7 @@ $(document).ready(function() {
         const phone = $(this).data('phone');
         const rm    = $(this).data('rm');
         const msg   = encodeURIComponent($('#msgText').val());
-        const url   = `https://web.whatsapp.com/send?phone=${phone}&text=${msg}`;
+        const url   = `whatsapp://send?phone=${phone}&text=${msg}`;
         
         // First send: open new window; subsequent sends: navigate same window
         if (!waWindow || waWindow.closed) {

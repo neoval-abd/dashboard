@@ -467,11 +467,50 @@ $(document).ready(function() {
         applyFilterAndSearch();
     });
 
+    function markCardAsSent(cardBtn) {
+        if (!cardBtn) return;
+
+        const $btn = $(cardBtn);
+        const $col = $btn.closest('.kontrol-col');
+        const wasSent = String($col.attr('data-sent') || $col.data('sent') || '0') === '1';
+
+        $btn.html('<i class="fas fa-check"></i> Terkirim')
+            .prop('disabled', true)
+            .css({background: '#6c757d', cursor: 'default'});
+        $col.attr('data-sent', 1).data('sent', 1);
+
+        if (!wasSent) {
+            sentCount++;
+            pendingCount = Math.max(0, pendingCount - 1);
+            $('#sentCount').text(sentCount);
+            $('#pendingCount').text(pendingCount);
+            $('#badgeSent').text(sentCount);
+            $('#badgePending').text(pendingCount);
+        }
+
+        applyFilterAndSearch();
+    }
+
+    function loadSentStatus() {
+        $.getJSON('api/reminder_kontrol.php', function(res) {
+            const sentList = res.sent || [];
+            const sentSeps = sentList.map(item => String(item.no_sep || ''));
+
+            $('.btn-send-wa').each(function() {
+                const noSep = String($(this).data('no-sep') || '');
+                if (sentSeps.includes(noSep)) {
+                    markCardAsSent(this);
+                }
+            });
+        });
+    }
+
     applyFilterAndSearch();
+    loadSentStatus();
 
     // Default message template
     function getDefaultMsg(name, poli, dokter, tanggal) {
-        return `Yth. Bapak/Ibu *${name}*,\n\nKami mengingatkan bahwa Anda memiliki jadwal *KONTROL* pada hari ini, ${tanggal} di Poli ${poli} dengan dokter ${dokter}.\n\nMohon untuk datang sesuai jadwal yang telah ditentukan. Apabila ada pertanyaan atau perubahan jadwal, silakan hubungi kami.\n\nTerima kasih.\n\nSalam hangat,\nRSU Adella Slawi`;
+        return `Yth. Bapak/Ibu *${name}*,\n\nKami mengingatkan bahwa Anda memiliki jadwal *KONTROL* pada tanggal, ${tanggal} di Poli ${poli} dengan dokter ${dokter}.\n\nMohon untuk datang sesuai jadwal yang telah ditentukan. Apabila ada pertanyaan atau perubahan jadwal, silakan hubungi kami.\n\nTerima kasih.\n\nSalam hangat,\nRSU Adella Slawi`;
     }
 
     // Open message editor modal
@@ -511,40 +550,31 @@ $(document).ready(function() {
         const nomr  = $(this).data('nomr');
         const name  = $(this).data('name');
         const msg   = encodeURIComponent($('#msgText').val());
-        const url   = `https://web.whatsapp.com/send?phone=${phone}&text=${msg}`;
+        const url   = `whatsapp://send?phone=${phone}&text=${msg}`;
 
-        if (!waWindow || waWindow.closed) {
-            waWindow = window.open(url, 'whatsapp_kontrol');
-        } else {
-            waWindow.location.href = url;
-            waWindow.focus();
-        }
-
-        bootstrap.Modal.getInstance(document.getElementById('msgModal'))?.hide();
-
-        // Mark card as sent
         const cardBtn = $(this).data('card-btn');
-        if (cardBtn) {
-            $(cardBtn).html('<i class="fas fa-check"></i> Terkirim').prop('disabled', true)
-                .css({background: '#6c757d', cursor: 'default'});
-            $(cardBtn).closest('.kontrol-col').attr('data-sent', 1);
+        const $sendBtn = $(this);
+        $sendBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menyimpan...');
 
-            sentCount++; pendingCount--;
-            $('#sentCount').text(sentCount);
-            $('#pendingCount').text(pendingCount);
-            $('#badgeSent').text(sentCount);
-            $('#badgePending').text(pendingCount);
-
-            applyFilterAndSearch();
-        }
-
-        // Save to DB
         $.post('api/reminder_kontrol.php', { no_sep: noSep, nomr: nomr, nama_pasien: name, pengirim: '' }, function(res) {
             if (!res || res.success !== true) {
                 alert('Status reminder belum tersimpan ke database. Silakan coba lagi atau hubungi admin.');
+                return;
+            }
+
+            markCardAsSent(cardBtn);
+            bootstrap.Modal.getInstance(document.getElementById('msgModal'))?.hide();
+
+            if (!waWindow || waWindow.closed) {
+                waWindow = window.open(url, 'whatsapp_kontrol');
+            } else {
+                waWindow.location.href = url;
+                waWindow.focus();
             }
         }, 'json').fail(function() {
             alert('Status reminder belum tersimpan ke database. Silakan coba lagi atau hubungi admin.');
+        }).always(function() {
+            $sendBtn.prop('disabled', false).html('<i class="fab fa-whatsapp me-1"></i> Buka WhatsApp');
         });
     });
 });
