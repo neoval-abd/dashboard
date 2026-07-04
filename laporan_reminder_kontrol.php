@@ -3,12 +3,24 @@ $page_title = "Reminder Kontrol Pasien";
 require_once('includes/header.php');
 
 // ============================================================
-// Query: Pasien yang dijadwalkan KONTROL hari ini
-// Patokan utama: bridging_surat_kontrol_bpjs (tgl_rencana = hari ini)
+// Query: Pasien yang dijadwalkan KONTROL pada range tanggal pilihan user
+// Patokan utama: bridging_surat_kontrol_bpjs (tgl_rencana)
 // Data pelengkap (no RM, nama, jenis kelamin, no HP) diambil dari bridging_sep
 // via no_sep. Status terkirim dicek dari log_kirim_reminder_kontrol.
 // ============================================================
 $today = date('Y-m-d');
+$tgl_awal = $_GET['tgl_awal'] ?? $today;
+$tgl_akhir = $_GET['tgl_akhir'] ?? $today;
+
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $tgl_awal)) $tgl_awal = $today;
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $tgl_akhir)) $tgl_akhir = $tgl_awal;
+if (strtotime($tgl_awal) > strtotime($tgl_akhir)) {
+    [$tgl_awal, $tgl_akhir] = [$tgl_akhir, $tgl_awal];
+}
+
+$periode_label = ($tgl_awal === $tgl_akhir)
+    ? date('d F Y', strtotime($tgl_awal))
+    : date('d F Y', strtotime($tgl_awal)) . ' - ' . date('d F Y', strtotime($tgl_akhir));
 
 $sql = "SELECT 
     k.no_sep,
@@ -27,8 +39,12 @@ $sql = "SELECT
     l.tgl_kirim
 FROM bridging_surat_kontrol_bpjs k
 INNER JOIN bridging_sep s ON k.no_sep = s.no_sep
-LEFT JOIN log_kirim_reminder_kontrol l ON l.no_sep = k.no_sep
-WHERE k.tgl_rencana = ?
+LEFT JOIN (
+    SELECT no_sep, MAX(tgl_kirim) AS tgl_kirim
+    FROM log_kirim_reminder_kontrol
+    GROUP BY no_sep
+) l ON l.no_sep = k.no_sep
+WHERE k.tgl_rencana BETWEEN ? AND ?
 ORDER BY s.nama_pasien ASC";
 
 $kontrol_patients = [];
@@ -36,11 +52,9 @@ $sent_count      = 0;
 $has_phone_count = 0;
 
 if ($stmt = $koneksi->prepare($sql)) {
-    $stmt->bind_param("s", $today);
+    $stmt->bind_param("ss", $tgl_awal, $tgl_akhir);
     if ($stmt->execute()) {
         $result = $stmt->get_result();
-        // DEBUG SEMENTARA — hapus baris ini setelah masalah ketemu
-        // echo "<pre>DEBUG: today=$today | num_rows=" . $result->num_rows . "</pre>";
         while ($row = $result->fetch_assoc()) {
             $row['is_sent'] = !empty($row['tgl_kirim']) ? 1 : 0;
 
@@ -145,6 +159,22 @@ $pending_count = $total - $sent_count;
         gap: 12px;
         flex-wrap: wrap;
     }
+    .filter-bar .form-control {
+        background-color: #fff !important;
+        color: #212529 !important;
+        border: 1px solid #ced4da !important;
+        color-scheme: light;
+    }
+    .filter-bar .form-control::placeholder {
+        color: #6c757d !important;
+        opacity: 1;
+    }
+    .filter-bar .form-control:focus {
+        background-color: #fff !important;
+        color: #212529 !important;
+        border-color: #86b7fe !important;
+        box-shadow: 0 0 0 .2rem rgba(13,110,253,.18) !important;
+    }
     .filter-btn {
         padding: 8px 20px;
         border-radius: 20px;
@@ -189,7 +219,7 @@ $pending_count = $total - $sent_count;
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
     <h1 class="h2"><i class="fas fa-bell text-warning me-2"></i> Reminder Kontrol Pasien</h1>
     <span class="badge bg-primary fs-6 px-3 py-2">
-        <i class="fas fa-calendar-day me-1"></i> <?php echo date('d F Y'); ?>
+        <i class="fas fa-calendar-day me-1"></i> <?php echo htmlspecialchars($periode_label); ?>
     </span>
 </div>
 
@@ -201,7 +231,7 @@ $pending_count = $total - $sent_count;
                 <i class="fas fa-calendar-check fa-2x opacity-75"></i>
                 <div>
                     <h2 class="mb-0 fw-bold"><?php echo $total; ?></h2>
-                    <small class="opacity-75">Total kontrol hari ini</small>
+                    <small class="opacity-75">Total kontrol periode ini</small>
                 </div>
             </div>
         </div>
@@ -243,7 +273,18 @@ $pending_count = $total - $sent_count;
 
 <!-- Filter Bar -->
 <div class="filter-bar mb-4">
-    <span class="fw-bold text-muted"><i class="fas fa-filter me-1"></i> Filter:</span>
+    <span style="color: #484848;" class="fw-bold"><i class="fas fa-filter me-1"></i> Filter:</span>
+    <form method="get" class="d-flex align-items-center gap-2 flex-wrap me-2">
+        <input type="date" name="tgl_awal" class="form-control form-control-sm" value="<?php echo htmlspecialchars($tgl_awal); ?>" style="max-width: 155px;">
+        <span class="text-muted small">s/d</span>
+        <input type="date" name="tgl_akhir" class="form-control form-control-sm" value="<?php echo htmlspecialchars($tgl_akhir); ?>" style="max-width: 155px;">
+        <button type="submit" class="btn btn-sm btn-primary">
+            <i class="fas fa-search me-1"></i> Tampilkan
+        </button>
+        <a href="laporan_reminder_kontrol.php" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-undo me-1"></i> Hari Ini
+        </a>
+    </form>
     <button class="filter-btn active" data-filter="pending" id="btnFilterPending">
         <i class="fas fa-hourglass-half me-1"></i> Belum Dikirim <span class="badge bg-light text-dark ms-1" id="badgePending"><?php echo $pending_count; ?></span>
     </button>
@@ -263,8 +304,8 @@ $pending_count = $total - $sent_count;
 <?php if ($total === 0): ?>
     <div class="kontrol-empty">
         <i class="fas fa-calendar-check d-block"></i>
-        <h4 class="text-muted fw-bold">Tidak ada pasien yang dijadwalkan kontrol hari ini</h4>
-        <p class="text-muted">Coba cek lagi besok, atau ubah tanggal server untuk testing.</p>
+        <h4 class="text-muted fw-bold">Tidak ada pasien yang dijadwalkan kontrol pada periode ini</h4>
+        <p class="text-muted">Silakan ubah range tanggal untuk melihat jadwal kontrol lainnya.</p>
     </div>
 <?php else: ?>
     <div class="row g-3" id="kontrolGrid">
@@ -293,7 +334,7 @@ $pending_count = $total - $sent_count;
                     </div>
                     <div class="kontrol-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="kontrol-badge"><i class="fas fa-calendar-check me-1"></i> Kontrol Hari Ini</span>
+                            <span class="kontrol-badge"><i class="fas fa-calendar-check me-1"></i> Jadwal Kontrol</span>
                             <small class="kontrol-date fs-6"><i class="fas fa-calendar me-1"></i> <?php echo $tgl_rencana; ?></small>
                         </div>
                         <div class="kontrol-info mt-2">
@@ -498,7 +539,13 @@ $(document).ready(function() {
         }
 
         // Save to DB
-        $.post('api/reminder_kontrol.php', { no_sep: noSep, nomr: nomr, nama_pasien: name, pengirim: '' });
+        $.post('api/reminder_kontrol.php', { no_sep: noSep, nomr: nomr, nama_pasien: name, pengirim: '' }, function(res) {
+            if (!res || res.success !== true) {
+                alert('Status reminder belum tersimpan ke database. Silakan coba lagi atau hubungi admin.');
+            }
+        }, 'json').fail(function() {
+            alert('Status reminder belum tersimpan ke database. Silakan coba lagi atau hubungi admin.');
+        });
     });
 });
 </script>

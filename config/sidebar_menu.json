@@ -63,8 +63,8 @@
             },
             {
                 "url": "laporan_jasa_medis.php",
-                "title": "Jasa Medis",
-                "icon": "fas fa-user-tie",
+                "title": "Jasa Med. & Paramed.",
+                "icon": "fas fa-user-nurse",
                 "is_active": true
             }
         ]
@@ -230,6 +230,12 @@
         "is_active": true,
         "items": [
             {
+                "url": "laporan_data_master_rm.php",
+                "title": "Data Master",
+                "icon": "fas fa-database",
+                "is_active": true
+            },
+            {
                 "url": "kelola_data_rm.php",
                 "title": "Laporan RL",
                 "icon": "fas fa-file-alt",
@@ -282,3 +288,4 @@
         ]
     }
 ]
+

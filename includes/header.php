@@ -242,6 +242,128 @@ function get_arrow_class($pages, $current) {
             box-shadow: 0 0 0 .25rem rgba(56,189,248,.25);
         }
 
+        /* Global DataTables polish: soft scrollbar & pagination */
+        .dataTables_wrapper .dataTables_scroll {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .dataTables_wrapper .dataTables_scrollBody {
+            scrollbar-width: thin;
+            scrollbar-color: #9aa8bd transparent;
+        }
+        .dataTables_wrapper .dataTables_scrollBody::-webkit-scrollbar {
+            height: 9px;
+            width: 9px;
+        }
+        .dataTables_wrapper .dataTables_scrollBody::-webkit-scrollbar-track {
+            background: rgba(148, 163, 184, .16);
+            border-radius: 999px;
+        }
+        .dataTables_wrapper .dataTables_scrollBody::-webkit-scrollbar-thumb {
+            background: linear-gradient(90deg, #94a3b8, #64748b);
+            border: 2px solid transparent;
+            border-radius: 999px;
+            background-clip: padding-box;
+        }
+        .dataTables_wrapper .dataTables_scrollBody::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(90deg, #64748b, #475569);
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+        .dataTables_wrapper .dataTables_info {
+            padding-top: 14px;
+            color: #64748b;
+            font-size: .82rem;
+            font-weight: 600;
+        }
+        .dataTables_wrapper .dataTables_paginate {
+            padding-top: 12px;
+        }
+        .dataTables_wrapper .pagination {
+            gap: 6px;
+            align-items: center;
+        }
+        .dataTables_wrapper .page-item .page-link {
+            min-width: 34px;
+            height: 34px;
+            padding: 7px 11px;
+            border: 1px solid #dbe3ef;
+            border-radius: 999px;
+            color: #4e73df;
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+            font-size: .8rem;
+            line-height: 1.2;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease;
+        }
+        .dataTables_wrapper .page-item:not(.disabled) .page-link:hover {
+            background: #edf2ff;
+            border-color: #bfd0ff;
+            color: #224abe;
+            box-shadow: 0 5px 14px rgba(78, 115, 223, .16);
+            transform: translateY(-1px);
+        }
+        .dataTables_wrapper .page-item.active .page-link {
+            background: #4e73df;
+            border-color: #4e73df;
+            color: #fff;
+            box-shadow: 0 6px 16px rgba(78, 115, 223, .28);
+        }
+        .dataTables_wrapper .page-item.disabled .page-link {
+            background: rgba(148, 163, 184, .12);
+            border-color: rgba(148, 163, 184, .18);
+            color: #94a3b8;
+            box-shadow: none;
+        }
+        html.theme-glass-solid .dataTables_wrapper .dataTables_info,
+        html.theme-glass-animated .dataTables_wrapper .dataTables_info {
+            color: #cbd5e1 !important;
+        }
+        html.theme-glass-solid .dataTables_wrapper .dataTables_scrollBody,
+        html.theme-glass-animated .dataTables_wrapper .dataTables_scrollBody {
+            scrollbar-color: #64748b rgba(15, 23, 42, .35);
+        }
+        html.theme-glass-solid .dataTables_wrapper .dataTables_scrollBody::-webkit-scrollbar-track,
+        html.theme-glass-animated .dataTables_wrapper .dataTables_scrollBody::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, .5);
+        }
+        html.theme-glass-solid .dataTables_wrapper .dataTables_scrollBody::-webkit-scrollbar-thumb,
+        html.theme-glass-animated .dataTables_wrapper .dataTables_scrollBody::-webkit-scrollbar-thumb {
+            background: linear-gradient(90deg, #64748b, #94a3b8);
+            border: 2px solid rgba(15, 23, 42, .5);
+            background-clip: padding-box;
+        }
+        html.theme-glass-solid .dataTables_wrapper .page-item .page-link,
+        html.theme-glass-animated .dataTables_wrapper .page-item .page-link {
+            background: #111827;
+            border-color: #334155;
+            color: #dbeafe;
+            box-shadow: none;
+        }
+        html.theme-glass-solid .dataTables_wrapper .page-item:not(.disabled) .page-link:hover,
+        html.theme-glass-animated .dataTables_wrapper .page-item:not(.disabled) .page-link:hover {
+            background: #1e293b;
+            border-color: #4e73df;
+            color: #fff;
+            box-shadow: 0 6px 16px rgba(78, 115, 223, .2);
+        }
+        html.theme-glass-solid .dataTables_wrapper .page-item.active .page-link,
+        html.theme-glass-animated .dataTables_wrapper .page-item.active .page-link {
+            background: #4e73df;
+            border-color: #6f8ff0;
+            color: #fff;
+            box-shadow: 0 6px 16px rgba(78, 115, 223, .34);
+        }
+        html.theme-glass-solid .dataTables_wrapper .page-item.disabled .page-link,
+        html.theme-glass-animated .dataTables_wrapper .page-item.disabled .page-link {
+            background: rgba(15, 23, 42, .55);
+            border-color: #1f2937;
+            color: #64748b;
+        }
+
         /* Glass Modals */
         html.theme-glass-solid .modal-content, html.theme-glass-animated .modal-content {
             background-color: var(--modal-bg);
