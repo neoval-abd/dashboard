@@ -383,6 +383,32 @@ $(document).ready(function() {
         }, 3500);
     }
 
+    function getAjaxErrorMessage(xhr, fallback) {
+        if (xhr.responseJSON && xhr.responseJSON.error) {
+            return xhr.responseJSON.error;
+        }
+        if (xhr.responseJSON && xhr.responseJSON.message) {
+            return xhr.responseJSON.message;
+        }
+
+        const responseText = String(xhr.responseText || '').trim();
+        if (responseText) {
+            try {
+                const parsed = JSON.parse(responseText);
+                if (parsed.error) return parsed.error;
+                if (parsed.message) return parsed.message;
+            } catch (e) {
+                return responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 220);
+            }
+        }
+
+        if (xhr.status) {
+            return fallback + ' (HTTP ' + xhr.status + ')';
+        }
+
+        return fallback;
+    }
+
     // Load sent status from DB on page load
     function loadSentStatus() {
         $.getJSON('api/ucapan_ulang_tahun.php', function(res) {
@@ -504,12 +530,19 @@ $(document).ready(function() {
 
         $sendBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Mengirim...');
 
-        $.post('api/ucapan_ulang_tahun.php', {
-            no_rkm_medis: rm,
-            phone: phone,
-            message: msg,
-            pengirim: ''
-        }, function(res) {
+        $.ajax({
+            url: 'api/ucapan_ulang_tahun.php',
+            method: 'POST',
+            dataType: 'json',
+            global: false,
+            timeout: 45000,
+            data: {
+                no_rkm_medis: rm,
+                phone: phone,
+                message: msg,
+                pengirim: ''
+            }
+        }).done(function(res) {
             if (!res || res.success !== true) {
                 alert((res && res.error) ? res.error : 'Ucapan gagal dikirim. Silakan coba lagi atau hubungi admin.');
                 return;
@@ -527,8 +560,8 @@ $(document).ready(function() {
                     showSuccessNotification('Ucapan ulang tahun berhasil dikirim ke ' + name + '.');
                 }, 250);
             }
-        }, 'json').fail(function() {
-            alert('Ucapan gagal dikirim. Silakan coba lagi atau hubungi admin.');
+        }).fail(function(xhr) {
+            alert(getAjaxErrorMessage(xhr, 'Ucapan gagal dikirim. Silakan coba lagi atau hubungi admin.'));
         }).always(function() {
             $sendBtn.prop('disabled', false).html('<i class="fab fa-whatsapp me-1"></i> Kirim via Fonnte');
         });

@@ -1,7 +1,7 @@
 <?php
 /*
  * File: config/koneksi.php (SECURITY HARDENED v2)
- * - Session hardening: httponly, samesite=Strict, use_only_cookies
+ * - Session hardening: httponly, samesite=Lax, use_only_cookies
  * - display_errors dimatikan (tidak bocorkan info ke publik)
  * - Security Headers: X-Frame-Options, X-Content-Type-Options, Referrer-Policy
  * - Koneksi tetap menggunakan MySQLi (sesuai pola Khanza)
@@ -22,14 +22,14 @@ if (session_status() == PHP_SESSION_NONE) {
     ini_set('session.cookie_httponly', 1);     // Anti XSS cookie theft
     ini_set('session.cookie_secure', $is_https ? '1' : '0'); // Otomatis True jika HTTPS
 
-    // Set parameter cookie (SameSite=Strict tersedia native di PHP 7.3+)
+    // Set parameter cookie (SameSite=Lax lebih ramah untuk akses LAN/IP lokal)
     session_set_cookie_params([
         'lifetime' => 0,
         'path'     => '/',
         'domain'   => '',
         'secure'   => $is_https, 
         'httponly' => true,
-        'samesite' => 'Strict'
+        'samesite' => 'Lax'
     ]);
 
     session_start();

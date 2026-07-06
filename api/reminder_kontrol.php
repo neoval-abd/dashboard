@@ -9,6 +9,19 @@ header('Content-Type: application/json; charset=utf-8');
 require_once(dirname(__DIR__) . '/config/koneksi.php');
 require_once(__DIR__ . '/fonnte_client.php');
 
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        echo json_encode([
+            'success' => false,
+            'error' => 'Server error: ' . $error['message'],
+        ], JSON_UNESCAPED_UNICODE);
+    }
+});
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $sent = [];
     $sql = "SELECT no_sep, nomr, nama_pasien, tgl_kirim, pengirim

@@ -443,6 +443,32 @@ $(document).ready(function() {
         }, 3500);
     }
 
+    function getAjaxErrorMessage(xhr, fallback) {
+        if (xhr.responseJSON && xhr.responseJSON.error) {
+            return xhr.responseJSON.error;
+        }
+        if (xhr.responseJSON && xhr.responseJSON.message) {
+            return xhr.responseJSON.message;
+        }
+
+        const responseText = String(xhr.responseText || '').trim();
+        if (responseText) {
+            try {
+                const parsed = JSON.parse(responseText);
+                if (parsed.error) return parsed.error;
+                if (parsed.message) return parsed.message;
+            } catch (e) {
+                return responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 220);
+            }
+        }
+
+        if (xhr.status) {
+            return fallback + ' (HTTP ' + xhr.status + ')';
+        }
+
+        return fallback;
+    }
+
     // Apply filter + search
     function applyFilterAndSearch() {
         const filter = currentFilter;
@@ -573,14 +599,21 @@ $(document).ready(function() {
         const $sendBtn = $(this);
         $sendBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Mengirim...');
 
-        $.post('api/reminder_kontrol.php', {
-            no_sep: noSep,
-            nomr: nomr,
-            nama_pasien: name,
-            phone: phone,
-            message: msg,
-            pengirim: ''
-        }, function(res) {
+        $.ajax({
+            url: 'api/reminder_kontrol.php',
+            method: 'POST',
+            dataType: 'json',
+            global: false,
+            timeout: 45000,
+            data: {
+                no_sep: noSep,
+                nomr: nomr,
+                nama_pasien: name,
+                phone: phone,
+                message: msg,
+                pengirim: ''
+            }
+        }).done(function(res) {
             if (!res || res.success !== true) {
                 alert((res && res.error) ? res.error : 'Reminder gagal dikirim. Silakan coba lagi atau hubungi admin.');
                 return;
@@ -591,8 +624,8 @@ $(document).ready(function() {
             setTimeout(function() {
                 showSuccessNotification('Reminder berhasil dikirim ke ' + name + '.');
             }, 250);
-        }, 'json').fail(function() {
-            alert('Reminder gagal dikirim. Silakan coba lagi atau hubungi admin.');
+        }).fail(function(xhr) {
+            alert(getAjaxErrorMessage(xhr, 'Reminder gagal dikirim. Silakan coba lagi atau hubungi admin.'));
         }).always(function() {
             $sendBtn.prop('disabled', false).html('<i class="fab fa-whatsapp me-1"></i> Kirim via Fonnte');
         });
