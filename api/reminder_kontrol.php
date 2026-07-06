@@ -7,6 +7,7 @@
  */
 header('Content-Type: application/json; charset=utf-8');
 require_once(dirname(__DIR__) . '/config/koneksi.php');
+require_once(__DIR__ . '/fonnte_client.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $sent = [];
@@ -27,10 +28,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nomr = trim($_POST['nomr'] ?? '');
     $nama_pasien = trim($_POST['nama_pasien'] ?? '');
     $pengirim = trim($_POST['pengirim'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $message = trim($_POST['message'] ?? '');
 
     if ($no_sep === '') {
         echo json_encode(['success' => false, 'error' => 'no_sep required']);
         exit;
+    }
+
+    if ($phone !== '' || $message !== '') {
+        $send = send_fonnte_message($phone, $message);
+        if (empty($send['success'])) {
+            echo json_encode([
+                'success' => false,
+                'error' => $send['error'] ?? 'Gagal mengirim via Fonnte',
+                'fonnte' => $send,
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
     }
 
     $sql = "INSERT INTO log_kirim_reminder_kontrol (no_sep, nomr, nama_pasien, tgl_kirim, pengirim)
@@ -46,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ok = $stmt->execute();
         $error = $stmt->error;
         $stmt->close();
-        echo json_encode($ok ? ['success' => true] : ['success' => false, 'error' => $error]);
+        echo json_encode($ok ? ['success' => true, 'sent_via' => ($phone !== '' ? 'fonnte' : 'manual')] : ['success' => false, 'error' => $error]);
     } else {
         echo json_encode(['success' => false, 'error' => $koneksi->error]);
     }

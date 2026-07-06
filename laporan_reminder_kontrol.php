@@ -403,14 +403,14 @@ $pending_count = $total - $sent_count;
                     <textarea id="msgText" class="form-control"></textarea>
                 </div>
                 <div class="alert alert-info py-2 small mb-0">
-                    <i class="fas fa-info-circle me-1"></i> Pesan akan dibuka di WhatsApp. Anda bisa edit lagi sebelum kirim.
+                    <i class="fas fa-info-circle me-1"></i> Pesan akan dikirim otomatis melalui Fonnte setelah tombol kirim ditekan.
                 </div>
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <a id="btnSendWA" href="#" class="btn-wa text-decoration-none" style="padding:10px 24px;" role="button">
-                    <i class="fab fa-whatsapp me-1"></i> Buka WhatsApp
-                </a>
+                <button id="btnSendWA" type="button" class="btn-wa" style="padding:10px 24px;">
+                    <i class="fab fa-whatsapp me-1"></i> Kirim via Fonnte
+                </button>
             </div>
         </div>
     </div>
@@ -422,6 +422,26 @@ $(document).ready(function() {
     let currentFilter = 'pending'; // default: belum dikirim
     let sentCount    = <?php echo $sent_count; ?>;
     let pendingCount = <?php echo $pending_count; ?>;
+
+    function showSuccessNotification(message) {
+        let $notif = $('#waSuccessNotif');
+        if (!$notif.length) {
+            $('body').append(`
+                <div id="waSuccessNotif" class="alert alert-success shadow-lg d-flex align-items-center gap-2"
+                    style="display:none; position:fixed; top:22px; right:22px; z-index:9999; border-radius:12px; min-width:280px; max-width:420px;">
+                    <i class="fas fa-check-circle"></i>
+                    <span class="wa-success-text"></span>
+                </div>
+            `);
+            $notif = $('#waSuccessNotif');
+        }
+
+        $notif.find('.wa-success-text').text(message);
+        $notif.stop(true, true).fadeIn(180);
+        setTimeout(function() {
+            $notif.fadeOut(250);
+        }, 3500);
+    }
 
     // Apply filter + search
     function applyFilterAndSearch() {
@@ -541,40 +561,40 @@ $(document).ready(function() {
         alert(getDefaultMsg(name, poli, dokter, tanggal));
     });
 
-    let waWindow = null;
-
     $('#btnSendWA').on('click', function(e) {
         e.preventDefault();
         const phone = $(this).data('phone');
         const noSep = $(this).data('no-sep');
         const nomr  = $(this).data('nomr');
         const name  = $(this).data('name');
-        const msg   = encodeURIComponent($('#msgText').val());
-        const url   = `whatsapp://send?phone=${phone}&text=${msg}`;
+        const msg   = $('#msgText').val();
 
         const cardBtn = $(this).data('card-btn');
         const $sendBtn = $(this);
-        $sendBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menyimpan...');
+        $sendBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Mengirim...');
 
-        $.post('api/reminder_kontrol.php', { no_sep: noSep, nomr: nomr, nama_pasien: name, pengirim: '' }, function(res) {
+        $.post('api/reminder_kontrol.php', {
+            no_sep: noSep,
+            nomr: nomr,
+            nama_pasien: name,
+            phone: phone,
+            message: msg,
+            pengirim: ''
+        }, function(res) {
             if (!res || res.success !== true) {
-                alert('Status reminder belum tersimpan ke database. Silakan coba lagi atau hubungi admin.');
+                alert((res && res.error) ? res.error : 'Reminder gagal dikirim. Silakan coba lagi atau hubungi admin.');
                 return;
             }
 
             markCardAsSent(cardBtn);
             bootstrap.Modal.getInstance(document.getElementById('msgModal'))?.hide();
-
-            if (!waWindow || waWindow.closed) {
-                waWindow = window.open(url, 'whatsapp_kontrol');
-            } else {
-                waWindow.location.href = url;
-                waWindow.focus();
-            }
+            setTimeout(function() {
+                showSuccessNotification('Reminder berhasil dikirim ke ' + name + '.');
+            }, 250);
         }, 'json').fail(function() {
-            alert('Status reminder belum tersimpan ke database. Silakan coba lagi atau hubungi admin.');
+            alert('Reminder gagal dikirim. Silakan coba lagi atau hubungi admin.');
         }).always(function() {
-            $sendBtn.prop('disabled', false).html('<i class="fab fa-whatsapp me-1"></i> Buka WhatsApp');
+            $sendBtn.prop('disabled', false).html('<i class="fab fa-whatsapp me-1"></i> Kirim via Fonnte');
         });
     });
 });

@@ -7,6 +7,7 @@
  */
 header('Content-Type: application/json; charset=utf-8');
 require_once(dirname(__DIR__) . '/config/koneksi.php');
+require_once(__DIR__ . '/fonnte_client.php');
 
 $tahun = (int) date('Y');
 
@@ -28,21 +29,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 // POST: mark as sent
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $rm = isset($_POST['no_rkm_medis']) ? $koneksi->real_escape_string($_POST['no_rkm_medis']) : '';
-    $pengirim = isset($_POST['pengirim']) ? $koneksi->real_escape_string($_POST['pengirim']) : '';
+    $rm = trim($_POST['no_rkm_medis'] ?? '');
+    $pengirim = trim($_POST['pengirim'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $message = trim($_POST['message'] ?? '');
     
     if (empty($rm)) {
         echo json_encode(['success' => false, 'error' => 'no_rkm_medis required']);
         exit;
     }
+
+    if ($phone !== '' || $message !== '') {
+        $send = send_fonnte_message($phone, $message);
+        if (empty($send['success'])) {
+            echo json_encode([
+                'success' => false,
+                'error' => $send['error'] ?? 'Gagal mengirim via Fonnte',
+                'fonnte' => $send,
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
     
-    // INSERT ... ON DUPLICATE KEY UPDATE (in case re-sent same year)
     $sql = "INSERT INTO ucapan_ulang_tahun (no_rkm_medis, tahun, tgl_kirim, pengirim)
-            VALUES ('$rm', $tahun, NOW(), '$pengirim')
-            ON DUPLICATE KEY UPDATE tgl_kirim = NOW(), pengirim = '$pengirim'";
+            VALUES (?, ?, NOW(), ?)
+            ON DUPLICATE KEY UPDATE tgl_kirim = NOW(), pengirim = VALUES(pengirim)";
     
-    if ($koneksi->query($sql)) {
-        echo json_encode(['success' => true]);
+    if ($stmt = $koneksi->prepare($sql)) {
+        $stmt->bind_param("sis", $rm, $tahun, $pengirim);
+        $ok = $stmt->execute();
+        $error = $stmt->error;
+        $stmt->close();
+        echo json_encode($ok ? ['success' => true, 'sent_via' => ($phone !== '' ? 'fonnte' : 'manual')] : ['success' => false, 'error' => $error]);
     } else {
         echo json_encode(['success' => false, 'error' => $koneksi->error]);
     }

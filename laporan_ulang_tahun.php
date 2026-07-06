@@ -341,14 +341,14 @@ $total = count($birthday_patients);
                     <textarea id="msgText" class="form-control"></textarea>
                 </div>
                 <div class="alert alert-info py-2 small mb-0">
-                    <i class="fas fa-info-circle me-1"></i> Pesan akan dibuka di WhatsApp. Anda bisa edit lagi sebelum kirim.
+                    <i class="fas fa-info-circle me-1"></i> Pesan akan dikirim otomatis melalui Fonnte setelah tombol kirim ditekan.
                 </div>
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <a id="btnSendWA" href="#" class="btn-wa text-decoration-none" style="padding:10px 24px;" role="button">
-                    <i class="fab fa-whatsapp me-1"></i> Buka WhatsApp
-                </a>
+                <button id="btnSendWA" type="button" class="btn-wa" style="padding:10px 24px;">
+                    <i class="fab fa-whatsapp me-1"></i> Kirim via Fonnte
+                </button>
             </div>
         </div>
     </div>
@@ -362,6 +362,26 @@ $(document).ready(function() {
     const ONE_YEAR_COUNT = <?php echo $one_year_count; ?>;
     let currentFilter = 'active'; // default: 5 tahun terakhir
     let sentCount = 0;
+
+    function showSuccessNotification(message) {
+        let $notif = $('#waSuccessNotif');
+        if (!$notif.length) {
+            $('body').append(`
+                <div id="waSuccessNotif" class="alert alert-success shadow-lg d-flex align-items-center gap-2"
+                    style="display:none; position:fixed; top:22px; right:22px; z-index:9999; border-radius:12px; min-width:280px; max-width:420px;">
+                    <i class="fas fa-check-circle"></i>
+                    <span class="wa-success-text"></span>
+                </div>
+            `);
+            $notif = $('#waSuccessNotif');
+        }
+
+        $notif.find('.wa-success-text').text(message);
+        $notif.stop(true, true).fadeIn(180);
+        setTimeout(function() {
+            $notif.fadeOut(250);
+        }, 3500);
+    }
 
     // Load sent status from DB on page load
     function loadSentStatus() {
@@ -474,39 +494,44 @@ $(document).ready(function() {
         alert(getDefaultMsg(name, age));
     });
 
-    // Store WA window reference to reuse same tab
-    let waWindow = null;
-
-    // Update WA link when sending — reuse same tab
     $('#btnSendWA').on('click', function(e) {
         e.preventDefault();
         const phone = $(this).data('phone');
         const rm    = $(this).data('rm');
-        const msg   = encodeURIComponent($('#msgText').val());
-        const url   = `whatsapp://send?phone=${phone}&text=${msg}`;
-        
-        // First send: open new window; subsequent sends: navigate same window
-        if (!waWindow || waWindow.closed) {
-            waWindow = window.open(url, 'whatsapp_bday');
-        } else {
-            waWindow.location.href = url;
-            waWindow.focus();
-        }
-        
-        // Close the modal
-        bootstrap.Modal.getInstance(document.getElementById('msgModal'))?.hide();
-        
-        // Mark card as sent
+        const msg   = $('#msgText').val();
         const cardBtn = $(this).data('card-btn');
-        if (cardBtn) {
-            $(cardBtn).html('<i class="fas fa-check"></i> Terkirim').prop('disabled', true)
-                .css({background: '#6c757d', cursor: 'default'});
-            sentCount++;
-            $('#sentCount').text(sentCount);
-        }
-        
-        // Save to DB
-        $.post('api/ucapan_ulang_tahun.php', { no_rkm_medis: rm, pengirim: '' });
+        const $sendBtn = $(this);
+
+        $sendBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Mengirim...');
+
+        $.post('api/ucapan_ulang_tahun.php', {
+            no_rkm_medis: rm,
+            phone: phone,
+            message: msg,
+            pengirim: ''
+        }, function(res) {
+            if (!res || res.success !== true) {
+                alert((res && res.error) ? res.error : 'Ucapan gagal dikirim. Silakan coba lagi atau hubungi admin.');
+                return;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('msgModal'))?.hide();
+
+            if (cardBtn) {
+                const name = $(cardBtn).data('name') || 'pasien';
+                $(cardBtn).html('<i class="fas fa-check"></i> Terkirim').prop('disabled', true)
+                    .css({background: '#6c757d', cursor: 'default'});
+                sentCount++;
+                $('#sentCount').text(sentCount);
+                setTimeout(function() {
+                    showSuccessNotification('Ucapan ulang tahun berhasil dikirim ke ' + name + '.');
+                }, 250);
+            }
+        }, 'json').fail(function() {
+            alert('Ucapan gagal dikirim. Silakan coba lagi atau hubungi admin.');
+        }).always(function() {
+            $sendBtn.prop('disabled', false).html('<i class="fab fa-whatsapp me-1"></i> Kirim via Fonnte');
+        });
     });
 });
 </script>
