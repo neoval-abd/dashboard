@@ -8,6 +8,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once(dirname(__DIR__) . '/config/koneksi.php');
 require_once(__DIR__ . '/fonnte_client.php');
+require_once(__DIR__ . '/reminder_queue_helpers.php');
 
 register_shutdown_function(function() {
     $error = error_get_last();
@@ -23,6 +24,8 @@ register_shutdown_function(function() {
 });
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    ensure_reminder_queue_table($koneksi);
+
     $sent = [];
     $sql = "SELECT no_sep, nomr, nama_pasien, tgl_kirim, pengirim
             FROM log_kirim_reminder_kontrol";
@@ -32,7 +35,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $sent[] = $row;
         }
     }
-    echo json_encode(['sent' => $sent], JSON_UNESCAPED_UNICODE);
+
+    $queued = [];
+    $sql = "SELECT no_sep, nomr, nama_pasien, status, attempts, scheduled_at, sent_at, last_error
+            FROM antrean_reminder_kontrol
+            WHERE status IN ('pending', 'processing', 'failed')";
+    $res = $koneksi->query($sql);
+    if ($res) {
+        while ($row = $res->fetch_assoc()) {
+            $queued[] = $row;
+        }
+    }
+
+    echo json_encode([
+        'sent' => $sent,
+        'queued' => $queued,
+        'fonnte_cooldown_seconds' => get_fonnte_send_cooldown(),
+        'fonnte_cooldown_remaining' => get_fonnte_cooldown_remaining(),
+        'fonnte_queue_delay_seconds' => get_fonnte_queue_delay(),
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -49,32 +70,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    if ($phone !== '' || $message !== '') {
-        $send = send_fonnte_message($phone, $message);
-        if (empty($send['success'])) {
-            echo json_encode([
-                'success' => false,
-                'error' => $send['error'] ?? 'Gagal mengirim via Fonnte',
-                'fonnte' => $send,
-            ], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
+    if ($phone === '' || $message === '') {
+        echo json_encode(['success' => false, 'error' => 'Nomor HP dan pesan wajib diisi']);
+        exit;
     }
 
-    $sql = "INSERT INTO log_kirim_reminder_kontrol (no_sep, nomr, nama_pasien, tgl_kirim, pengirim)
-            VALUES (?, ?, ?, NOW(), ?)
+    if (!ensure_reminder_queue_table($koneksi)) {
+        echo json_encode(['success' => false, 'error' => 'Tabel antrean reminder gagal dibuat: ' . $koneksi->error]);
+        exit;
+    }
+
+    $scheduledAt = get_next_reminder_schedule($koneksi);
+    $sql = "INSERT INTO antrean_reminder_kontrol
+                (no_sep, nomr, nama_pasien, phone, message, pengirim, status, attempts, scheduled_at, last_error)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL)
             ON DUPLICATE KEY UPDATE
                 nomr = VALUES(nomr),
                 nama_pasien = VALUES(nama_pasien),
-                tgl_kirim = NOW(),
-                pengirim = VALUES(pengirim)";
+                phone = VALUES(phone),
+                message = VALUES(message),
+                pengirim = VALUES(pengirim),
+                status = IF(antrean_reminder_kontrol.status = 'sent', antrean_reminder_kontrol.status, 'pending'),
+                scheduled_at = IF(antrean_reminder_kontrol.status = 'sent', antrean_reminder_kontrol.scheduled_at, VALUES(scheduled_at)),
+                last_error = IF(antrean_reminder_kontrol.status = 'sent', antrean_reminder_kontrol.last_error, NULL)";
 
     if ($stmt = $koneksi->prepare($sql)) {
-        $stmt->bind_param("ssss", $no_sep, $nomr, $nama_pasien, $pengirim);
+        $stmt->bind_param("sssssss", $no_sep, $nomr, $nama_pasien, $phone, $message, $pengirim, $scheduledAt);
         $ok = $stmt->execute();
         $error = $stmt->error;
         $stmt->close();
-        echo json_encode($ok ? ['success' => true, 'sent_via' => ($phone !== '' ? 'fonnte' : 'manual')] : ['success' => false, 'error' => $error]);
+        echo json_encode($ok ? [
+            'success' => true,
+            'queued' => true,
+            'scheduled_at' => $scheduledAt,
+            'message' => 'Reminder masuk antrean dan akan dikirim otomatis pada ' . $scheduledAt,
+        ] : ['success' => false, 'error' => $error], JSON_UNESCAPED_UNICODE);
     } else {
         echo json_encode(['success' => false, 'error' => $koneksi->error]);
     }

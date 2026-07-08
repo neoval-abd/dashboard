@@ -62,8 +62,8 @@
                 "is_active": true
             },
             {
-                "url": "laporan_jasa_medis.php",
-                "title": "Jasa Med. & Paramed.",
+                "url": "laporan_jasa_medis_baru.php",
+                "title": "Jasa Medis",
                 "icon": "fas fa-user-nurse",
                 "is_active": true
             }
