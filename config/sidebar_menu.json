@@ -62,8 +62,8 @@
                 "is_active": true
             },
             {
-                "url": "laporan_jasa_medis_baru.php",
-                "title": "Jasa Medis",
+                "url": "laporan_jasa_medis.php",
+                "title": "Jasa Med. & Paramed.",
                 "icon": "fas fa-user-nurse",
                 "is_active": true
             }
@@ -79,6 +79,12 @@
                 "url": "laporan_absensi.php",
                 "title": "Laporan Absensi",
                 "icon": "fas fa-user-clock",
+                "is_active": true
+            },
+            {
+                "url": "laporan_jasa_medis_baru.php",
+                "title": "Jasa Medis",
+                "icon": "fas fa-user-nurse",
                 "is_active": true
             }
         ]

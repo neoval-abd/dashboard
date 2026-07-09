@@ -144,6 +144,12 @@ $pending_count = $total - $sent_count;
     }
     .btn-wa:hover { background: #1ebe57; color: #fff; }
     .btn-wa:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-wa-manual {
+        color: #128c7e;
+        border-color: #128c7e;
+        font-weight: 600;
+    }
+    .btn-wa-manual:hover { background: #128c7e; border-color: #128c7e; color: #fff; }
     .kontrol-empty {
         text-align: center;
         padding: 60px 20px;
@@ -368,6 +374,15 @@ $pending_count = $total - $sent_count;
                                     <i class="fab fa-whatsapp"></i> Kirim Reminder
                                 <?php endif; ?>
                             </button>
+                            <button class="btn btn-sm btn-outline-success btn-wa-manual"
+                                data-phone="<?php echo $p['phone_wa']; ?>"
+                                data-name="<?php echo $nm; ?>"
+                                data-poli="<?php echo $poli; ?>"
+                                data-dokter="<?php echo $dokter; ?>"
+                                data-tanggal="<?php echo $tgl_rencana; ?>"
+                                title="Buka WhatsApp Web atau aplikasi WhatsApp">
+                                <i class="fab fa-whatsapp"></i> Kirim Manual
+                            </button>
                         <?php else: ?>
                             <button class="btn-wa" disabled>
                                 <i class="fas fa-phone-slash"></i> No. HP Tidak Ada
@@ -402,14 +417,11 @@ $pending_count = $total - $sent_count;
                     <label class="form-label fw-bold">Pesan Reminder:</label>
                     <textarea id="msgText" class="form-control"></textarea>
                 </div>
-                <div class="alert alert-info py-2 small mb-0">
-                    <i class="fas fa-info-circle me-1"></i> Pesan akan masuk antrean dan dikirim otomatis bertahap melalui Fonnte.
-                </div>
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                 <button id="btnSendWA" type="button" class="btn-wa" style="padding:10px 24px;">
-                    <i class="fas fa-clock me-1"></i> Masukkan Antrean
+                    <i class="fab fa-whatsapp me-1"></i> Kirim
                 </button>
             </div>
         </div>
@@ -422,9 +434,6 @@ $(document).ready(function() {
     let currentFilter = 'pending'; // default: belum dikirim
     let sentCount    = <?php echo $sent_count; ?>;
     let pendingCount = <?php echo $pending_count; ?>;
-    let fonnteCooldownSeconds = 0;
-    let fonnteCooldownUntil = 0;
-    let fonnteCooldownTimer = null;
 
     function showSuccessNotification(message) {
         let $notif = $('#waSuccessNotif');
@@ -470,62 +479,6 @@ $(document).ready(function() {
         }
 
         return fallback;
-    }
-
-    function getCooldownRemaining() {
-        return Math.max(0, Math.ceil((fonnteCooldownUntil - Date.now()) / 1000));
-    }
-
-    function startFonnteCooldown(seconds) {
-        seconds = parseInt(seconds, 10) || 0;
-        if (seconds <= 0) {
-            fonnteCooldownUntil = 0;
-            updateFonnteCooldownUi();
-            return;
-        }
-
-        fonnteCooldownUntil = Date.now() + (seconds * 1000);
-        updateFonnteCooldownUi();
-
-        if (fonnteCooldownTimer) {
-            clearInterval(fonnteCooldownTimer);
-        }
-
-        fonnteCooldownTimer = setInterval(function() {
-            updateFonnteCooldownUi();
-            if (getCooldownRemaining() <= 0) {
-                clearInterval(fonnteCooldownTimer);
-                fonnteCooldownTimer = null;
-            }
-        }, 1000);
-    }
-
-    function updateFonnteCooldownUi() {
-        const remaining = getCooldownRemaining();
-        const isCoolingDown = remaining > 0;
-
-        $('.btn-send-wa').each(function() {
-            const $btn = $(this);
-            const $col = $btn.closest('.kontrol-col');
-            const isSent = String($col.attr('data-sent') || $col.data('sent') || '0') === '1';
-            const isQueued = String($col.attr('data-queued') || $col.data('queued') || '0') === '1';
-            if (isSent) return;
-            if (isQueued) return;
-
-            $btn.prop('disabled', false);
-            if (isCoolingDown) {
-                $btn.attr('title', 'Fonnte sedang jeda ' + remaining + ' detik. Klik tetap hanya masuk antrean.');
-            } else {
-                $btn.html('<i class="fab fa-whatsapp"></i> Kirim Reminder');
-                $btn.removeAttr('title');
-            }
-        });
-
-        const $modalBtn = $('#btnSendWA');
-        if ($modalBtn.length && !$modalBtn.data('is-sending')) {
-            $modalBtn.prop('disabled', false);
-            $modalBtn.html('<i class="fas fa-clock me-1"></i> Masukkan Antrean');
-        }
     }
 
     // Apply filter + search
@@ -583,7 +536,6 @@ $(document).ready(function() {
             .prop('disabled', true)
             .css({background: '#6c757d', cursor: 'default'});
         $col.attr('data-sent', 1).data('sent', 1);
-        $col.attr('data-queued', 0).data('queued', 0);
 
         if (!wasSent) {
             sentCount++;
@@ -597,41 +549,17 @@ $(document).ready(function() {
         applyFilterAndSearch();
     }
 
-    function markCardAsQueued(cardBtn, scheduledAt) {
-        if (!cardBtn) return;
-
-        const $btn = $(cardBtn);
-        const $col = $btn.closest('.kontrol-col');
-        const label = scheduledAt ? 'Terjadwal ' + scheduledAt.substring(11, 16) : 'Terjadwal';
-
-        $btn.html('<i class="fas fa-clock"></i> ' + label)
-            .prop('disabled', true)
-            .css({background: '#0d6efd', cursor: 'default'});
-        $col.attr('data-queued', 1).data('queued', 1);
-    }
-
     function loadSentStatus() {
         $.getJSON('api/reminder_kontrol.php', function(res) {
             const sentList = res.sent || [];
             const sentSeps = sentList.map(item => String(item.no_sep || ''));
-            const queuedList = res.queued || [];
-            const queuedBySep = {};
-            fonnteCooldownSeconds = parseInt(res.fonnte_cooldown_seconds, 10) || 0;
-
-            queuedList.forEach(function(item) {
-                if (item && item.no_sep) queuedBySep[String(item.no_sep)] = item;
-            });
 
             $('.btn-send-wa').each(function() {
                 const noSep = String($(this).data('no-sep') || '');
                 if (sentSeps.includes(noSep)) {
                     markCardAsSent(this);
-                } else if (queuedBySep[noSep] && queuedBySep[noSep].status !== 'failed') {
-                    markCardAsQueued(this, queuedBySep[noSep].scheduled_at || '');
                 }
             });
-
-            startFonnteCooldown(parseInt(res.fonnte_cooldown_remaining, 10) || 0);
         });
     }
 
@@ -671,6 +599,17 @@ $(document).ready(function() {
         alert(getDefaultMsg(name, poli, dokter, tanggal));
     });
 
+    $(document).on('click', '.btn-wa-manual', function() {
+        const phone = String($(this).data('phone') || '');
+        const message = getDefaultMsg(
+            $(this).data('name'),
+            $(this).data('poli'),
+            $(this).data('dokter'),
+            $(this).data('tanggal')
+        );
+        window.open('https://wa.me/' + encodeURIComponent(phone) + '?text=' + encodeURIComponent(message), '_blank', 'noopener');
+    });
+
     $('#btnSendWA').on('click', function(e) {
         e.preventDefault();
         const phone = $(this).data('phone');
@@ -681,7 +620,7 @@ $(document).ready(function() {
 
         const cardBtn = $(this).data('card-btn');
         const $sendBtn = $(this);
-        $sendBtn.data('is-sending', true).prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menjadwalkan...');
+        $sendBtn.data('is-sending', true).prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Memproses...');
 
         $.ajax({
             url: 'api/reminder_kontrol.php',
@@ -699,23 +638,20 @@ $(document).ready(function() {
             }
         }).done(function(res) {
             if (!res || res.success !== true) {
-                if (res && res.fonnte && res.fonnte.retry_after) {
-                    startFonnteCooldown(res.fonnte.retry_after);
-                }
                 alert((res && res.error) ? res.error : 'Reminder gagal dikirim. Silakan coba lagi atau hubungi admin.');
                 return;
             }
 
-            markCardAsQueued(cardBtn, res.scheduled_at || '');
+            markCardAsSent(cardBtn);
             bootstrap.Modal.getInstance(document.getElementById('msgModal'))?.hide();
             setTimeout(function() {
-                showSuccessNotification('Reminder ' + name + ' masuk antrean kirim.');
+                showSuccessNotification('Reminder ' + name + ' berhasil diproses.');
             }, 250);
         }).fail(function(xhr) {
             alert(getAjaxErrorMessage(xhr, 'Reminder gagal dikirim. Silakan coba lagi atau hubungi admin.'));
         }).always(function() {
             $sendBtn.data('is-sending', false);
-            updateFonnteCooldownUi();
+            $sendBtn.prop('disabled', false).html('<i class="fab fa-whatsapp me-1"></i> Kirim');
         });
     });
 });

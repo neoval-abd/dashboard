@@ -1,8 +1,5 @@
 <?php
-/*
- * Jalankan via Windows Task Scheduler:
- * php C:\Apache24\htdocs\dashboard\api\process_reminder_queue.php
- */
+/* Dipanggil berulang oleh service Windows/Linux setiap lima menit. */
 if (php_sapi_name() !== 'cli') {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'error' => 'Worker antrean hanya boleh dijalankan via CLI']);
@@ -12,35 +9,6 @@ if (php_sapi_name() !== 'cli') {
 require_once(dirname(__DIR__) . '/config/koneksi.php');
 require_once(__DIR__ . '/fonnte_client.php');
 require_once(__DIR__ . '/reminder_queue_helpers.php');
-
-function mark_reminder_sent($koneksi, $item)
-{
-    $sql = "INSERT INTO log_kirim_reminder_kontrol (no_sep, nomr, nama_pasien, tgl_kirim, pengirim)
-            VALUES (?, ?, ?, NOW(), ?)
-            ON DUPLICATE KEY UPDATE
-                nomr = VALUES(nomr),
-                nama_pasien = VALUES(nama_pasien),
-                tgl_kirim = NOW(),
-                pengirim = VALUES(pengirim)";
-
-    $stmt = $koneksi->prepare($sql);
-    if (!$stmt) {
-        return ['success' => false, 'error' => $koneksi->error];
-    }
-
-    $stmt->bind_param(
-        "ssss",
-        $item['no_sep'],
-        $item['nomr'],
-        $item['nama_pasien'],
-        $item['pengirim']
-    );
-    $ok = $stmt->execute();
-    $error = $stmt->error;
-    $stmt->close();
-
-    return $ok ? ['success' => true] : ['success' => false, 'error' => $error];
-}
 
 if (!ensure_reminder_queue_table($koneksi)) {
     echo 'Gagal memastikan tabel antrean: ' . $koneksi->error . PHP_EOL;
@@ -86,19 +54,6 @@ $item['attempts'] = (int) $item['attempts'] + 1;
 $send = send_fonnte_message($item['phone'], $item['message']);
 
 if (!empty($send['success'])) {
-    $mark = mark_reminder_sent($koneksi, $item);
-    if (empty($mark['success'])) {
-        $error = $mark['error'] ?? 'Gagal mencatat log terkirim';
-        $stmt = $koneksi->prepare("UPDATE antrean_reminder_kontrol
-                                   SET status = 'failed', last_error = ?
-                                   WHERE id = ?");
-        $stmt->bind_param("si", $error, $item['id']);
-        $stmt->execute();
-        $stmt->close();
-        echo $error . PHP_EOL;
-        exit(1);
-    }
-
     $stmt = $koneksi->prepare("UPDATE antrean_reminder_kontrol
                                SET status = 'sent', sent_at = NOW(), last_error = NULL
                                WHERE id = ?");

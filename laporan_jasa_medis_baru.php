@@ -23,7 +23,7 @@ if ($res_unit) {
     while ($row = $res_unit->fetch_assoc()) { $units[] = $row; }
 }
 
-$penjabs = [];
+$penjabs = []; 
 $res_pj = $koneksi->query("SELECT kd_pj, png_jawab FROM penjab WHERE status='1' ORDER BY png_jawab");
 if ($res_pj) {
     while ($row = $res_pj->fetch_assoc()) { $penjabs[] = $row; }
@@ -324,7 +324,7 @@ function loadJasaMedis() {
         activeRequest.abort();
     }
 
-    const request = $.getJSON('api/data_jasa_medis_baru.php', collectParams(), function(res) {
+    const request = $.getJSON('api/data_jasa_medis.php', collectParams(), function(res) {
         if (!res.success) {
             alert(res.message || 'Gagal memuat data.');
             return;

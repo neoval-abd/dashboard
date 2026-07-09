@@ -36,23 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         }
     }
 
-    $queued = [];
-    $sql = "SELECT no_sep, nomr, nama_pasien, status, attempts, scheduled_at, sent_at, last_error
-            FROM antrean_reminder_kontrol
-            WHERE status IN ('pending', 'processing', 'failed')";
-    $res = $koneksi->query($sql);
-    if ($res) {
-        while ($row = $res->fetch_assoc()) {
-            $queued[] = $row;
-        }
-    }
-
     echo json_encode([
         'sent' => $sent,
-        'queued' => $queued,
-        'fonnte_cooldown_seconds' => get_fonnte_send_cooldown(),
-        'fonnte_cooldown_remaining' => get_fonnte_cooldown_remaining(),
-        'fonnte_queue_delay_seconds' => get_fonnte_queue_delay(),
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -80,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    $scheduledAt = get_next_reminder_schedule($koneksi);
+    $scheduledAt = date('Y-m-d H:i:s');
     $sql = "INSERT INTO antrean_reminder_kontrol
                 (no_sep, nomr, nama_pasien, phone, message, pengirim, status, attempts, scheduled_at, last_error)
             VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL)
@@ -99,11 +84,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ok = $stmt->execute();
         $error = $stmt->error;
         $stmt->close();
+        if ($ok) {
+            $logSql = "INSERT INTO log_kirim_reminder_kontrol
+                           (no_sep, nomr, nama_pasien, tgl_kirim, pengirim)
+                       VALUES (?, ?, ?, NOW(), ?)
+                       ON DUPLICATE KEY UPDATE
+                           nomr = VALUES(nomr),
+                           nama_pasien = VALUES(nama_pasien),
+                           tgl_kirim = NOW(),
+                           pengirim = VALUES(pengirim)";
+            $logStmt = $koneksi->prepare($logSql);
+            if (!$logStmt) {
+                echo json_encode(['success' => false, 'error' => $koneksi->error]);
+                exit;
+            }
+            $logStmt->bind_param("ssss", $no_sep, $nomr, $nama_pasien, $pengirim);
+            $ok = $logStmt->execute();
+            $error = $logStmt->error;
+            $logStmt->close();
+        }
+
         echo json_encode($ok ? [
             'success' => true,
-            'queued' => true,
-            'scheduled_at' => $scheduledAt,
-            'message' => 'Reminder masuk antrean dan akan dikirim otomatis pada ' . $scheduledAt,
+            'message' => 'Reminder diterima sistem dan akan dikirim oleh service.',
         ] : ['success' => false, 'error' => $error], JSON_UNESCAPED_UNICODE);
     } else {
         echo json_encode(['success' => false, 'error' => $koneksi->error]);
