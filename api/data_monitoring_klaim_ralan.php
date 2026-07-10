@@ -14,6 +14,13 @@ require_once(dirname(__DIR__) . '/config/koneksi.php');
 $tgl_awal    = isset($_GET['tgl_awal'])    ? $_GET['tgl_awal']    : date('Y-m-01');
 $tgl_akhir   = isset($_GET['tgl_akhir'])   ? $_GET['tgl_akhir']   : date('Y-m-d');
 $kd_pj       = isset($_GET['kd_pj'])       ? $_GET['kd_pj']       : '';
+$stts_pulang = isset($_GET['stts_pulang']) ? $_GET['stts_pulang'] : '';
+$stts_keluar_expr = "
+    CASE
+        WHEN rp.stts = 'Sudah' THEN 'Sembuh'
+        ELSE rp.stts
+    END
+";
 
 // ─── Helper: Summary kosong ──────────────────────────────────────────────────
 function getSummaryEmpty() {
@@ -39,6 +46,7 @@ $sql_main = "
         d.nm_dokter,
         rp.tgl_registrasi,
         rp.jam_reg,
+        $stts_keluar_expr AS stts_pulang,
         COALESCE(
             (SELECT bs.no_sep FROM bridging_sep bs WHERE bs.no_rawat = rp.no_rawat LIMIT 1),
             (SELECT bsi.no_sep FROM bridging_sep_internal bsi WHERE bsi.no_rawat = rp.no_rawat LIMIT 1)
@@ -62,6 +70,11 @@ $types  = "ss";
 if (!empty($kd_pj)) {
     $sql_main .= " AND rp.kd_pj = ? ";
     $params[] = $kd_pj;
+    $types  .= "s";
+}
+if (!empty($stts_pulang)) {
+    $sql_main .= " AND $stts_keluar_expr = ? ";
+    $params[] = $stts_pulang;
     $types  .= "s";
 }
 
@@ -257,6 +270,7 @@ foreach ($rows as $r) {
         'kd_pj'          => $r['kd_pj'],
         'kd_dokter_jaga' => $r['nm_dokter'] ?? '-',
         'tgl_registrasi' => $r['tgl_registrasi'] . ' ' . $r['jam_reg'],
+        'stts_pulang'    => $r['stts_pulang'],
         'no_sep'         => $r['no_sep'],
         'du'             => $du,
         'ds1'            => $ds1,

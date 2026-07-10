@@ -1,7 +1,7 @@
 <?php
 /*
  * File: api/data_indikator_ranap.php
- * Fungsi: Menghitung Indikator Barber Johnson (BOR, ALOS, TOI, BTO, NDR, GDR)
+ * Fungsi: Menghitung Indikator (BOR, ALOS, TOI, BTO, NDR, GDR)
  * Logika: 
  * - Hari Perawatan (HP): Sum DATEDIFF semua pasien keluar (termasuk pindah).
  * - Pasien Keluar (D): Count pasien (kecuali pindah kamar).
@@ -122,7 +122,7 @@ $pembagi_pasien = ($pasien_keluar == 0) ? 1 : $pasien_keluar;
 
 
 // ---------------------------------------------------------
-// LANGKAH D: Kalkulasi Indikator Barber Johnson
+// LANGKAH D: Kalkulasi Indikator 
 // ---------------------------------------------------------
 
 // 1. BOR (Bed Occupancy Rate) %

@@ -234,6 +234,14 @@ function get_arrow_class($pages, $current) {
             color: var(--input-text);
             border: 1px solid var(--input-border);
         }
+        html.theme-glass-solid .form-control:disabled, html.theme-glass-animated .form-control:disabled,
+        html.theme-glass-solid .form-select:disabled, html.theme-glass-animated .form-select:disabled,
+        html.theme-glass-solid input:disabled, html.theme-glass-animated input:disabled {
+            background-color: var(--input-bg);
+            color: var(--input-text);
+            border-color: var(--input-border);
+            opacity: 0.85;
+        }
         html.theme-glass-solid .form-control:focus, html.theme-glass-animated .form-control:focus,
         html.theme-glass-solid .form-select:focus, html.theme-glass-animated .form-select:focus {
             background-color: var(--input-bg);

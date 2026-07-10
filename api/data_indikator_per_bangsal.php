@@ -1,7 +1,7 @@
 <?php
 /*
  * File: api/data_indikator_per_bangsal.php
- * Fungsi: Menghitung Indikator Barber Johnson per Bangsal.
+ * Fungsi: Menghitung Indikator per Bangsal.
  * Logika Spesifik:
  * - Pasien Pindah Kamar DIHITUNG sebagai Pasien Keluar (D) untuk bangsal tersebut.
  * - Menggunakan LEFT JOIN agar bangsal yang kosong tetap muncul di laporan.
@@ -92,7 +92,7 @@ foreach ($bangsal_data as $row) {
     $pembagi_d = ($d == 0) ? 1 : $d;
     $pembagi_bed = ($bed == 0) ? 1 : $bed;
 
-    // Rumus Barber Johnson
+    // Rumus
     $bor = ($hp / ($bed * $days_period)) * 100;
     $alos = $hp / $pembagi_d;
     $toi = (($bed * $days_period) - $hp) / $pembagi_d;

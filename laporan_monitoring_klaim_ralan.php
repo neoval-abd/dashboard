@@ -154,10 +154,20 @@ if ($kd_pj === '') {
                         <input type="date" id="tgl_akhir" name="tgl_akhir" class="form-control"
                                value="<?php echo htmlspecialchars($tgl_akhir); ?>" required>
                     </div>
-                    <div class="col-lg-3 col-md-4">
+                    <div class="col-lg-2 col-md-4">
                         <label class="form-label">Penjamin</label>
                         <input type="text" class="form-control" value="BPJS Kesehatan" disabled>
                         <input type="hidden" id="kd_pj" name="kd_pj" value="<?php echo htmlspecialchars($kd_pj); ?>">
+                    </div>
+                    <div class="col-lg-2 col-md-4">
+                        <label class="form-label">Status Keluar</label>
+                        <select id="stts_pulang" name="stts_pulang" class="form-select">
+                            <option value="">-- Semua Status --</option>
+                            <option value="Sembuh" <?php echo ($stts_pulang=='Sembuh') ? 'selected':''; ?>>Sembuh</option>
+                            <option value="Dirujuk" <?php echo ($stts_pulang=='Dirujuk') ? 'selected':''; ?>>Dirujuk</option>
+                            <option value="Batal" <?php echo ($stts_pulang=='Batal') ? 'selected':''; ?>>Batal</option>
+                            <option value="Belum" <?php echo ($stts_pulang=='Belum') ? 'selected':''; ?>>Belum</option>
+                        </select>
                     </div>
                     <div class="col-lg-3 col-md-4 d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-fill">
@@ -221,6 +231,7 @@ if ($kd_pj === '') {
                             <th>Dokter DPJP</th>
                             <th>Penjamin</th>
                             <th>Tanggal Kunjungan</th>
+                            <th>Stts Keluar</th>
                             <th>DU</th>
                             <th>DS 1</th>
                             <th>P 1</th>
@@ -233,7 +244,7 @@ if ($kd_pj === '') {
                     <tbody></tbody>
                     <tfoot>
                         <tr class="fw-bold">
-                            <td colspan="12" style="text-align:right; padding-right:12px;">
+                            <td colspan="13" style="text-align:right; padding-right:12px;">
                                 <strong>TOTAL</strong>
                             </td>
                             <td class="num" id="tblTotalRS">Rp 0</td>
@@ -296,7 +307,7 @@ function getTable() {
             autoWidth: false,
             columnDefs: [
                 { orderable: false, targets: [0] },
-                { className: 'num', targets: [12, 13, 14] }
+                { className: 'num', targets: [13, 14, 15] }
             ]
         });
     }
@@ -331,6 +342,7 @@ function populateTable(data) {
             escHtml(r.kd_dokter_jaga),
             escHtml(r.png_jawab),
             escHtml(r.tgl_registrasi),
+            escHtml(r.stts_pulang),
             r.du  ? '<span class="badge-dx text-info">' + escHtml(r.du) + '</span>'  : '–',
             r.ds1 ? '<span class="badge-dx text-info">' + escHtml(r.ds1) + '</span>' : '–',
             r.p1  ? '<span class="badge-dx text-info">' + escHtml(r.p1) + '</span>'  : '–',
@@ -370,7 +382,8 @@ function loadData() {
     const params = {
         tgl_awal    : $('#tgl_awal').val(),
         tgl_akhir   : $('#tgl_akhir').val(),
-        kd_pj       : $('#kd_pj').val()
+        kd_pj       : $('#kd_pj').val(),
+        stts_pulang : $('#stts_pulang').val()
     };
 
     $('#loadingArea').addClass('show');
@@ -433,6 +446,7 @@ $(document).ready(function() {
         const d   = String(now.getDate()).padStart(2, '0');
         $('#tgl_awal').val(y + '-' + m + '-01');
         $('#tgl_akhir').val(y + '-' + m + '-' + d);
+        $('#stts_pulang').val('');
         $('#statGrid').hide();
         $('#tableSection').hide();
     });

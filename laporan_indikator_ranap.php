@@ -183,7 +183,7 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                             <tr>
                                 <th>Indikator</th>
                                 <th>Rumus</th>
-                                <th>Nilai Ideal (Barber Johnson)</th>
+                                <th>Nilai Ideal</th>
                             </tr>
                         </thead>
                         <tbody>

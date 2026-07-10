@@ -60,19 +60,13 @@
                 "title": "Analisa Lengkap",
                 "icon": "fas fa-microscope",
                 "is_active": true
-            },
-            {
-                "url": "laporan_jasa_medis.php",
-                "title": "Jasa Med. & Paramed.",
-                "icon": "fas fa-user-nurse",
-                "is_active": true
             }
         ]
     },
     {
         "id": "grp_hrd",
         "is_group": true,
-        "title": "Administrasi & HRD",
+        "title": "Administrasi",
         "is_active": true,
         "items": [
             {
@@ -184,15 +178,21 @@
                 "is_active": true
             },
             {
-                "url": "laporan_hutang_obat.php",
-                "title": "Hutang Obat",
-                "icon": "fas fa-file-invoice-dollar",
+                "url": "laporan_rekap_obat_poli.php",
+                "title": "Rekap Obat Poli",
+                "icon": "fas fa-prescription-bottle-alt",
                 "is_active": true
             },
             {
-                "url": "laporan_dead_stock.php",
-                "title": "Dead Stock Obat",
-                "icon": "fas fa-skull-crossbones",
+                "url": "laporan_rekap_obat_ppn.php",
+                "title": "Rekap Obat PPN",
+                "icon": "fas fa-percent",
+                "is_active": true
+            },
+            {
+                "url": "laporan_hutang_obat.php",
+                "title": "Hutang Obat",
+                "icon": "fas fa-file-invoice-dollar",
                 "is_active": true
             },
             {
