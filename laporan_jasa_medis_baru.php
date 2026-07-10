@@ -5,29 +5,40 @@ require_once('includes/header.php');
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-d');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 
-$dokters = [];
-$res_dr = $koneksi->query("SELECT kd_dokter, nm_dokter FROM dokter WHERE status='1' ORDER BY nm_dokter");
-if ($res_dr) {
-    while ($row = $res_dr->fetch_assoc()) { $dokters[] = $row; }
+function jm_baru_fetch_options($koneksi, $sql)
+{
+    $items = [];
+
+    try {
+        $result = $koneksi->query($sql);
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $items[] = $row;
+            }
+        }
+    } catch (Throwable $error) {
+        error_log('[Jasa Medis Baru] Gagal memuat filter: ' . $error->getMessage());
+    }
+
+    return $items;
 }
 
-$petugas = [];
-$res_pt = $koneksi->query("SELECT nip, nama FROM petugas WHERE stts_aktif='AKTIF' ORDER BY nama");
-if ($res_pt) {
-    while ($row = $res_pt->fetch_assoc()) { $petugas[] = $row; }
-}
-
-$units = [];
-$res_unit = $koneksi->query("SELECT kd_poli, nm_poli FROM poliklinik WHERE status='1' ORDER BY nm_poli");
-if ($res_unit) {
-    while ($row = $res_unit->fetch_assoc()) { $units[] = $row; }
-}
-
-$penjabs = []; 
-$res_pj = $koneksi->query("SELECT kd_pj, png_jawab FROM penjab WHERE status='1' ORDER BY png_jawab");
-if ($res_pj) {
-    while ($row = $res_pj->fetch_assoc()) { $penjabs[] = $row; }
-}
+$dokters = jm_baru_fetch_options(
+    $koneksi,
+    "SELECT kd_dokter, nm_dokter FROM dokter WHERE status='1' ORDER BY nm_dokter"
+);
+$petugas = jm_baru_fetch_options(
+    $koneksi,
+    "SELECT nip, nama FROM petugas WHERE stts_aktif='AKTIF' ORDER BY nama"
+);
+$units = jm_baru_fetch_options(
+    $koneksi,
+    "SELECT kd_poli, nm_poli FROM poliklinik WHERE status='1' ORDER BY nm_poli"
+);
+$penjabs = jm_baru_fetch_options(
+    $koneksi,
+    "SELECT kd_pj, png_jawab FROM penjab WHERE status='1' ORDER BY png_jawab"
+);
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -324,7 +335,7 @@ function loadJasaMedis() {
         activeRequest.abort();
     }
 
-    const request = $.getJSON('api/data_jasa_medis.php', collectParams(), function(res) {
+    const request = $.getJSON('api/data_jasa_medis_baru.php', collectParams(), function(res) {
         if (!res.success) {
             alert(res.message || 'Gagal memuat data.');
             return;
