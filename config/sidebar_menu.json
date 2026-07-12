@@ -290,6 +290,12 @@
                 "title": "Reminder Kontrol",
                 "icon": "fas fa-calendar-check",
                 "is_active": true
+            },
+            {
+                "url": "laporan_generate_nomor_dok.php",
+                "title": "Generate Nomor DOK",
+                "icon": "fas fa-file-signature",
+                "is_active": true
             }
         ]
     }
