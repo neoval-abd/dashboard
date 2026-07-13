@@ -143,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $table_ready) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $table_ready && ($_POST['action'] ?? 'create') === 'create') {
     $jenis_kode = $_POST['jenis_kode'] ?? '';
     $pokja_kode = $_POST['pokja_kode'] ?? '';
-    $keterangan = trim($_POST['keterangan'] ?? '');
+    $keterangan = strtoupper(trim($_POST['keterangan'] ?? ''));
     $bulan = (int) ($_POST['bulan'] ?? $current_month);
     $tahun = $current_year;
     $kode_instansi = 'RSA';
@@ -347,6 +347,20 @@ require_once('includes/header.php');
     .pokja-counts strong { font-size: 1rem; }
     #tblDok thead th { white-space: nowrap; font-size: .78rem; }
     #tblDok tbody td { vertical-align: middle; font-size: .82rem; }
+    #tblDok th.col-nomor,
+    #tblDok td.col-nomor {
+        min-width: 210px;
+    }
+    #tblDok th.col-pokja,
+    #tblDok td.col-pokja {
+        min-width: 220px;
+    }
+    #tblDok th.col-keterangan,
+    #tblDok td.col-keterangan {
+        min-width: 360px;
+        width: 34%;
+        white-space: normal;
+    }
     .nomor-pill {
         display: inline-block;
         padding: 5px 9px;
@@ -527,7 +541,7 @@ require_once('includes/header.php');
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Keterangan / Judul Dokumen</label>
-                        <textarea class="form-control" name="keterangan" rows="4" placeholder="Contoh: Tim Pelayanan Obstetri Neonatal Emergensi Komprehensif..." required></textarea>
+                        <textarea class="form-control text-uppercase" name="keterangan" id="keteranganDok" rows="4" placeholder="Contoh: Pengukuran dan Pemantauan Indikator..." required></textarea>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-7">
@@ -601,10 +615,10 @@ require_once('includes/header.php');
                 <thead class="table-primary">
                     <tr>
                         <th>No</th>
-                        <th>Nomor Dokumen</th>
+                        <th class="col-nomor">Nomor Dokumen</th>
                         <th>Jenis</th>
-                        <th>POKJA / BAB</th>
-                        <th>Keterangan</th>
+                        <th class="col-pokja">POKJA / BAB</th>
+                        <th class="col-keterangan">Keterangan / Judul Dokumen</th>
                         <th>Bulan</th>
                         <th>Tahun</th>
                         <th>Dibuat</th>
@@ -617,13 +631,13 @@ require_once('includes/header.php');
                     <?php foreach ($documents as $idx => $doc): ?>
                         <tr>
                             <td><?php echo $idx + 1; ?></td>
-                            <td><span class="nomor-pill"><?php echo htmlspecialchars($doc['nomor_dok']); ?></span></td>
+                            <td class="col-nomor"><span class="nomor-pill"><?php echo htmlspecialchars($doc['nomor_dok']); ?></span></td>
                             <td><?php echo htmlspecialchars($doc['jenis_nama']); ?></td>
-                            <td>
+                            <td class="col-pokja">
                                 <strong><?php echo htmlspecialchars($doc['pokja_kode']); ?></strong><br>
                                 <small class="text-muted"><?php echo htmlspecialchars($doc['pokja_nama']); ?></small>
                             </td>
-                            <td><?php echo nl2br(htmlspecialchars($doc['keterangan'])); ?></td>
+                            <td class="col-keterangan"><?php echo nl2br(htmlspecialchars($doc['keterangan'])); ?></td>
                             <td><?php echo htmlspecialchars($months[(int)$doc['bulan']]['name'] ?? $doc['bulan_romawi']); ?></td>
                             <td><?php echo (int) $doc['tahun']; ?></td>
                             <td>
@@ -793,6 +807,12 @@ $(document).ready(function() {
     });
 
     $('#jenisKode, #bulanDok').on('change', updatePreviewNomor);
+    $('#keteranganDok').on('input', function() {
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        this.value = this.value.toUpperCase();
+        this.setSelectionRange(start, end);
+    });
     updatePreviewNomor();
 });
 </script>
