@@ -30,7 +30,7 @@ function dok_months() {
 
 function dok_types() {
     return [
-        'SK' => 'Kebijakan / SK',
+        'SK' => 'Kebijakan Direktur / SK',
         'PDN' => 'Pedoman / PDN',
         'SPO' => 'Standar Prosedur Operasional / SPO',
     ];
@@ -50,7 +50,7 @@ function dok_pokja() {
         'PAP' => 'Pelayanan dan Asuhan Pasien',
         'PAB' => 'Pelayanan Anestesi dan Bedah',
         'PKPO' => 'Pelayanan Kefarmasian dan Penggunaan Obat',
-        'KE' => 'Komunikasi dan Edukasi',
+        'KKE' => 'Komunikasi dan Edukasi',
         'SKP' => 'Sasaran Keselamatan Pasien',
         'PROGNAS PONEK' => 'Program Nasional PONEK',
         'PROGNAS HIV' => 'Program Nasional HIV',
