@@ -31,7 +31,7 @@ function dok_months() {
 function dok_types() {
     return [
         'SK' => 'Kebijakan Direktur / SK',
-        'PDN' => 'Pedoman / PDN',
+        'PDM' => 'Pedoman / PDM',
         'SPO' => 'Standar Prosedur Operasional / SPO',
     ];
 }
@@ -489,8 +489,8 @@ require_once('includes/header.php');
         <i class="fas fa-gavel"></i>
     </div>
     <div class="card shadow-sm dok-stat dok-orange">
-        <div class="value"><?php echo number_format($summary['by_type']['PDN'], 0, ',', '.'); ?></div>
-        <div class="label text-muted">Pedoman / PDN</div>
+        <div class="value"><?php echo number_format($summary['by_type']['PDM'], 0, ',', '.'); ?></div>
+        <div class="label text-muted">Pedoman / PDM</div>
         <i class="fas fa-book"></i>
     </div>
     <div class="card shadow-sm dok-stat dok-cyan">
@@ -580,7 +580,7 @@ require_once('includes/header.php');
                             <div class="pokja-counts">
                                 <div><small>SK</small><strong><?php echo (int) ($counts['SK'] ?? 0); ?></strong></div>
                                 <div><small>SPO</small><strong><?php echo (int) ($counts['SPO'] ?? 0); ?></strong></div>
-                                <div><small>PDN</small><strong><?php echo (int) ($counts['PDN'] ?? 0); ?></strong></div>
+                                <div><small>PDM</small><strong><?php echo (int) ($counts['PDM'] ?? 0); ?></strong></div>
                             </div>
                         </div>
                     <?php endforeach; ?>
