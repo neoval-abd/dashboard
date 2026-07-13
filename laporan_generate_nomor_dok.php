@@ -32,7 +32,7 @@ function dok_types() {
     return [
         'SK' => 'Kebijakan / SK',
         'PDN' => 'Pedoman / PDN',
-        'SPO' => 'SPO / SPO',
+        'SPO' => 'Standar Prosedur Operasional / SPO',
     ];
 }
 
@@ -55,11 +55,11 @@ function dok_pokja() {
         'SKP' => 'Sasaran Keselamatan Pasien',
         'PROGNAS PONEK' => 'Program Nasional PONEK',
         'PROGNAS HIV' => 'Program Nasional HIV',
-        'PROGRAM TB' => 'Program Nasional TB',
-        'PROGRAM PPRA' => 'Program Nasional PPRA',
-        'PROGRAM GERIATRI' => 'Program Nasional Geriatri',
-        'PROGRAM STUNTING' => 'Program Nasional Stunting',
-        'PROGRAM KB' => 'Program Nasional KB',
+        'PROGNAS TB' => 'Program Nasional TB',
+        'PROGNAS PPRA' => 'Program Nasional PPRA',
+        'PROGNAS GERIATRI' => 'Program Nasional Geriatri',
+        'PROGNAS STUNTING' => 'Program Nasional Stunting',
+        'PROGNAS KB' => 'Program Nasional KB',
     ];
 }
 
@@ -113,8 +113,36 @@ $current_year = (int) date('Y');
 $current_month = (int) date('n');
 $alert = null;
 $table_ready = dok_ensure_table($koneksi);
+$is_super_admin = isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $table_ready) {
+    $action = $_POST['action'] ?? 'create';
+
+    if ($action === 'delete') {
+        $delete_id = (int) ($_POST['id'] ?? 0);
+        $redirect_year = (int) ($_POST['tahun'] ?? $current_year);
+        if ($redirect_year < 2000 || $redirect_year > 2100) $redirect_year = $current_year;
+
+        if (!$is_super_admin) {
+            $alert = ['type' => 'danger', 'text' => 'Hapus nomor dokumen hanya bisa dilakukan oleh Super Admin.'];
+        } elseif ($delete_id <= 0) {
+            $alert = ['type' => 'danger', 'text' => 'Data dokumen tidak valid untuk dihapus.'];
+        } else {
+            if ($stmt = $koneksi->prepare("DELETE FROM generate_nomor_dok WHERE id = ?")) {
+                $stmt->bind_param("i", $delete_id);
+                if ($stmt->execute() && $stmt->affected_rows > 0) {
+                    $stmt->close();
+                    header('Location: laporan_generate_nomor_dok.php?tahun=' . $redirect_year . '&deleted=1');
+                    exit;
+                }
+                $stmt->close();
+            }
+            $alert = ['type' => 'danger', 'text' => 'Data dokumen gagal dihapus atau sudah tidak tersedia.'];
+        }
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $table_ready && ($_POST['action'] ?? 'create') === 'create') {
     $jenis_kode = $_POST['jenis_kode'] ?? '';
     $pokja_kode = $_POST['pokja_kode'] ?? '';
     $keterangan = trim($_POST['keterangan'] ?? '');
@@ -174,6 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $table_ready) {
 }
 
 $saved_number = $_GET['saved'] ?? '';
+$deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
 $year_filter = (int) ($_GET['tahun'] ?? $current_year);
 if ($year_filter < 2000 || $year_filter > 2100) $year_filter = $current_year;
 $next_preview = $table_ready ? dok_build_number(dok_next_number($koneksi, $current_year), 'SK', $months[$current_month]['roman'], $current_year) : '001/RSA/SK/' . $months[$current_month]['roman'] . '/' . $current_year;
@@ -216,6 +245,18 @@ require_once('includes/header.php');
 
 <style>
     .dok-filter .form-label { font-size: .78rem; font-weight: 700; margin-bottom: 4px; }
+    .dok-filter textarea.form-control,
+    .dok-filter input.form-control[readonly],
+    .dok-filter input.form-control[disabled],
+    .dok-filter .form-control-plain {
+        background-color: var(--bs-body-bg, #fff);
+        color: var(--bs-body-color, #212529);
+        border-color: var(--bs-border-color, #ced4da);
+    }
+    .dok-filter textarea.form-control::placeholder {
+        color: var(--bs-secondary-color, #6c757d);
+        opacity: 1;
+    }
     .dok-preview {
         border-radius: 8px;
         border: 1px dashed #0d6efd;
@@ -334,6 +375,81 @@ require_once('includes/header.php');
     }
     html.theme-glass-solid .dok-preview .number,
     html.theme-glass-animated .dok-preview .number { color: #38bdf8; }
+    html.theme-glass-solid .dok-filter textarea.form-control,
+    html.theme-glass-animated .dok-filter textarea.form-control,
+    html.theme-glass-solid .dok-filter input.form-control[readonly],
+    html.theme-glass-animated .dok-filter input.form-control[readonly] {
+        background: rgba(15, 23, 42, .72);
+        border-color: rgba(148, 163, 184, .45);
+        color: rgba(255,255,255,.92);
+    }
+    html.theme-glass-solid .dok-filter textarea.form-control::placeholder,
+    html.theme-glass-animated .dok-filter textarea.form-control::placeholder {
+        color: rgba(226, 232, 240, .62);
+    }
+    .dok-confirm-modal .modal-content {
+        border: 0;
+        border-radius: 14px;
+        box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+        overflow: hidden;
+    }
+    .dok-confirm-modal .modal-header {
+        background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+        color: #fff;
+        border-bottom: 0;
+        padding: 18px 20px;
+    }
+    .dok-confirm-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,.18);
+        margin-right: 12px;
+        flex: 0 0 auto;
+    }
+    .dok-confirm-modal .modal-body {
+        padding: 20px;
+        font-weight: 700;
+    }
+    .dok-confirm-box {
+        border: 1px dashed rgba(13, 110, 253, .35);
+        background: rgba(13, 110, 253, .06);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-weight: 700;
+        color: #0d6efd;
+    }
+    .dok-confirm-modal .modal-footer {
+        border-top: 0;
+        padding: 0 20px 20px;
+        gap: 8px;
+    }
+    .dok-confirm-modal .btn {
+        border-radius: 8px;
+        font-weight: 700;
+        padding: 8px 14px;
+    }
+    .dok-confirm-modal.is-danger .modal-header {
+        background: linear-gradient(135deg, #dc3545, #fd7e14);
+    }
+    .dok-confirm-modal.is-danger .dok-confirm-box {
+        border-color: rgba(220, 53, 69, .35);
+        background: rgba(220, 53, 69, .06);
+        color: #dc3545;
+    }
+    html.theme-glass-solid .dok-confirm-modal .modal-content,
+    html.theme-glass-animated .dok-confirm-modal .modal-content {
+        background: rgba(15, 23, 42, .96);
+        color: rgba(255,255,255,.92);
+        border: 1px solid rgba(148, 163, 184, .2);
+    }
+    html.theme-glass-solid .dok-confirm-modal .text-muted,
+    html.theme-glass-animated .dok-confirm-modal .text-muted {
+        color: rgba(226, 232, 240, .68) !important;
+    }
 </style>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -354,6 +470,11 @@ require_once('includes/header.php');
     <div class="alert alert-success">
         <i class="fas fa-check-circle me-1"></i> Nomor dokumen berhasil dibuat:
         <strong><?php echo htmlspecialchars($saved_number); ?></strong>
+    </div>
+<?php endif; ?>
+<?php if ($deleted): ?>
+    <div class="alert alert-success">
+        <i class="fas fa-trash-alt me-1"></i> Nomor dokumen berhasil dihapus.
     </div>
 <?php endif; ?>
 
@@ -388,6 +509,7 @@ require_once('includes/header.php');
             </div>
             <div class="card-body">
                 <form method="post" id="dokForm">
+                    <input type="hidden" name="action" value="create">
                     <div class="mb-3">
                         <label class="form-label">Jenis Dokumen</label>
                         <select class="form-select" name="jenis_kode" id="jenisKode" required>
@@ -487,6 +609,9 @@ require_once('includes/header.php');
                         <th>Bulan</th>
                         <th>Tahun</th>
                         <th>Dibuat</th>
+                        <?php if ($is_super_admin): ?>
+                            <th class="no-export text-center">Aksi</th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
@@ -506,6 +631,18 @@ require_once('includes/header.php');
                                 <?php echo htmlspecialchars(date('d/m/Y H:i', strtotime($doc['created_at']))); ?><br>
                                 <small class="text-muted"><?php echo htmlspecialchars($doc['created_by'] ?? '-'); ?></small>
                             </td>
+                            <?php if ($is_super_admin): ?>
+                                <td class="text-center">
+                                    <form method="post" class="d-inline delete-dok-form">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?php echo (int) $doc['id']; ?>">
+                                        <input type="hidden" name="tahun" value="<?php echo (int) $year_filter; ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus dokumen">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            <?php endif; ?>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -514,16 +651,72 @@ require_once('includes/header.php');
     </div>
 </div>
 
+<div class="modal fade dok-confirm-modal" id="dokConfirmModal" tabindex="-1" aria-labelledby="dokConfirmTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center">
+                    <span class="dok-confirm-icon"><i class="fas fa-check-circle"></i></span>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0" id="dokConfirmTitle">Konfirmasi Data</h5>
+                        <small id="dokConfirmSubtitle">Pastikan data dokumen sudah sesuai.</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3 text-muted" id="dokConfirmMessage">Data sudah benar dan siap dibuatkan nomor dokumen?</p>
+                <div class="dok-confirm-box" id="dokConfirmPreview">
+                    <?php echo htmlspecialchars($next_preview); ?>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal" id="dokConfirmCancel">
+                    <i class="fas fa-times me-1"></i>Tidak
+                </button>
+                <button type="button" class="btn btn-primary" id="dokConfirmYes">
+                    <i class="fas fa-save me-1"></i>Ya, Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php ob_start(); ?>
 <script>
 const nextUrut = <?php echo (int) dok_next_number($koneksi, $current_year); ?>;
 const yearDok = <?php echo (int) $current_year; ?>;
+let pendingDokForm = null;
+let dokConfirmModal = null;
 
 function updatePreviewNomor() {
     const jenis = $('#jenisKode').val() || 'SK';
     const roman = $('#bulanDok option:selected').data('roman') || 'I';
     const nomor = String(nextUrut).padStart(3, '0') + '/RSA/' + jenis + '/' + roman + '/' + yearDok;
     $('#previewNomor').text(nomor);
+}
+
+function openDokConfirm(options) {
+    const modalEl = document.getElementById('dokConfirmModal');
+    if (!modalEl) return false;
+
+    modalEl.classList.toggle('is-danger', options.variant === 'danger');
+    $('#dokConfirmTitle').text(options.title);
+    $('#dokConfirmSubtitle').text(options.subtitle);
+    $('#dokConfirmMessage').text(options.message);
+    $('#dokConfirmPreview').text(options.preview);
+    $('#dokConfirmYes')
+        .removeClass('btn-primary btn-danger')
+        .addClass(options.variant === 'danger' ? 'btn-danger' : 'btn-primary')
+        .html(options.confirmHtml);
+
+    if (window.bootstrap && bootstrap.Modal) {
+        dokConfirmModal = dokConfirmModal || new bootstrap.Modal(modalEl);
+        dokConfirmModal.show();
+        return true;
+    }
+
+    return false;
 }
 
 $(document).ready(function() {
@@ -547,15 +740,56 @@ $(document).ready(function() {
                 text: '<i class="fas fa-file-excel me-1"></i>Export Excel',
                 className: 'btn btn-success btn-sm',
                 title: 'Generate_Nomor_DOK_<?php echo $year_filter; ?>',
-                exportOptions: { columns: ':visible' }
+                exportOptions: { columns: ':visible:not(.no-export)' }
             },
             {
                 extend: 'print',
                 text: '<i class="fas fa-print me-1"></i>Print',
                 className: 'btn btn-outline-secondary btn-sm',
-                exportOptions: { columns: ':visible' }
+                exportOptions: { columns: ':visible:not(.no-export)' }
             }
         ]
+    });
+
+    $('#dokForm').on('submit', function(e) {
+        e.preventDefault();
+        pendingDokForm = this;
+        const shown = openDokConfirm({
+            title: 'Konfirmasi Data',
+            subtitle: 'Pastikan data dokumen sudah sesuai.',
+            message: 'Data sudah benar dan siap dibuatkan nomor dokumen?',
+            preview: $('#previewNomor').text(),
+            confirmHtml: '<i class="fas fa-save me-1"></i>Ya, Simpan',
+            variant: 'primary'
+        });
+
+        if (!shown && confirm('Data sudah benar?')) {
+            pendingDokForm.submit();
+        }
+    });
+
+    $('.delete-dok-form').on('submit', function(e) {
+        e.preventDefault();
+        pendingDokForm = this;
+        const nomorDok = $(this).closest('tr').find('.nomor-pill').text() || 'Nomor dokumen ini';
+        const shown = openDokConfirm({
+            title: 'Hapus Dokumen',
+            subtitle: 'Aksi ini hanya untuk Super Admin.',
+            message: 'Yakin ingin menghapus nomor dokumen ini? Data yang sudah dihapus tidak bisa dikembalikan.',
+            preview: nomorDok,
+            confirmHtml: '<i class="fas fa-trash-alt me-1"></i>Ya, Hapus',
+            variant: 'danger'
+        });
+
+        if (!shown && confirm('Hapus nomor dokumen ini? Data yang sudah dihapus tidak bisa dikembalikan.')) {
+            pendingDokForm.submit();
+        }
+    });
+
+    $('#dokConfirmYes').on('click', function() {
+        if (pendingDokForm) {
+            pendingDokForm.submit();
+        }
     });
 
     $('#jenisKode, #bulanDok').on('change', updatePreviewNomor);

@@ -290,7 +290,15 @@
                 "title": "Reminder Kontrol",
                 "icon": "fas fa-calendar-check",
                 "is_active": true
-            },
+            }
+        ]
+    },
+    {
+        "id": "grp_akreditasi",
+        "is_group": true,
+        "title": "Akreditasi",
+        "is_active": true,
+        "items": [
             {
                 "url": "laporan_generate_nomor_dok.php",
                 "title": "Generate Nomor DOK",
