@@ -44,7 +44,6 @@ function dok_pokja() {
         'PMKP' => 'Peningkatan Mutu dan Keselamatan Pasien',
         'MRMIK' => 'Manajemen Rekam Medis dan Informasi Kesehatan',
         'PPI' => 'Pencegahan dan Pengendalian Infeksi',
-        'PPK' => 'Pendidikan Dalam Pelayanan Kesehatan',
         'AKP' => 'Akses dan Kesinambungan Pelayanan',
         'HPK' => 'Hak Pasien dan Keterlibatan Keluarga',
         'PP' => 'Pengkajian Pasien',
@@ -57,7 +56,6 @@ function dok_pokja() {
         'PROGNAS HIV' => 'Program Nasional HIV',
         'PROGNAS TB' => 'Program Nasional TB',
         'PROGNAS PPRA' => 'Program Nasional PPRA',
-        'PROGNAS GERIATRI' => 'Program Nasional Geriatri',
         'PROGNAS STUNTING' => 'Program Nasional Stunting',
         'PROGNAS KB' => 'Program Nasional KB',
     ];
@@ -87,10 +85,10 @@ function dok_ensure_table($koneksi) {
     return (bool) $koneksi->query($sql);
 }
 
-function dok_next_number($koneksi, $tahun) {
+function dok_next_number($koneksi, $tahun, $jenis_kode) {
     $next = 1;
-    if ($stmt = $koneksi->prepare("SELECT COALESCE(MAX(nomor_urut), 0) + 1 AS next_no FROM generate_nomor_dok WHERE tahun = ?")) {
-        $stmt->bind_param("i", $tahun);
+    if ($stmt = $koneksi->prepare("SELECT COALESCE(MAX(nomor_urut), 0) + 1 AS next_no FROM generate_nomor_dok WHERE tahun = ? AND jenis_kode = ?")) {
+        $stmt->bind_param("is", $tahun, $jenis_kode);
         if ($stmt->execute()) {
             $res = $stmt->get_result();
             if ($row = $res->fetch_assoc()) {
@@ -159,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $table_ready && ($_POST['action'] ?
         $inserted = false;
 
         for ($try = 0; $try < 3 && !$inserted; $try++) {
-            $nomor_urut = dok_next_number($koneksi, $tahun);
+            $nomor_urut = dok_next_number($koneksi, $tahun, $jenis_kode);
             $nomor_dok = dok_build_number($nomor_urut, $jenis_kode, $months[$bulan]['roman'], $tahun, $kode_instansi);
             $jenis_nama = $types[$jenis_kode];
             $pokja_nama = $pokja[$pokja_kode];
@@ -205,7 +203,11 @@ $saved_number = $_GET['saved'] ?? '';
 $deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
 $year_filter = (int) ($_GET['tahun'] ?? $current_year);
 if ($year_filter < 2000 || $year_filter > 2100) $year_filter = $current_year;
-$next_preview = $table_ready ? dok_build_number(dok_next_number($koneksi, $current_year), 'SK', $months[$current_month]['roman'], $current_year) : '001/RSA/SK/' . $months[$current_month]['roman'] . '/' . $current_year;
+$next_numbers = [];
+foreach ($types as $type_code => $type_label) {
+    $next_numbers[$type_code] = $table_ready ? dok_next_number($koneksi, $current_year, $type_code) : 1;
+}
+$next_preview = dok_build_number($next_numbers['SK'] ?? 1, 'SK', $months[$current_month]['roman'], $current_year);
 
 $documents = [];
 $summary = [
@@ -227,9 +229,6 @@ if ($table_ready) {
                 $summary['total']++;
                 if (isset($summary['by_type'][$row['jenis_kode']])) {
                     $summary['by_type'][$row['jenis_kode']]++;
-                }
-                if (!isset($summary['by_pokja'][$row['pokja_kode']])) {
-                    $summary['by_pokja'][$row['pokja_kode']] = array_fill_keys(array_keys($types), 0);
                 }
                 if (isset($summary['by_pokja'][$row['pokja_kode']][$row['jenis_kode']])) {
                     $summary['by_pokja'][$row['pokja_kode']][$row['jenis_kode']]++;
@@ -684,7 +683,7 @@ require_once('includes/header.php');
 
 <?php ob_start(); ?>
 <script>
-const nextUrut = <?php echo (int) dok_next_number($koneksi, $current_year); ?>;
+const nextUrutByJenis = <?php echo json_encode($next_numbers, JSON_UNESCAPED_SLASHES); ?>;
 const yearDok = <?php echo (int) $current_year; ?>;
 let pendingDokForm = null;
 let dokConfirmModal = null;
@@ -692,6 +691,7 @@ let dokConfirmModal = null;
 function updatePreviewNomor() {
     const jenis = $('#jenisKode').val() || 'SK';
     const roman = $('#bulanDok option:selected').data('roman') || 'I';
+    const nextUrut = nextUrutByJenis[jenis] || 1;
     const nomor = String(nextUrut).padStart(3, '0') + '/RSA/' + jenis + '/' + roman + '/' + yearDok;
     $('#previewNomor').text(nomor);
 }
