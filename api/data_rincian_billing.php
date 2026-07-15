@@ -264,6 +264,51 @@ try {
         $sum_potong += $val;
     }
 
+    // G2. BIAYA PERAWATAN BAYI
+    // Pada nota ranap ibu, komponen bayi disimpan sebagai blok khusus di tabel billing.
+    // Blok ini tidak selalu punya jejak detail di tabel rawat/obat yang dihitung ulang.
+    $q_bayi_block = safe_query($koneksi, "SELECT noindex FROM billing WHERE no_rawat='$no_rawat' AND no='Biaya Perawatan Bayi' ORDER BY noindex LIMIT 1");
+    if ($q_bayi_block && $bayi_block = $q_bayi_block->fetch_assoc()) {
+        $bayi_start = (int)$bayi_block['noindex'];
+        $bayi_end = 999999;
+        $q_bayi_end = safe_query($koneksi, "SELECT noindex FROM billing WHERE no_rawat='$no_rawat' AND noindex > $bayi_start AND no IN ('Resep Pulang','Tambahan Biaya','Potongan Biaya') ORDER BY noindex LIMIT 1");
+        if ($q_bayi_end && $end_row = $q_bayi_end->fetch_assoc()) {
+            $bayi_end = (int)$end_row['noindex'];
+        }
+
+        addRow($rows, $grand_total, "Biaya Perawatan Bayi", ":", 0, 0, 0, 0, true);
+        $sql_bayi = "SELECT nm_perawatan, status, biaya, jumlah, tambahan,
+            CASE
+                WHEN status IN ('Retur Obat','Potongan') AND totalbiaya > 0 THEN (totalbiaya * -1)
+                ELSE totalbiaya
+            END AS totalbiaya
+            FROM billing
+            WHERE no_rawat='$no_rawat'
+              AND noindex > $bayi_start
+              AND noindex < $bayi_end
+              AND totalbiaya <> 0
+              AND status <> 'Tagihan'
+              AND status NOT LIKE 'Ttl%'
+            ORDER BY noindex";
+        $q_bayi = safe_query($koneksi, $sql_bayi);
+        if ($q_bayi) while($r = $q_bayi->fetch_assoc()) {
+            $val = safeFloat($r['totalbiaya']);
+            $status = trim($r['status']);
+            $label = $status !== '' && $status !== '-' ? $status : 'Billing Bayi';
+            addRow($rows, $grand_total, $label, $r['nm_perawatan'], $r['biaya'], $r['jumlah'], $r['tambahan'], $val);
+
+            $kat = strtolower($status);
+            if (strpos($kat, 'obat') !== false) {
+                if ($val < 0) $sum_retur += abs($val);
+                else $sum_obat += $val;
+            } elseif (strpos($kat, 'ranap') !== false && strpos($kat, 'dokter') !== false) {
+                $sum_dr_ranap += $val;
+            } elseif (strpos($kat, 'ranap') !== false && strpos($kat, 'paramedis') !== false) {
+                $sum_pr_ranap += $val;
+            }
+        }
+    }
+
     // H. JASA ADMINISTRASI MEDIS (REVISI: LOGIKA PILAH SETTING)
     // Hanya hitung jika pasien RANAP (sesuai logika Khanza umumnya)
     if($status_lanjut == 'Ranap') {

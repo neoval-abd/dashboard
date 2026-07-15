@@ -307,6 +307,12 @@ $total = count($birthday_patients);
                                 data-rm="<?php echo $rm; ?>">
                                 <i class="fab fa-whatsapp"></i> Kirim Ucapan
                             </button>
+                            <button class="btn btn-sm btn-outline-success btn-manual-wa"
+                                data-phone="<?php echo $phone_wa; ?>"
+                                data-name="<?php echo $nm; ?>"
+                                data-age="<?php echo $usia; ?>">
+                                <i class="fab fa-whatsapp"></i> Kirim Manual
+                            </button>
                         <?php else: ?>
                             <button class="btn-wa" disabled>
                                 <i class="fas fa-phone-slash"></i> No. HP Tidak Ada
@@ -341,13 +347,13 @@ $total = count($birthday_patients);
                     <textarea id="msgText" class="form-control"></textarea>
                 </div>
                 <div class="alert alert-info py-2 small mb-0">
-                    <i class="fas fa-info-circle me-1"></i> Pesan akan dikirim otomatis melalui Fonnte setelah tombol kirim ditekan.
+                    <i class="fas fa-info-circle me-1"></i> Pesan akan masuk antrean service dan dikirim bertahap melalui Fonnte.
                 </div>
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                 <button id="btnSendWA" type="button" class="btn-wa" style="padding:10px 24px;">
-                    <i class="fab fa-whatsapp me-1"></i> Kirim via Fonnte
+                    <i class="fab fa-whatsapp me-1"></i> Kirim
                 </button>
             </div>
         </div>
@@ -520,6 +526,14 @@ $(document).ready(function() {
         alert(getDefaultMsg(name, age));
     });
 
+    $(document).on('click', '.btn-manual-wa', function() {
+        const phone = $(this).data('phone');
+        const name = $(this).data('name');
+        const age = $(this).data('age');
+        const msg = getDefaultMsg(name, age);
+        window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+    });
+
     $('#btnSendWA').on('click', function(e) {
         e.preventDefault();
         const phone = $(this).data('phone');
@@ -540,6 +554,7 @@ $(document).ready(function() {
                 no_rkm_medis: rm,
                 phone: phone,
                 message: msg,
+                nama_pasien: $(cardBtn).data('name') || '',
                 pengirim: ''
             }
         }).done(function(res) {
@@ -557,13 +572,13 @@ $(document).ready(function() {
                 sentCount++;
                 $('#sentCount').text(sentCount);
                 setTimeout(function() {
-                    showSuccessNotification('Ucapan ulang tahun berhasil dikirim ke ' + name + '.');
+                    showSuccessNotification('Ucapan ulang tahun masuk antrean service untuk ' + name + '.');
                 }, 250);
             }
         }).fail(function(xhr) {
             alert(getAjaxErrorMessage(xhr, 'Ucapan gagal dikirim. Silakan coba lagi atau hubungi admin.'));
         }).always(function() {
-            $sendBtn.prop('disabled', false).html('<i class="fab fa-whatsapp me-1"></i> Kirim via Fonnte');
+            $sendBtn.prop('disabled', false).html('<i class="fab fa-whatsapp me-1"></i> Kirim');
         });
     });
 });

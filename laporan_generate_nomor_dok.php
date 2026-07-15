@@ -365,10 +365,38 @@ require_once('includes/header.php');
         display: inline-block;
         padding: 5px 9px;
         border-radius: 8px;
+        border: 0;
         background: rgba(13, 110, 253, .1);
         color: #0d6efd;
         font-weight: 800;
         font-variant-numeric: tabular-nums;
+        cursor: pointer;
+        transition: background-color .2s, color .2s, transform .2s;
+        user-select: none;
+    }
+    .nomor-pill:hover,
+    .nomor-pill:focus {
+        background: rgba(13, 110, 253, .18);
+        color: #084298;
+        outline: none;
+        transform: translateY(-1px);
+    }
+    .nomor-pill.is-copied {
+        background: rgba(25, 135, 84, .15);
+        color: #198754;
+    }
+    .dok-copy-toast {
+        position: fixed;
+        right: 22px;
+        bottom: 68px;
+        z-index: 1080;
+        border-radius: 8px;
+        background: #198754;
+        color: #fff;
+        padding: 10px 14px;
+        font-weight: 700;
+        box-shadow: 0 10px 24px rgba(0,0,0,.22);
+        display: none;
     }
     html.theme-glass-solid .pokja-box,
     html.theme-glass-animated .pokja-box {
@@ -575,11 +603,6 @@ require_once('includes/header.php');
         <div class="card shadow-sm h-100">
             <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h6 class="m-0 text-primary fw-bold"><i class="fas fa-chart-bar me-2"></i>Dashboard POKJA / BAB</h6>
-                <form method="get" class="d-flex align-items-center gap-2">
-                    <label class="small text-muted fw-bold">Tahun</label>
-                    <input type="number" name="tahun" class="form-control form-control-sm" style="width: 100px;" value="<?php echo $year_filter; ?>" min="2000" max="2100">
-                    <button class="btn btn-sm btn-outline-primary"><i class="fas fa-filter"></i></button>
-                </form>
             </div>
             <div class="card-body">
                 <div class="pokja-grid">
@@ -607,7 +630,6 @@ require_once('includes/header.php');
 <div class="card shadow-sm">
     <div class="card-header py-3 d-flex justify-content-between align-items-center">
         <h6 class="m-0 text-primary fw-bold"><i class="fas fa-table me-2"></i>Rekapan Nomor Dokumen</h6>
-        <small class="text-muted">Format: Nomor Urut/RSA/Jenis/Bulan/Tahun</small>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -631,7 +653,7 @@ require_once('includes/header.php');
                     <?php foreach ($documents as $idx => $doc): ?>
                         <tr>
                             <td><?php echo $idx + 1; ?></td>
-                            <td class="col-nomor"><span class="nomor-pill"><?php echo htmlspecialchars($doc['nomor_dok']); ?></span></td>
+                            <td class="col-nomor"><span class="nomor-pill" role="button" tabindex="0" title="Klik untuk copy nomor dokumen" data-copy-number="<?php echo htmlspecialchars($doc['nomor_dok']); ?>"><?php echo htmlspecialchars($doc['nomor_dok']); ?></span></td>
                             <td><?php echo htmlspecialchars($doc['jenis_nama']); ?></td>
                             <td class="col-pokja">
                                 <strong><?php echo htmlspecialchars($doc['pokja_kode']); ?></strong><br>
@@ -662,6 +684,10 @@ require_once('includes/header.php');
             </table>
         </div>
     </div>
+</div>
+
+<div class="dok-copy-toast" id="dokCopyToast">
+    <i class="fas fa-check-circle me-1"></i>Nomor dokumen tersalin
 </div>
 
 <div class="modal fade dok-confirm-modal" id="dokConfirmModal" tabindex="-1" aria-labelledby="dokConfirmTitle" aria-hidden="true">
@@ -731,6 +757,45 @@ function openDokConfirm(options) {
     }
 
     return false;
+}
+
+function copyDokNumber(text, el) {
+    const copyText = String(text || '').trim();
+    if (!copyText) return;
+
+    const done = function() {
+        $('.nomor-pill').removeClass('is-copied');
+        $(el).addClass('is-copied');
+        $('#dokCopyToast').stop(true, true).fadeIn(120).delay(1200).fadeOut(200);
+        setTimeout(function() {
+            $(el).removeClass('is-copied');
+        }, 1600);
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(copyText).then(done).catch(function() {
+            fallbackCopyDokNumber(copyText, done);
+        });
+        return;
+    }
+
+    fallbackCopyDokNumber(copyText, done);
+}
+
+function fallbackCopyDokNumber(text, callback) {
+    const input = document.createElement('textarea');
+    input.value = text;
+    input.setAttribute('readonly', '');
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    input.select();
+    try {
+        document.execCommand('copy');
+        callback();
+    } finally {
+        document.body.removeChild(input);
+    }
 }
 
 $(document).ready(function() {
@@ -803,6 +868,17 @@ $(document).ready(function() {
     $('#dokConfirmYes').on('click', function() {
         if (pendingDokForm) {
             pendingDokForm.submit();
+        }
+    });
+
+    $('#tblDok').on('click', '.nomor-pill', function() {
+        copyDokNumber($(this).data('copy-number') || $(this).text(), this);
+    });
+
+    $('#tblDok').on('keydown', '.nomor-pill', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            copyDokNumber($(this).data('copy-number') || $(this).text(), this);
         }
     });
 

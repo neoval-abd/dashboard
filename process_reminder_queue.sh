@@ -2,7 +2,7 @@
 cd "$(dirname "$0")" || exit 1
 
 while true; do
-    printf '[%s] Memeriksa antrean reminder...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+    printf '[%s] Memeriksa antrean WhatsApp...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     php api/process_reminder_queue.php
     sleep 300
 done
