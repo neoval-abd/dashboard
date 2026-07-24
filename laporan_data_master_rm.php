@@ -38,6 +38,7 @@ $tgl_akhir_default = date('Y-m-d');
         font-weight: 700;
         color: #303642;
         border-bottom: 2px solid #d9deea !important;
+        line-height: 1.35;
         white-space: nowrap;
         vertical-align: middle;
     }
@@ -45,9 +46,28 @@ $tgl_akhir_default = date('Y-m-d');
         font-size: .74rem;
         vertical-align: middle;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #tblDataMasterRm {
+        table-layout: fixed;
+    }
+    #tblDataMasterRm th,
+    #tblDataMasterRm td {
+        padding: .55rem .65rem;
+        box-sizing: border-box;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #tblDataMasterRm .dmrm-cell-text {
+        display: block;
+        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     .dmrm-table-wrap {
-        overflow-x: auto;
+        overflow: hidden;
     }
     .dmrm-note {
         border-left: 4px solid #f6c23e;
@@ -55,6 +75,82 @@ $tgl_akhir_default = date('Y-m-d');
     }
     .dmrm-wide-card .card-body {
         padding: .75rem;
+    }
+    .dmrm-wide-card .dataTables_wrapper .row:first-child {
+        row-gap: .75rem;
+    }
+    .dmrm-wide-card .dt-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .4rem;
+    }
+    .dmrm-wide-card .dt-buttons .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        min-height: 30px;
+        padding: .25rem .65rem;
+        font-size: .78rem;
+        font-weight: 600;
+        line-height: 1.2;
+    }
+    .dt-button-collection {
+        max-height: min(72vh, 520px);
+        overflow-y: auto !important;
+        overflow-x: hidden;
+        scrollbar-width: thin;
+    }
+    .dt-button-collection .dt-button {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        width: 100%;
+        min-width: 220px;
+        white-space: nowrap;
+    }
+    .dmrm-wide-card .dataTables_filter {
+        margin: 0;
+        text-align: right;
+    }
+    .dmrm-wide-card .dataTables_filter label {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        margin: 0;
+        font-size: .8rem;
+        font-weight: 600;
+    }
+    .dmrm-wide-card .dataTables_filter input {
+        width: min(260px, 56vw);
+        margin-left: 0;
+    }
+    .dmrm-wide-card .dataTables_scrollHeadInner table,
+    .dmrm-wide-card .dataTables_scrollBody table {
+        margin-bottom: 0 !important;
+        table-layout: fixed !important;
+    }
+    html.theme-glass-solid #tblDataMasterRm thead th,
+    html.theme-glass-animated #tblDataMasterRm thead th {
+        background: rgba(15, 23, 42, .9) !important;
+        color: #f8fafc !important;
+        border-color: rgba(255, 255, 255, .12) !important;
+    }
+    html.theme-glass-solid .dmrm-wide-card .dt-buttons .btn,
+    html.theme-glass-animated .dmrm-wide-card .dt-buttons .btn {
+        background: #334155 !important;
+        border-color: #64748b !important;
+        color: #f8fafc !important;
+    }
+    @media (max-width: 575.98px) {
+        .dmrm-wide-card .dataTables_filter,
+        .dmrm-wide-card .dataTables_filter label,
+        .dmrm-wide-card .dataTables_filter input {
+            width: 100%;
+        }
+        .dmrm-wide-card .dataTables_filter {
+            text-align: left;
+        }
     }
 </style>
 
@@ -147,8 +243,8 @@ $tgl_akhir_default = date('Y-m-d');
         <span class="badge bg-light text-dark border" id="infoRange">Data belum dimuat</span>
     </div>
     <div class="card-body">
-        <div class="table-responsive dmrm-table-wrap">
-            <table class="table table-bordered table-hover table-striped" id="tblDataMasterRm" style="width:100%">
+        <div class="dmrm-table-wrap">
+            <table class="table table-bordered table-hover table-striped" id="tblDataMasterRm">
                 <thead><tr id="dmrmHead"></tr></thead>
                 <tbody></tbody>
             </table>
@@ -198,32 +294,101 @@ function renderWarnings(warnings) {
     $('#warningBox').html(html).show();
 }
 
+function getColumnStyle(title) {
+    const normalized = String(title || '').toUpperCase();
+    const explicit = {
+        'BATAL': 82,
+        'NO.REGISTRASI': 150,
+        'NO.RI': 132,
+        'NO.RM': 112,
+        'TGL.LAHIR': 126,
+        'UMUR': 96,
+        'KEL.UMUR': 122,
+        'JNS.KELAMIN': 142,
+        'GOL.DARAH': 132,
+        'LOS': 78,
+        'KELAS': 92
+    };
+    const titleWidth = String(title || '').length * 8 + 54;
+    const width = explicit[normalized] || Math.max(90, Math.min(230, titleWidth));
+
+    return { width: width + 'px', className: 'dmrm-ellipsis' };
+}
+
+function buildColumnGroup(columnStyles) {
+    return '<colgroup>' + columnStyles.map(style => '<col style="width:' + style.width + '">').join('') + '</colgroup>';
+}
+
+function syncColumnLayout(columnStyles) {
+    const tableWidth = columnStyles.reduce((total, style) => total + parseInt(style.width, 10), 0);
+    const colGroup = buildColumnGroup(columnStyles);
+    $('.dmrm-wide-card .dataTables_scrollHeadInner').css({
+        width: tableWidth + 'px',
+        minWidth: tableWidth + 'px'
+    });
+    const $tables = $('#tblDataMasterRm')
+        .add($('.dmrm-wide-card .dataTables_scrollHead table'))
+        .add($('.dmrm-wide-card .dataTables_scrollBody table'));
+
+    $tables.each(function() {
+        const $table = $(this);
+        $table.children('colgroup').remove();
+        $table.prepend(colGroup);
+        $table.css({
+            width: tableWidth + 'px',
+            minWidth: tableWidth + 'px',
+            tableLayout: 'fixed'
+        });
+    });
+}
+
 function buildTable(columns, data) {
     columnsDataMaster = columns || [];
-    $('#dmrmHead').html(columnsDataMaster.map(col => '<th>' + escapeHtml(col.title) + '</th>').join(''));
+    const columnStyles = columnsDataMaster.map(col => getColumnStyle(col.title));
 
     if (dtDataMaster) {
         dtDataMaster.destroy();
+        $('#tblDataMasterRm colgroup').remove();
         $('#tblDataMasterRm tbody').empty();
     }
 
+    $('#dmrmHead').html(columnsDataMaster.map((col, index) => {
+        const style = columnStyles[index];
+        return '<th class="' + style.className + '" style="width:' + style.width + '">' + escapeHtml(col.title) + '</th>';
+    }).join(''));
+    syncColumnLayout(columnStyles);
+
     dtDataMaster = $('#tblDataMasterRm').DataTable({
         data: data || [],
-        columns: columnsDataMaster.map(col => ({
-            data: col.data,
-            defaultContent: '-',
-            render: function(value, type) {
-                if (type !== 'display') return value;
-                return escapeHtml(value || '-');
-            }
-        })),
+        columns: columnsDataMaster.map((col, index) => {
+            const style = columnStyles[index];
+            return {
+                data: col.data,
+                defaultContent: '-',
+                width: style.width,
+                className: style.className,
+                render: function(value, type) {
+                    if (type !== 'display') return value;
+                    const displayValue = escapeHtml(value || '-');
+                    return '<span class="dmrm-cell-text" title="' + displayValue + '">' + displayValue + '</span>';
+                }
+            };
+        }),
         language: ID_LANG_DMRM,
         pageLength: 25,
         lengthMenu: [10, 25, 50, 100, 250, 500],
         scrollX: true,
         scrollCollapse: true,
+        autoWidth: false,
+        columnDefs: columnStyles.map((style, index) => ({
+            targets: index,
+            width: style.width,
+            className: style.className
+        })),
         order: [[2, 'desc']],
-        dom: 'Bfrtip',
+        dom: "<'row align-items-center mb-2'<'col-sm-6'B><'col-sm-6'f>>" +
+             "<'row'<'col-12'tr>>" +
+             "<'row align-items-center mt-2'<'col-sm-5'i><'col-sm-7'p>>",
         buttons: [
             {
                 extend: 'excelHtml5',
@@ -243,10 +408,22 @@ function buildTable(columns, data) {
             },
             {
                 extend: 'colvis',
-                text: 'Kolom',
-                className: 'btn btn-sm btn-outline-secondary'
+                text: '<i class="fas fa-columns"></i><span>  Kolom</span>',
+                className: 'btn btn-secondary btn-sm',
+                columns: ':not(.noVis)'
             }
-        ]
+        ],
+        initComplete: function() {
+            syncColumnLayout(columnStyles);
+            this.api().columns.adjust();
+            syncColumnLayout(columnStyles);
+        }
+    });
+
+    dtDataMaster.on('column-visibility.dt draw.dt', function() {
+        syncColumnLayout(columnStyles);
+        dtDataMaster.columns.adjust();
+        syncColumnLayout(columnStyles);
     });
 }
 
@@ -307,6 +484,12 @@ $('#limitData').on('change', function() {
 
 $(document).ready(function() {
     loadDataMaster();
+});
+
+$(window).on('resize', function() {
+    if (dtDataMaster) {
+        dtDataMaster.columns.adjust();
+    }
 });
 </script>
 <?php $page_js = ob_get_clean(); ?>

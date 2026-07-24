@@ -23,9 +23,7 @@ $limit = (int)($_GET['limit'] ?? 1000);
 $limit = max(100, min($limit, 10000));
 
 $columns = [
-    ['data' => 'batal', 'title' => 'BATAL'],
-    ['data' => 'no_registrasi', 'title' => 'NO.REGISTRASI'],
-    ['data' => 'no_ri', 'title' => 'NO.RI'],
+    ['data' => 'no_ri', 'title' => 'NO.PERAWATAN'],
     ['data' => 'no_rm', 'title' => 'NO.RM'],
     ['data' => 'nama_pasien', 'title' => 'NAMA PASIEN'],
     ['data' => 'ibu_kandung', 'title' => 'IBU KANDUNG'],
@@ -45,35 +43,28 @@ $columns = [
     ['data' => 'pekerjaan', 'title' => 'PEKERJAAN'],
     ['data' => 'no_ktp_nik', 'title' => 'NO.KTP / NIK'],
     ['data' => 'no_bpjs', 'title' => 'NO.BPJS'],
-    ['data' => 'no_kk', 'title' => 'NO.KK'],
-    ['data' => 'nama_kk', 'title' => 'NAMA KK'],
     ['data' => 'no_telpon_hp', 'title' => 'NO.TELPON/HP'],
     ['data' => 'status', 'title' => 'STATUS'],
     ['data' => 'asal_pasien', 'title' => 'ASAL PASIEN'],
     ['data' => 'ket_asal_pasien', 'title' => 'KET.ASAL PASIEN'],
-    ['data' => 'cara_masuk', 'title' => 'CARA MASUK'],
     ['data' => 'poliklinik_ruang', 'title' => 'POLIKLINIK/RUANG'],
     ['data' => 'opname', 'title' => 'OPNAME'],
-    ['data' => 'no_kamar_tt', 'title' => 'NO.KAMAR/TT'],
     ['data' => 'kelas', 'title' => 'KELAS'],
     ['data' => 'cara_bayar', 'title' => 'CARA BAYAR'],
-    ['data' => 'no_jaminan', 'title' => 'NO.JAMINAN'],
+    ['data' => 'no_jaminan', 'title' => 'NO. SEP PASIEN'],
     ['data' => 'covid19_no_sep', 'title' => 'COVID19_NO_SEP'],
     ['data' => 'tgl_masuk', 'title' => 'TGL.MASUK'],
     ['data' => 'tgl_pulang', 'title' => 'TGL.PULANG'],
     ['data' => 'los', 'title' => 'LOS'],
     ['data' => 'cara_keluar', 'title' => 'CARA KELUAR'],
-    ['data' => 'keterangan_cara_keluar', 'title' => 'KETERANGAN (CARA KELUAR)'],
+    ['data' => 'keterangan_cara_keluar', 'title' => 'KET. (CARA KELUAR)'],
     ['data' => 'keadaan_keluar', 'title' => 'KEADAAN KELUAR'],
     ['data' => 'bb_lahir', 'title' => 'BB.LAHIR'],
-    ['data' => 'lengkap', 'title' => 'LENGKAP'],
-    ['data' => 'no_pemberitahuan', 'title' => 'NO.PEMBERITAHUAN'],
     ['data' => 'tgl_drm_kembali', 'title' => 'TGL.DRM KEMBALI'],
-    ['data' => 'tgl_lengkap', 'title' => 'TGL.LENGKAP'],
     ['data' => 'dx_masuk', 'title' => 'DX.MASUK'],
-    ['data' => 'dpjp', 'title' => 'DPJP'],
+    ['data' => 'dpjp', 'title' => 'DOKTER DPJP'],
     ['data' => 'no_dtd', 'title' => 'NO.DTD'],
-    ['data' => 'kasus', 'title' => 'KASUS'],
+    ['data' => 'kasus', 'title' => 'MACAM KASUS'],
     ['data' => 'dtd_utama', 'title' => 'DTD UTAMA'],
     ['data' => 'diagnosis_01', 'title' => 'DIAGNOSIS_01'],
     ['data' => 'icd10_01', 'title' => 'ICD 10.01'],
@@ -349,11 +340,8 @@ while ($row = $result->fetch_assoc()) {
 $stmt->close();
 
 $warnings = [
-    'NO.KK belum ditemukan sebagai kolom standar di tabel pasien; kolom disiapkan kosong.',
-    'LENGKAP, NO.PEMBERITAHUAN, TGL.DRM KEMBALI, dan TGL.LENGKAP belum punya tabel tracking per pasien yang jelas. Tabel set_kelengkapan_data_pasien yang ada adalah master kelengkapan identitas, bukan riwayat DRM.',
     'NO.DTD dan DTD belum ditemukan tabel referensinya pada skema yang terlihat, sehingga kolom disiapkan kosong.',
     'SP.PROCEDURE/SP.DRUG/SP.INVESTIGATION/SP.PROSTHESIS diambil dari inacbg_grouping_stage2 berdasarkan kolom type; jika type memakai istilah berbeda, hasil bisa kosong.',
-    'COVID19_NO_SEP dipetakan dari inacbg_noklaim_corona.no_klaim, bukan kolom di bridging_sep karena kolom COVID19_NO_SEP tidak ada.',
 ];
 
 echo json_encode([

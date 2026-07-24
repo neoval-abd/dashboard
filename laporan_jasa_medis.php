@@ -203,13 +203,22 @@ function fmtRp(value) {
     return 'Rp ' + fmtNum(value);
 }
 
+function normalizeExportNumber(value) {
+    const text = $('<div>').html(value ?? '').text().trim();
+    if (!text) return 0;
+    const normalized = text.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+    const number = Number(normalized);
+    return Number.isFinite(number) ? number : 0;
+}
+
 function exportCellValue(data, row, column) {
     const col = activeColumns[column] || {};
-    const text = $('<div>').html(data).text();
     if (col.money) {
-        return '\u200C' + text;
+        const rowData = dtJasaMedis ? dtJasaMedis.row(row).data() : null;
+        const rawValue = rowData && Object.prototype.hasOwnProperty.call(rowData, col.data) ? rowData[col.data] : data;
+        return typeof rawValue === 'number' ? rawValue : normalizeExportNumber(rawValue);
     }
-    return text;
+    return $('<div>').html(data).text();
 }
 
 function buildFooter(columns, summary) {
@@ -277,7 +286,10 @@ function buildTable(columns, data, title, summary) {
                 className: 'd-none',
                 exportOptions: {
                     columns: ':visible',
-                    format: { body: exportCellValue }
+                    format: {
+                        body: exportCellValue,
+                        footer: exportCellValue
+                    }
                 }
             },
             {
