@@ -253,7 +253,18 @@ function initTable() {
                 className: 'btn btn-success btn-sm',
                 title: 'Rekap_Obat_Poli',
                 footer: true,
-                exportOptions: { columns: ':visible' }
+                exportOptions: {
+                    columns: ':visible',
+                    format: {
+                        body: function(data, row, column) {
+                            return [2, 5, 6, 7, 8].includes(column) ? dtExportNumber(data) : dtExportCleanText(data);
+                        },
+                        footer: function(data, row, column) {
+                            const text = dtExportCleanText(data);
+                            return [2, 5, 6, 7, 8].includes(column) && /\d/.test(text) ? dtExportNumber(text) : text;
+                        }
+                    }
+                }
             },
             {
                 extend: 'print',

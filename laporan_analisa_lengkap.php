@@ -205,9 +205,7 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
                             body: function(data, row, column, node) {
                                 // 1. KHUSUS KOLOM RUPIAH (Index 20)
                                 if (column === 20) {
-                                    return typeof data === 'string' ?
-                                        data.replace(/\./g, '').replace(',', '.') :
-                                        data;
+                                    return dtExportNumber(data);
                                 }
 
                                 // 2. KHUSUS KOLOM TEXT LAINNYA (Untuk membersihkan <span class="badge">)
@@ -215,10 +213,10 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
                                 if (typeof data === 'string' && data.indexOf('<') > -1) {
                                     // Regex ini akan menghapus semua tag HTML dan menyisakan teksnya saja
                                     // Contoh: <span class="badge">Baru</span>  Menjadi:  Baru
-                                    return data.replace(/<[^>]+>/g, "").trim();
+                                    return dtExportCleanText(data);
                                 }
 
-                                return data;
+                                return dtExportCleanText(data);
                             }
                         }
                     }

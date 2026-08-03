@@ -237,7 +237,19 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
             "responsive": true,
             "dom": 'Bfrtip',
             "buttons": [
-                { extend: 'excelHtml5', className: 'btn btn-success btn-sm', title: 'Laporan Indikator Per Bangsal' },
+                {
+                    extend: 'excelHtml5',
+                    className: 'btn btn-success btn-sm',
+                    title: 'Laporan Indikator Per Bangsal',
+                    exportOptions: {
+                        columns: ':visible',
+                        format: {
+                            body: function(data, row, column) {
+                                return column > 0 ? dtExportNumber(data) : dtExportCleanText(data);
+                            }
+                        }
+                    }
+                },
                 { extend: 'pdfHtml5', className: 'btn btn-danger btn-sm', title: 'Laporan Indikator Per Bangsal' },
                 { extend: 'print', className: 'btn btn-secondary btn-sm' }
             ],

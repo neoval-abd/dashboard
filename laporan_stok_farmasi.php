@@ -223,20 +223,16 @@ while($row = $res_bangsal->fetch_assoc()){
 
                                 // 1. KHUSUS KOLOM ANGKA (Stok: Col 2 & Aset: Col 3)
                                 if (column === 2 || column === 3) {
-                                    // Hapus tag HTML (jika ada)
-                                    let clean = strData.replace(/<[^>]+>/g, "");
-                                    // Bersihkan karakter non-angka (kecuali koma & minus)
-                                    // Ganti koma desimal jadi titik (standar Excel)
-                                    return clean.replace(/[^\d,-]/g, '').replace(',', '.');
+                                    return dtExportNumber(strData);
                                 }
 
                                 // 2. BERSIHKAN HTML PADA KOLOM TEKS (Misal: Nama Obat)
                                 // Ganti <br> dengan strip " - " supaya tidak nempel
                                 if (strData.indexOf('<') > -1) {
-                                    return strData.replace(/<br\s*\/?>/gi, " - ").replace(/<[^>]+>/g, "").trim();
+                                    return dtExportCleanText(strData);
                                 }
 
-                                return data;
+                                return dtExportCleanText(data);
                             }
                         }
                     }

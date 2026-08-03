@@ -181,7 +181,14 @@ if($res_pj) {
                     extend: 'excelHtml5',
                     title: 'Laporan Waktu Tunggu Pelayanan Pasien Ralan',
                     className: 'btn btn-success btn-sm',
-                    exportOptions: { columns: ':visible' }
+                    exportOptions: {
+                        columns: ':visible',
+                        format: {
+                            body: function(data, row, column) {
+                                return [7, 9, 11].includes(column) ? dtExportNumber(data) : dtExportCleanText(data);
+                            }
+                        }
+                    }
                 }
             ],
             "columns": [

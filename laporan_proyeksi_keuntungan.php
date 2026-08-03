@@ -213,18 +213,16 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
                         body: function(data, row, column, node) {
                             // 1. FORMAT RUPIAH (Kolom 4 & 5)
                             if (column === 4 || column === 5) {
-                                return typeof data === 'string' ? data.replace(/[^\d,-]/g, '').replace(',', '.') : data;
+                                return dtExportNumber(data);
                             }
 
                             // 2. BERSIHKAN HTML (Untuk kolom No. Rawat/Nota yang ada <br> dan <small>)
                             if (typeof data === 'string') {
                                 // Ganti tag <br> dengan tanda strip " - " agar teks tidak menempel
-                                let text = data.replace(/<br\s*\/?>/gi, " - ");
-                                // Hapus semua tag HTML lain (<small>, <span>, dll)
-                                return text.replace(/<[^>]+>/g, "").trim();
+                                return dtExportCleanText(data);
                             }
 
-                            return data;
+                            return dtExportCleanText(data);
                         }
                     }
                 }
@@ -253,18 +251,16 @@ while($row = $res_pj->fetch_assoc()){ $penjabs[] = $row; }
                         body: function(data, row, column, node) {
                             // 1. FORMAT RUPIAH (Kolom 4 & 5)
                             if (column === 4 || column === 5) {
-                                return typeof data === 'string' ? data.replace(/[^\d,-]/g, '').replace(',', '.') : data;
+                                return dtExportNumber(data);
                             }
 
                             // 2. BERSIHKAN HTML (Untuk kolom No. Rawat/Nota yang ada <br> dan <small>)
                             if (typeof data === 'string') {
                                 // Ganti tag <br> dengan tanda strip " - " agar teks tidak menempel
-                                let text = data.replace(/<br\s*\/?>/gi, " - ");
-                                // Hapus semua tag HTML lain (<small>, <span>, dll)
-                                return text.replace(/<[^>]+>/g, "").trim();
+                                return dtExportCleanText(data);
                             }
 
-                            return data;
+                            return dtExportCleanText(data);
                         }
                     }
                 }

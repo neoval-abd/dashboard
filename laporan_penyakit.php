@@ -128,7 +128,20 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
             "responsive": true,
             "dom": 'Bfrtip', 
             "buttons": [
-                { extend: 'excelHtml5', className: 'btn btn-success btn-sm', text:'Excel', title: 'Top 10 Penyakit' },
+                {
+                    extend: 'excelHtml5',
+                    className: 'btn btn-success btn-sm',
+                    text:'Excel',
+                    title: 'Top 10 Penyakit',
+                    exportOptions: {
+                        columns: ':visible:not(:last-child)',
+                        format: {
+                            body: function(data, row, column) {
+                                return column === 2 ? dtExportNumber(data) : dtExportCleanText(data);
+                            }
+                        }
+                    }
+                },
                 { extend: 'print', className: 'btn btn-secondary btn-sm', text:'Print' }
             ],
             "columns": [
@@ -155,7 +168,19 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
             "responsive": true,
             "dom": 'Bfrtip',
             "buttons": [
-                { extend: 'excelHtml5', className: 'btn btn-success btn-sm', text: 'Export Excel Detail' }
+                {
+                    extend: 'excelHtml5',
+                    className: 'btn btn-success btn-sm',
+                    text: 'Export Excel Detail',
+                    exportOptions: {
+                        columns: ':visible',
+                        format: {
+                            body: function(data) {
+                                return dtExportCleanText(data);
+                            }
+                        }
+                    }
+                }
             ],
             "columns": [
                 // PERBAIKAN DISINI: Mapping Kolom harus sesuai urutan <thead>

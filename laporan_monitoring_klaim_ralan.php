@@ -289,7 +289,18 @@ function getTable() {
                     className: 'btn btn-success btn-sm',
                     title: 'Rekap_Monitoring_Klaim_Ralan',
                     footer: true,
-                    exportOptions: { columns: ':visible' }
+                    exportOptions: {
+                        columns: ':visible',
+                        format: {
+                            body: function(data, row, column) {
+                                return [13, 14, 15].includes(column) ? dtExportNumber(data) : dtExportCleanText(data);
+                            },
+                            footer: function(data, row, column) {
+                                const text = dtExportCleanText(data);
+                                return [13, 14, 15].includes(column) && /\d/.test(text) ? dtExportNumber(text) : text;
+                            }
+                        }
+                    }
                 },
                 {
                     extend: 'print',

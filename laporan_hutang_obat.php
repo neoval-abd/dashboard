@@ -232,7 +232,14 @@ require_once('includes/header.php');
                     extend: 'excelHtml5',
                     title: 'Laporan Hutang Obat Belum Lunas',
                     className: 'btn btn-success btn-sm',
-                    exportOptions: { columns: [1, 2, 3, 4, 5, 6, 7, 8, 9] } // Skip kolom Aksi (index 0)
+                    exportOptions: {
+                        columns: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+                        format: {
+                            body: function(data, row, column) {
+                                return [7, 8, 9].includes(column) ? dtExportNumber(data) : dtExportCleanText(data);
+                            }
+                        }
+                    } // Skip kolom Aksi (index 0)
                 },
                 {
                     extend: 'print',

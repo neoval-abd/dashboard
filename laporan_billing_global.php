@@ -355,7 +355,20 @@ if ($is_search) {
                         extend: 'excelHtml5',
                         text: '<i class="fas fa-file-excel"></i> Export Excel',
                         className: 'btn btn-success btn-sm',
-                        title: 'Laporan Billing Global - ' + $('input[name="tgl_awal"]').val() + ' sd ' + $('input[name="tgl_akhir"]').val()
+                        title: 'Laporan Billing Global - ' + $('input[name="tgl_awal"]').val() + ' sd ' + $('input[name="tgl_akhir"]').val(),
+                        exportOptions: {
+                            columns: ':visible',
+                            format: {
+                                body: function(data) {
+                                    const text = dtExportCleanText(data);
+                                    return text.includes('Rp') || /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(text) ? dtExportNumber(text) : text;
+                                },
+                                footer: function(data) {
+                                    const text = dtExportCleanText(data);
+                                    return text.includes('Rp') || /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(text) ? dtExportNumber(text) : text;
+                                }
+                            }
+                        }
                     },
                     {
                         extend: 'pdfHtml5',

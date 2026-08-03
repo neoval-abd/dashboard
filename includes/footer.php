@@ -88,6 +88,37 @@
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.colVis.min.js"></script>
 
+<script>
+window.dtExportCleanText = function(data) {
+    var text = (data === null || data === undefined) ? '' : String(data);
+    return text
+        .replace(/<br\s*\/?>/gi, ' - ')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\u200B|\u200C|\u200D|\uFEFF/g, '')
+        .trim();
+};
+
+window.dtExportNumber = function(data) {
+    var text = window.dtExportCleanText(data);
+    if (!text || text === '-') return 0;
+    var clean = text.replace(/[^\d,.-]/g, '');
+    if (!clean) return 0;
+
+    var comma = clean.lastIndexOf(',');
+    var dot = clean.lastIndexOf('.');
+    if (comma > -1 && dot > -1) {
+        clean = comma > dot ? clean.replace(/\./g, '').replace(',', '.') : clean.replace(/,/g, '');
+    } else if (comma > -1) {
+        clean = clean.replace(/\./g, '').replace(',', '.');
+    } else {
+        clean = clean.replace(/\.(?=\d{3}(\D|$))/g, '');
+    }
+
+    var number = Number(clean);
+    return Number.isFinite(number) ? number : 0;
+};
+</script>
+
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
 

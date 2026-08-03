@@ -277,7 +277,19 @@ include 'includes/header.php';
                  "<'row'<'col-sm-12'tr>>" +
                  "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
             buttons: [
-                { extend: 'excelHtml5', text: '<i class="fas fa-file-excel"></i> Export Excel', className: 'btn btn-success btn-sm' }
+                {
+                    extend: 'excelHtml5',
+                    text: '<i class="fas fa-file-excel"></i> Export Excel',
+                    className: 'btn btn-success btn-sm',
+                    exportOptions: {
+                        columns: ':visible',
+                        format: {
+                            body: function(data) {
+                                return dtExportCleanText(data);
+                            }
+                        }
+                    }
+                }
             ],
             columns: [
                 { data: 'tanggal', className: 'text-nowrap' },
@@ -301,7 +313,19 @@ include 'includes/header.php';
                  "<'row'<'col-sm-12'tr>>" +
                  "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
             buttons: [
-                { extend: 'excelHtml5', text: '<i class="fas fa-file-excel"></i> Export Excel', className: 'btn btn-success btn-sm' }
+                {
+                    extend: 'excelHtml5',
+                    text: '<i class="fas fa-file-excel"></i> Export Excel',
+                    className: 'btn btn-success btn-sm',
+                    exportOptions: {
+                        columns: ':visible',
+                        format: {
+                            body: function(data, row, column) {
+                                return [2, 3, 4, 5].includes(column) ? dtExportNumber(data) : dtExportCleanText(data);
+                            }
+                        }
+                    }
+                }
             ],
             order: [[5, 'desc']], // Sort by total denda
             columns: [

@@ -194,10 +194,7 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                                 // 1. KOLOM ANGKA & SELISIH (Index 5, 6, 7, 8)
                                 // Col 5: Selisih (ada <span>), Col 6-8: Rupiah (ada titik)
                                 if (column === 5 || column === 6 || column === 7 || column === 8) {
-                                    // Hapus tag HTML dulu (untuk membuang <span> pada kolom selisih)
-                                    let clean = str.replace(/<[^>]+>/g, "");
-                                    // Bersihkan format angka (hapus titik ribuan, ganti koma jadi titik)
-                                    return clean.replace(/[^\d,-]/g, '').replace(',', '.');
+                                    return dtExportNumber(str);
                                 }
 
                                 // 2. KOLOM NAMA BARANG (Index 2)
@@ -205,15 +202,15 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                                 if (column === 2 && str.indexOf('<') > -1) {
                                     // Ganti <br> dengan " - " agar Nama dan Kode terpisah rapi
                                     // Lalu hapus sisa tag HTML
-                                    return str.replace(/<br\s*\/?>/gi, " - ").replace(/<[^>]+>/g, "").trim();
+                                    return dtExportCleanText(str);
                                 }
 
                                 // Pembersihan Umum untuk kolom lain yang mungkin ada HTML
                                 if (str.indexOf('<') > -1) {
-                                     return str.replace(/<[^>]+>/g, "").trim();
+                                     return dtExportCleanText(str);
                                 }
 
-                                return data;
+                                return dtExportCleanText(data);
                             }
                         }
                     }

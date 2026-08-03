@@ -218,7 +218,19 @@ function buildTableShell(columns) {
                 className: 'btn btn-success btn-sm',
                 title: 'Rekap_Obat_PPN',
                 footer: true,
-                exportOptions: { columns: ':visible' }
+                exportOptions: {
+                    columns: ':visible',
+                    format: {
+                        body: function(data, row, column) {
+                            const key = currentColumns[column - 1];
+                            return ['total','ppn','total_ppn'].includes(key) ? dtExportNumber(data) : dtExportCleanText(data);
+                        },
+                        footer: function(data) {
+                            const text = dtExportCleanText(data);
+                            return /\d/.test(text) ? dtExportNumber(text) : text;
+                        }
+                    }
+                }
             },
             {
                 extend: 'print',

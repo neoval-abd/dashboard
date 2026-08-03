@@ -224,9 +224,9 @@ while($row = $res_dr->fetch_assoc()){ $dokters[] = $row; }
                 body: function(data, row, column, node) {
                     // Kolom 6 & 7 adalah Rupiah
                     if (column === 6 || column === 7) {
-                        return typeof data === 'string' ? data.replace(/[^\d,-]/g, '').replace(',', '.') : data;
+                        return dtExportNumber(data);
                     }
-                    return data;
+                    return dtExportCleanText(data);
                 }
             }
         }

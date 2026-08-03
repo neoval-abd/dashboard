@@ -200,6 +200,12 @@
                 "title": "Penerimaan Obat",
                 "icon": "fas fa-boxes",
                 "is_active": true
+            },
+            {
+                "url": "laporan_ringkasan_penggunaan_obat.php",
+                "title": "Ringkasan Obat",
+                "icon": "fas fa-pills",
+                "is_active": true
             }
         ]
     },

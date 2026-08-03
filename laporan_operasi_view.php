@@ -179,7 +179,23 @@ $tgl_akhir = date('Y-m-d');
     $(document).ready(function() {
         // Table Realisasi
         tableRealisasi = $('#tableRealisasi').DataTable({
-            "dom": 'Bfrtip', "buttons": ['excel', 'print'], "pageLength": 10, "deferRender": true,
+            "dom": 'Bfrtip',
+            "buttons": [
+                {
+                    extend: 'excelHtml5',
+                    title: 'Laporan Operasi Realisasi',
+                    exportOptions: {
+                        columns: ':visible:not(:last-child)',
+                        format: {
+                            body: function(data, row, column) {
+                                return column === 6 ? dtExportNumber(data) : dtExportCleanText(data);
+                            }
+                        }
+                    }
+                },
+                'print'
+            ],
+            "pageLength": 10, "deferRender": true,
             "order": [[ 0, "desc" ]],
             "columns": [
                 { "data": "tgl_operasi" },

@@ -187,7 +187,7 @@ html.theme-glass-animated .skeleton-text {
                                 // 1. KOLOM RUPIAH (Biaya Obat & Total Tagihan)
                                 if (column === 4 || column === 5) {
                                      // Regex ini otomatis membuang huruf/html, sisakan angka, koma, minus
-                                     return str.replace(/[^\d,-]/g, '').replace(',', '.');
+                                     return dtExportNumber(str);
                                 }
                                 
                                 // 2. KOLOM TEKS (Pasien, Dokter, Penjamin, Status)
@@ -195,10 +195,10 @@ html.theme-glass-animated .skeleton-text {
                                 if (str.indexOf('<') > -1) {
                                     // Ganti <br> dengan " - " agar baris baru terbaca rapi di Excel
                                     // Lalu hapus semua tag HTML (<...>)
-                                    return str.replace(/<br\s*\/?>/gi, " - ").replace(/<[^>]+>/g, "").trim();
+                                    return dtExportCleanText(str);
                                 }
 
-                                return data;
+                                return dtExportCleanText(data);
                             }
                         }
                     }

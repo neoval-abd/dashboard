@@ -485,9 +485,9 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                         // Jika data mengandung "Rp" atau pola angka ribuan (1.000)
                         if (typeof data === 'string' && (data.includes('Rp') || /^\d{1,3}(\.\d{3})+/.test(data))) {
                              // Hapus Rp, Hapus Titik, Ganti Koma jadi Titik (untuk desimal Excel)
-                             return data.replace(/[^\d,-]/g, '').replace(',', '.');
+                             return dtExportNumber(data);
                         }
-                        return data;
+                        return dtExportCleanText(data);
                     }
                 }
             }

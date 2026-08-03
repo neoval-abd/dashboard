@@ -854,7 +854,7 @@ $(document).ready(function() {
                     if (type === 'export') {
                         var tarif = row.selected_inacbg_tarif || 0;
                         if (tarif > 0) return tarif;
-                        return (data === null || data === undefined) ? '' : String(data).replace(/[^\d-]/g, '');
+                        return dtExportNumber(data);
                     }
                     if (data === null) return '<span class="skeleton-cell" data-norawat="' + row.no_rawat + '" data-col="plafon"><span class="skeleton-text"></span></span>';
                     var displayValue = row.selected_inacbg_tarif ? formatRupiah(parseFloat(row.selected_inacbg_tarif)) : data;
@@ -866,7 +866,7 @@ $(document).ready(function() {
                 className: 'text-center fw-bold text-primary',
                 render: function(data, type, row) {
                     if (type === 'export') {
-                        return (data === null || data === undefined) ? '' : String(data).replace(/[^\d,-]/g, '').replace(',', '.');
+                        return dtExportNumber(data);
                     }
                     if (data === null) return '<span class="skeleton-cell" data-norawat="' + row.no_rawat + '" data-col="estimasi"><span class="skeleton-text"></span></span>';
                     return data;
@@ -878,7 +878,7 @@ $(document).ready(function() {
                 render: function(data, type, row) {
                     if (type === 'export') {
                         if (data === null || data === undefined || data === '-') return '';
-                        return String(data).replace(/[^\d,-]/g, '').replace(',', '.');
+                        return dtExportNumber(data);
                     }
                     if (data === null) return '<span class="skeleton-cell" data-norawat="' + row.no_rawat + '" data-col="selisih"><span class="skeleton-text"></span></span>';
                     if (!data || data === '-') return '<span class="selisih-cell text-muted">-</span>';
@@ -1094,13 +1094,6 @@ function _doExport(rows) {
             isOver  = estimasi > plafon;
         }
 
-        var displaySelisih = '';
-        if (selisih !== '') {
-            displaySelisih = isOver
-                ? '-' + Math.abs(selisih).toLocaleString('id-ID') + ''
-                : 'Sisa: ' + selisih.toLocaleString('id-ID');
-        }
-
         var kelas = r.bpjs_kelas ? 'Kelas ' + r.bpjs_kelas : (r.room_kelas || '-');
         var naik  = '';
         var isSpecialWard = /HCU|PERINA|PERINATOLOGI|NICU|PICU|ICU|ISOLASI/i.test(String(r.kamar || ''));
@@ -1122,7 +1115,7 @@ function _doExport(rows) {
             r.selected_inacbg_desc || '',
             plafon !== '' ? plafon : '',
             estimasi !== '' ? estimasi : '',
-            displaySelisih,
+            selisih !== '' ? selisih : '',
             r.status_pulang || ''
         ];
 
@@ -1132,7 +1125,7 @@ function _doExport(rows) {
 
     var ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    var numCols = [10, 11]; 
+    var numCols = [10, 11, 12]; 
     var range = XLSX.utils.decode_range(ws['!ref']);
 
     for (var R = 1; R <= range.e.r; R++) {

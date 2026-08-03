@@ -264,17 +264,17 @@ if($res_bangsal) {
                             body: function(data, row, column, node) {
                                 // Kolom Stok (3) dan Nilai uang (4, 5)
                                 if (column === 3) {
-                                    return (data === null || data === undefined) ? '' : String(data).replace(/[^\d.-]/g, '');
+                                    return dtExportNumber(data);
                                 }
                                 if (column === 4 || column === 5) {
-                                    return (data === null || data === undefined) ? '' : String(data).replace(/[^\d,-]/g, '').replace(',', '.');
+                                    return dtExportNumber(data);
                                 }
                                 // Bersihkan HTML jika ada
                                 var strData = String(data);
                                 if (strData.indexOf('<') > -1) {
-                                    return strData.replace(/<[^>]+>/g, "").trim();
+                                    return dtExportCleanText(strData);
                                 }
-                                return data;
+                                return dtExportCleanText(data);
                             }
                         }
                     }

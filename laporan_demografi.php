@@ -186,7 +186,14 @@ if($res_pj) {
                     extend: 'excelHtml5',
                     title: 'Laporan Kepadataan Kunjungan Pasien Per Daerah (Demografi)',
                     className: 'btn btn-success btn-sm',
-                    exportOptions: { columns: ':visible' }
+                    exportOptions: {
+                        columns: ':visible',
+                        format: {
+                            body: function(data, row, column) {
+                                return [3, 4, 5].includes(column) ? dtExportNumber(data) : dtExportCleanText(data);
+                            }
+                        }
+                    }
                 }
             ],
             "columns": [
