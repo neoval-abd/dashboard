@@ -22,23 +22,33 @@ $columns = [
 ];
 foreach ($filters as $key => $value) { if ($value !== '') { $where[] = $columns[$key] . ' LIKE ?'; $types .= 's'; $values[] = '%' . $value . '%'; } }
 
-$sql = "SELECT COALESCE(p.nm_poli, '-') AS nm_poli, dpo.status, dpo.kode_brng, db.nama_brng,
+$sql = "SELECT CONCAT(dpo.tgl_perawatan, ' ', dpo.jam) AS tanggal_pemberian,
+        COALESCE(p.nm_poli, '-') AS nm_poli, dpo.status, rp.no_rkm_medis, ps.nm_pasien,
+        CONCAT_WS(', ', NULLIF(ps.alamat, ''), kel.nm_kel, kec.nm_kec, kab.nm_kab, prop.nm_prop) AS alamat_pasien,
+        COALESCE(ro.no_resep, '-') AS no_resep, COALESCE(dk.nm_dokter, '-') AS nm_dokter,
+        dpo.kode_brng, db.nama_brng,
         COALESCE(ks.satuan, db.kode_sat, '-') AS satuan, COALESCE(j.nama, '-') AS jenis,
         COALESCE(kb.nama, '-') AS kategori, COALESCE(gb.nama, '-') AS golongan,
-        SUM(dpo.jml) AS jumlah,
-        SUM(dpo.total - dpo.embalase - dpo.tuslah) AS biaya_obat,
-        SUM(dpo.embalase) AS embalase, SUM(dpo.tuslah) AS tuslah, SUM(dpo.total) AS total
+        dpo.jml AS jumlah,
+        (dpo.total - dpo.embalase - dpo.tuslah) AS biaya_obat,
+        dpo.embalase, dpo.tuslah, dpo.total
     FROM detail_pemberian_obat dpo
     INNER JOIN reg_periksa rp ON dpo.no_rawat = rp.no_rawat
     INNER JOIN databarang db ON dpo.kode_brng = db.kode_brng
+    INNER JOIN pasien ps ON rp.no_rkm_medis = ps.no_rkm_medis
     LEFT JOIN poliklinik p ON rp.kd_poli = p.kd_poli
+    LEFT JOIN kelurahan kel ON ps.kd_kel = kel.kd_kel
+    LEFT JOIN kecamatan kec ON ps.kd_kec = kec.kd_kec
+    LEFT JOIN kabupaten kab ON ps.kd_kab = kab.kd_kab
+    LEFT JOIN propinsi prop ON ps.kd_prop = prop.kd_prop
+    LEFT JOIN resep_obat ro ON ro.no_rawat = dpo.no_rawat AND ro.tgl_perawatan = dpo.tgl_perawatan AND ro.jam = dpo.jam
+    LEFT JOIN dokter dk ON ro.kd_dokter = dk.kd_dokter
     LEFT JOIN kodesatuan ks ON db.kode_sat = ks.kode_sat
     LEFT JOIN jenis j ON db.kdjns = j.kdjns
     LEFT JOIN kategori_barang kb ON db.kode_kategori = kb.kode
     LEFT JOIN golongan_barang gb ON db.kode_golongan = gb.kode
     WHERE " . implode(' AND ', $where) . "
-    GROUP BY rp.kd_poli, dpo.status, dpo.kode_brng
-    ORDER BY p.nm_poli, db.nama_brng";
+    ORDER BY dpo.tgl_perawatan, dpo.jam, dpo.no_rawat, dpo.kode_brng";
 
 $data = [];
 if ($stmt = $koneksi->prepare($sql)) {
