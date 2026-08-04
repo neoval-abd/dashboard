@@ -5,34 +5,380 @@ $tgl_awal_default = date('Y-m-01');
 $tgl_akhir_default = date('Y-m-d');
 ?>
 <style>
-.stat-card{border-radius:12px;padding:16px 20px;color:#fff}.stat-card h3{margin:0;font-weight:700}.stat-card small{opacity:.8}.filter-section .form-label{font-size:.78rem;font-weight:600;margin-bottom:2px}table.dataTable thead th{background:#f8f9fc;font-size:.78rem;font-weight:700;color:#333;white-space:nowrap}table.dataTable tbody td{font-size:.78rem;vertical-align:middle}#tblData th:nth-child(7),#tblData td:nth-child(7){min-width:360px;width:360px}
+    .stat-card {
+        border-radius: 12px;
+        padding: 16px 20px;
+        color: #fff
+    }
+
+    .stat-card h3 {
+        margin: 0;
+        font-weight: 700
+    }
+
+    .stat-card small {
+        opacity: .8
+    }
+
+    .filter-section .form-label {
+        font-size: .78rem;
+        font-weight: 600;
+        margin-bottom: 2px
+    }
+
+    table.dataTable thead th {
+        background: #f8f9fc;
+        font-size: .78rem;
+        font-weight: 700;
+        color: #333;
+        white-space: nowrap
+    }
+
+    table.dataTable tbody td {
+        font-size: .78rem;
+        vertical-align: middle
+    }
+
+    #tblData th:nth-child(7),
+    #tblData td:nth-child(7) {
+        min-width: 360px;
+        width: 360px
+    }
+
+    #tblData th:nth-child(17),
+    #tblData td:nth-child(17),
+    #tblData th:nth-child(18),
+    #tblData td:nth-child(18),
+    #tblData th:nth-child(19),
+    #tblData td:nth-child(19) {
+        width: 120px !important;
+        min-width: 120px;
+        max-width: 120px
+    }
+
+    #tblData th:last-child,
+    #tblData td:last-child,
+    #tblData col:last-child {
+        width: 110px !important;
+        min-width: 110px !important;
+        max-width: 110px !important
+    }
 </style>
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <div><h4 class="mb-0"><i class="fas fa-pills text-success me-2"></i>Ringkasan Penggunaan Obat</h4><small class="text-muted">Rincian penggunaan obat pasien rawat jalan dan rawat inap untuk pelaporan Dinkes</small></div>
+    <div>
+        <h4 class="mb-0"><i class="fas fa-pills text-success me-2"></i>Ringkasan Penggunaan Obat</h4><small class="text-muted">Rincian penggunaan obat pasien rawat jalan dan rawat inap untuk pelaporan Dinkes</small>
+    </div>
 </div>
-<div class="card shadow-sm mb-3 filter-section"><div class="card-body py-2"><div class="row g-2 align-items-end">
-    <div class="col-md-2"><label class="form-label">Dari Tanggal</label><input type="date" class="form-control form-control-sm" id="tglAwal" value="<?= $tgl_awal_default ?>"></div>
-    <div class="col-md-2"><label class="form-label">Sampai Tanggal</label><input type="date" class="form-control form-control-sm" id="tglAkhir" value="<?= $tgl_akhir_default ?>"></div>
-    <div class="col-md-2"><label class="form-label">Poli</label><select class="form-select form-select-sm" id="fPoli"><option value="">Semua poli</option></select></div>
-    <div class="col-md-2"><label class="form-label">Status</label><select class="form-select form-select-sm" id="fStatus"><option value="Semua">Semua</option><option value="Ralan">Rawat Jalan</option><option value="Ranap">Rawat Inap</option></select></div>
-    <div class="col-md-2"><label class="form-label">Jenis</label><select class="form-select form-select-sm" id="fJenis"><option value="">Semua jenis</option></select></div>
-    <div class="col-md-2"><label class="form-label">Kategori</label><select class="form-select form-select-sm" id="fKategori"><option value="">Semua kategori</option></select></div>
-    <div class="col-md-2"><label class="form-label">Golongan</label><select class="form-select form-select-sm" id="fGolongan"><option value="">Semua golongan</option></select></div>
-    <div class="col-md-3"><label class="form-label">Nama Barang</label><input type="text" class="form-control form-control-sm" id="fBarang" placeholder="Ketik kode atau nama barang"></div>
-    <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" id="btnLoad"><i class="fas fa-sync-alt me-1"></i>Muat Data</button></div>
-    <div class="col-md-2"><button class="btn btn-sm btn-success w-100" id="btnExport" disabled><i class="fas fa-file-excel me-1"></i>Export Excel</button></div>
-</div></div></div>
-<div class="row g-3 mb-3"><div class="col-md-3"><div class="stat-card" style="background:linear-gradient(135deg,#667eea,#764ba2)"><h3 id="stItem">0</h3><small>Data Pemakaian</small></div></div><div class="col-md-3"><div class="stat-card" style="background:linear-gradient(135deg,#43e97b,#38f9d7)"><h3 id="stQty">0</h3><small>Total Qty</small></div></div><div class="col-md-3"><div class="stat-card" style="background:linear-gradient(135deg,#f093fb,#f5576c)"><h3 id="stNilai">Rp 0</h3><small>Total Nilai</small></div></div></div>
-<div class="card shadow-sm"><div class="card-body"><div class="table-responsive"><table class="table table-bordered table-hover table-striped" id="tblData" style="width:100%"><thead><tr><th>#</th><th>Tanggal</th><th>Poli</th><th>Status</th><th>No. RM</th><th>Nama Pasien</th><th>Alamat Pasien</th><th>Kode Barang</th><th>Nama Barang</th><th>Satuan</th><th>Jenis</th><th>Kategori</th><th>Golongan</th><th class="text-end">Jumlah</th><th>No. Resep</th><th>Dokter Peresep</th><th class="text-end">Biaya Obat</th><th class="text-end">Embalase</th><th class="text-end">Tuslah</th><th class="text-end">Total</th></tr></thead><tbody></tbody><tfoot><tr class="fw-bold"><td colspan="13" class="text-end">GRAND TOTAL:</td><td class="text-end" id="footQty">0</td><td colspan="2"></td><td class="text-end" id="footBiaya">Rp 0</td><td class="text-end" id="footEmbalase">Rp 0</td><td class="text-end" id="footTuslah">Rp 0</td><td class="text-end" id="footTotal">Rp 0</td></tr></tfoot></table></div></div></div>
+<div class="card shadow-sm mb-3 filter-section">
+    <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-2"><label class="form-label">Dari Tanggal</label><input type="date" class="form-control form-control-sm" id="tglAwal" value="<?= $tgl_awal_default ?>"></div>
+            <div class="col-md-2"><label class="form-label">Sampai Tanggal</label><input type="date" class="form-control form-control-sm" id="tglAkhir" value="<?= $tgl_akhir_default ?>"></div>
+            <div class="col-md-2"><label class="form-label">Poli</label><select class="form-select form-select-sm" id="fPoli">
+                    <option value="">Semua poli</option>
+                </select></div>
+            <div class="col-md-2"><label class="form-label">Status</label><select class="form-select form-select-sm" id="fStatus">
+                    <option value="Semua">Semua</option>
+                    <option value="Ralan">Rawat Jalan</option>
+                    <option value="Ranap">Rawat Inap</option>
+                </select></div>
+            <div class="col-md-2"><label class="form-label">Jenis</label><select class="form-select form-select-sm" id="fJenis">
+                    <option value="">Semua jenis</option>
+                </select></div>
+            <div class="col-md-2"><label class="form-label">Kategori</label><select class="form-select form-select-sm" id="fKategori">
+                    <option value="">Semua kategori</option>
+                </select></div>
+            <div class="col-md-2"><label class="form-label">Golongan</label><select class="form-select form-select-sm" id="fGolongan">
+                    <option value="">Semua golongan</option>
+                </select></div>
+            <div class="col-md-3"><label class="form-label">Nama Barang</label><input type="text" class="form-control form-control-sm" id="fBarang" placeholder="Ketik kode atau nama barang"></div>
+            <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" id="btnLoad"><i class="fas fa-sync-alt me-1"></i>Muat Data</button></div>
+            <div class="col-md-2"><button class="btn btn-sm btn-success w-100" id="btnExport" disabled><i class="fas fa-file-excel me-1"></i>Export Excel</button></div>
+        </div>
+    </div>
+</div>
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="stat-card" style="background:linear-gradient(135deg,#667eea,#764ba2)">
+            <h3 id="stItem">0</h3><small>Data Pemakaian</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card" style="background:linear-gradient(135deg,#43e97b,#38f9d7)">
+            <h3 id="stQty">0</h3><small>Total Qty</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card" style="background:linear-gradient(135deg,#f093fb,#f5576c)">
+            <h3 id="stNilai">Rp 0</h3><small>Total Nilai</small>
+        </div>
+    </div>
+</div>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-striped" id="tblData" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tanggal</th>
+                        <th>Poli</th>
+                        <th>Status</th>
+                        <th>No. RM</th>
+                        <th>Nama Pasien</th>
+                        <th>Alamat Pasien</th>
+                        <th>Kode Barang</th>
+                        <th>Nama Barang</th>
+                        <th>Satuan</th>
+                        <th>Jenis</th>
+                        <th>Kategori</th>
+                        <th>Golongan</th>
+                        <th class="text-end">Jumlah</th>
+                        <th>No. Resep</th>
+                        <th>Dokter Peresep</th>
+                        <th class="text-end">Biaya Obat</th>
+                        <th class="text-end">Embalase</th>
+                        <th class="text-end">Tuslah</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="13" class="text-end">GRAND TOTAL:</td>
+                        <td class="text-end" id="footQty">0</td>
+                        <td colspan="2"></td>
+                        <td class="text-end" id="footBiaya">Rp 0</td>
+                        <td class="text-end" id="footEmbalase">Rp 0</td>
+                        <td class="text-end" id="footTuslah">Rp 0</td>
+                        <td class="text-end" id="footTotal">Rp 0</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
 <?php ob_start(); ?>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-let dt, tableData=[]; const lang={search:'Cari:',lengthMenu:'Tampilkan _MENU_ data',info:'Menampilkan _START_ s/d _END_ dari _TOTAL_ data',infoEmpty:'Tidak ada data',infoFiltered:'(difilter dari _MAX_ total)',zeroRecords:'Data tidak ditemukan',paginate:{first:'Awal',last:'Akhir',next:'Selanjutnya',previous:'Sebelumnya'}};
-const num=n=>Number(n||0).toLocaleString('id-ID',{maximumFractionDigits:2}); const rp=n=>'Rp '+num(n);
-function initTable(){if(dt)dt.destroy();dt=$('#tblData').DataTable({data:tableData,language:lang,pageLength:50,scrollX:true,order:[[1,'asc'],[7,'asc'],[8,'asc']],columns:[{data:null,orderable:false,searchable:false,render:(d,t,r,i)=>i.settings._iDisplayStart+i.row+1},{data:'tanggal_pemberian'},{data:'nm_poli'},{data:'status'},{data:'no_rkm_medis'},{data:'nm_pasien'},{data:'alamat_pasien'},{data:'kode_brng'},{data:'nama_brng'},{data:'satuan'},{data:'jenis'},{data:'kategori'},{data:'golongan'},{data:'jumlah',className:'text-end',render:num},{data:'no_resep'},{data:'nm_dokter'},{data:'biaya_obat',className:'text-end',render:rp},{data:'embalase',className:'text-end',render:rp},{data:'tuslah',className:'text-end',render:rp},{data:'total',className:'text-end',render:rp}]});}
-function loadOptions(){ $.getJSON('api/data_filter_ringkasan_obat.php',{mode:'penggunaan'},function(data){['poli','jenis','kategori','golongan'].forEach(function(name){const select=$('#f'+name.charAt(0).toUpperCase()+name.slice(1));(data[name]||[]).forEach(item=>select.append($('<option>',{value:item.value,text:item.label})));});}); }
-function loadData(){const p={tgl_awal:$('#tglAwal').val(),tgl_akhir:$('#tglAkhir').val(),poli:$('#fPoli').val(),status:$('#fStatus').val(),jenis:$('#fJenis').val(),kategori:$('#fKategori').val(),golongan:$('#fGolongan').val(),barang:$('#fBarang').val()};if(!p.tgl_awal||!p.tgl_akhir)return alert('Pilih periode tanggal');$('#btnLoad').prop('disabled',true).html('<i class="fas fa-spinner fa-spin me-1"></i>Memuat...');$.getJSON('api/data_ringkasan_penggunaan_obat.php',p,function(res){tableData=res.data||[];const s=res.summary||{};initTable();$('#stItem').text(s.total_item||0);$('#stQty').text(num(s.total_qty));$('#stNilai').text(rp(s.total_nilai));$('#footQty').text(num(s.total_qty));$('#footBiaya').text(rp(s.total_biaya));$('#footEmbalase').text(rp(s.total_embalase));$('#footTuslah').text(rp(s.total_tuslah));$('#footTotal').text(rp(s.total_nilai));$('#btnExport').prop('disabled',!tableData.length)}).fail(()=>alert('Gagal memuat data.')).always(()=>$('#btnLoad').prop('disabled',false).html('<i class="fas fa-sync-alt me-1"></i>Muat Data'));}
-function exportExcel(){const headers=['No','Tanggal','Poli','Status','No. RM','Nama Pasien','Alamat Pasien','Kode Barang','Nama Barang','Satuan','Jenis','Kategori','Golongan','Jumlah','No. Resep','Dokter Peresep','Biaya Obat','Embalase','Tuslah','Total'];const rows=tableData.map((r,i)=>[i+1,r.tanggal_pemberian,r.nm_poli,r.status,r.no_rkm_medis,r.nm_pasien,r.alamat_pasien,r.kode_brng,r.nama_brng,r.satuan,r.jenis,r.kategori,r.golongan,r.jumlah,r.no_resep,r.nm_dokter,r.biaya_obat,r.embalase,r.tuslah,r.total]);const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);ws['!cols']=[{wch:5},{wch:20},{wch:22},{wch:12},{wch:14},{wch:28},{wch:50},{wch:16},{wch:36},{wch:12},{wch:20},{wch:20},{wch:20},{wch:12},{wch:16},{wch:30},{wch:16},{wch:16},{wch:16},{wch:16}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Ringkasan Obat');XLSX.writeFile(wb,'Ringkasan_Penggunaan_Obat_'+$('#tglAwal').val()+'_sd_'+$('#tglAkhir').val()+'.xlsx');}
-$('#btnLoad').on('click',loadData);$('#btnExport').on('click',exportExcel);$('#fBarang').on('keypress',e=>{if(e.which===13){e.preventDefault();loadData();}});$(document).ready(function(){loadOptions();loadData();});
+    let dt, tableData = [];
+    const lang = {
+        search: 'Cari:',
+        lengthMenu: 'Tampilkan _MENU_ data',
+        info: 'Menampilkan _START_ s/d _END_ dari _TOTAL_ data',
+        infoEmpty: 'Tidak ada data',
+        infoFiltered: '(difilter dari _MAX_ total)',
+        zeroRecords: 'Data tidak ditemukan',
+        paginate: {
+            first: 'Awal',
+            last: 'Akhir',
+            next: 'Selanjutnya',
+            previous: 'Sebelumnya'
+        }
+    };
+    const num = n => Number(n || 0).toLocaleString('id-ID', {
+        maximumFractionDigits: 2
+    });
+    const rp = n => 'Rp ' + num(n);
+
+    function initTable() {
+        if (dt) dt.destroy();
+        dt = $('#tblData').DataTable({
+            data: tableData,
+            language: lang,
+            pageLength: 50,
+            scrollX: true,
+            autoWidth: false,
+            order: [
+                [1, 'asc'],
+                [7, 'asc'],
+                [8, 'asc']
+            ],
+            columnDefs: [{
+                targets: 19,
+                width: '110px'
+            }],
+            columns: [{
+                data: null,
+                width: '45px',
+                orderable: false,
+                searchable: false,
+                render: (d, t, r, i) => i.settings._iDisplayStart + i.row + 1
+            }, {
+                data: 'tanggal_pemberian',
+                width: '150px'
+            }, {
+                data: 'nm_poli',
+                width: '150px'
+            }, {
+                data: 'status',
+                width: '80px'
+            }, {
+                data: 'no_rkm_medis',
+                width: '100px'
+            }, {
+                data: 'nm_pasien',
+                width: '180px'
+            }, {
+                data: 'alamat_pasien',
+                width: '360px'
+            }, {
+                data: 'kode_brng',
+                width: '120px'
+            }, {
+                data: 'nama_brng',
+                width: '200px'
+            }, {
+                data: 'satuan',
+                width: '90px'
+            }, {
+                data: 'jenis',
+                width: '140px'
+            }, {
+                data: 'kategori',
+                width: '140px'
+            }, {
+                data: 'golongan',
+                width: '140px'
+            }, {
+                data: 'jumlah',
+                width: '90px',
+                className: 'text-end',
+                render: num
+            }, {
+                data: 'no_resep',
+                width: '130px'
+            }, {
+                data: 'nm_dokter',
+                width: '200px'
+            }, {
+                data: 'biaya_obat',
+                width: '120px',
+                className: 'text-end',
+                render: rp
+            }, {
+                data: 'embalase',
+                width: '120px',
+                className: 'text-end',
+                render: rp
+            }, {
+                data: 'tuslah',
+                width: '120px',
+                className: 'text-end',
+                render: rp
+            }, {
+                data: 'total',
+                width: '110px',
+                className: 'text-end',
+                render: rp
+            }]
+        });
+    }
+
+    function loadOptions() {
+        $.getJSON('api/data_filter_ringkasan_obat.php', {
+            mode: 'penggunaan'
+        }, function(data) {
+            ['poli', 'jenis', 'kategori', 'golongan'].forEach(function(name) {
+                const select = $('#f' + name.charAt(0).toUpperCase() + name.slice(1));
+                (data[name] || []).forEach(item => select.append($('<option>', {
+                    value: item.value,
+                    text: item.label
+                })));
+            });
+        });
+    }
+
+    function loadData() {
+        const p = {
+            tgl_awal: $('#tglAwal').val(),
+            tgl_akhir: $('#tglAkhir').val(),
+            poli: $('#fPoli').val(),
+            status: $('#fStatus').val(),
+            jenis: $('#fJenis').val(),
+            kategori: $('#fKategori').val(),
+            golongan: $('#fGolongan').val(),
+            barang: $('#fBarang').val()
+        };
+        if (!p.tgl_awal || !p.tgl_akhir) return alert('Pilih periode tanggal');
+        $('#btnLoad').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>Memuat...');
+        $.getJSON('api/data_ringkasan_penggunaan_obat.php', p, function(res) {
+            tableData = res.data || [];
+            const s = res.summary || {};
+            initTable();
+            $('#stItem').text(s.total_item || 0);
+            $('#stQty').text(num(s.total_qty));
+            $('#stNilai').text(rp(s.total_nilai));
+            $('#footQty').text(num(s.total_qty));
+            $('#footBiaya').text(rp(s.total_biaya));
+            $('#footEmbalase').text(rp(s.total_embalase));
+            $('#footTuslah').text(rp(s.total_tuslah));
+            $('#footTotal').text(rp(s.total_nilai));
+            $('#btnExport').prop('disabled', !tableData.length)
+        }).fail(() => alert('Gagal memuat data.')).always(() => $('#btnLoad').prop('disabled', false).html('<i class="fas fa-sync-alt me-1"></i>Muat Data'));
+    }
+
+    function exportExcel() {
+        const headers = ['No', 'Tanggal', 'Poli', 'Status', 'No. RM', 'Nama Pasien', 'Alamat Pasien', 'Kode Barang', 'Nama Barang', 'Satuan', 'Jenis', 'Kategori', 'Golongan', 'Jumlah', 'No. Resep', 'Dokter Peresep', 'Biaya Obat', 'Embalase', 'Tuslah', 'Total'];
+        const rows = tableData.map((r, i) => [i + 1, r.tanggal_pemberian, r.nm_poli, r.status, r.no_rkm_medis, r.nm_pasien, r.alamat_pasien, r.kode_brng, r.nama_brng, r.satuan, r.jenis, r.kategori, r.golongan, r.jumlah, r.no_resep, r.nm_dokter, r.biaya_obat, r.embalase, r.tuslah, r.total]);
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        ws['!cols'] = [{
+            wch: 5
+        }, {
+            wch: 20
+        }, {
+            wch: 22
+        }, {
+            wch: 12
+        }, {
+            wch: 14
+        }, {
+            wch: 28
+        }, {
+            wch: 50
+        }, {
+            wch: 16
+        }, {
+            wch: 36
+        }, {
+            wch: 12
+        }, {
+            wch: 20
+        }, {
+            wch: 20
+        }, {
+            wch: 20
+        }, {
+            wch: 12
+        }, {
+            wch: 16
+        }, {
+            wch: 30
+        }, {
+            wch: 16
+        }, {
+            wch: 16
+        }, {
+            wch: 16
+        }, {
+            wch: 16
+        }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Ringkasan Obat');
+        XLSX.writeFile(wb, 'Ringkasan_Penggunaan_Obat_' + $('#tglAwal').val() + '_sd_' + $('#tglAkhir').val() + '.xlsx');
+    }
+    $('#btnLoad').on('click', loadData);
+    $('#btnExport').on('click', exportExcel);
+    $('#fBarang').on('keypress', e => {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadData();
+        }
+    });
+    $(document).ready(function() {
+        loadOptions();
+        loadData();
+    });
 </script>
-<?php $page_js=ob_get_clean(); require_once('includes/footer.php'); ?>
+<?php $page_js = ob_get_clean();
+require_once('includes/footer.php'); ?>
