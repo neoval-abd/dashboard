@@ -39,6 +39,10 @@ $tgl_akhir_default = date('Y-m-d');
         vertical-align: middle
     }
 
+    #tblData {
+        table-layout: fixed;
+    }
+
     #tblData th:nth-child(7),
     #tblData td:nth-child(7) {
         min-width: 360px;
@@ -48,20 +52,30 @@ $tgl_akhir_default = date('Y-m-d');
     #tblData th:nth-child(17),
     #tblData td:nth-child(17),
     #tblData th:nth-child(18),
-    #tblData td:nth-child(18),
-    #tblData th:nth-child(19),
-    #tblData td:nth-child(19) {
-        width: 120px !important;
-        min-width: 120px;
-        max-width: 120px
+    #tblData td:nth-child(18) {
+        width: 95px !important;
+        min-width: 95px;
+        max-width: 95px
+    }
+
+    #tblData th:nth-child(19) {
+        width: 95px !important;
+        min-width: 95px;
+        max-width: 95px
     }
 
     #tblData th:last-child,
     #tblData td:last-child,
     #tblData col:last-child {
-        width: 110px !important;
-        min-width: 110px !important;
-        max-width: 110px !important
+        width: 100px !important;
+        min-width: 100px !important;
+        max-width: 100px !important
+    }
+
+    #tblData td {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 </style>
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -253,22 +267,22 @@ $tgl_akhir_default = date('Y-m-d');
                 width: '200px'
             }, {
                 data: 'biaya_obat',
-                width: '120px',
+                width: '95px',
                 className: 'text-end',
                 render: rp
             }, {
                 data: 'embalase',
-                width: '120px',
+                width: '95px',
                 className: 'text-end',
                 render: rp
             }, {
                 data: 'tuslah',
-                width: '120px',
+                width: '95px',
                 className: 'text-end',
                 render: rp
             }, {
                 data: 'total',
-                width: '110px',
+                width: '100px',
                 className: 'text-end',
                 render: rp
             }]
@@ -361,7 +375,7 @@ $tgl_akhir_default = date('Y-m-d');
         }, {
             wch: 16
         }, {
-            wch: 16
+            wch: 10
         }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Ringkasan Obat');
