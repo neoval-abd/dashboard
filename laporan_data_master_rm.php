@@ -130,6 +130,105 @@ $tgl_akhir_default = date('Y-m-d');
         margin-bottom: 0 !important;
         table-layout: fixed !important;
     }
+    .dmrm-th-filter {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        max-width: 100%;
+    }
+    .dmrm-th-title {
+        display: inline-block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .dmrm-filter-btn {
+        flex: 0 0 auto;
+        width: 24px;
+        height: 22px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #cfd6e6;
+        border-radius: 4px;
+        background: #fff;
+        color: #5a5c69;
+        vertical-align: middle;
+    }
+    .dmrm-filter-btn.active {
+        background: #4e73df;
+        border-color: #4e73df;
+        color: #fff;
+    }
+    .dmrm-filter-menu {
+        position: absolute;
+        z-index: 2050;
+        width: 280px;
+        max-width: calc(100vw - 32px);
+        background: #fff;
+        color: #2f3542;
+        border: 1px solid #d1d3e2;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,.16);
+        padding: 10px;
+        display: none;
+    }
+    .dmrm-filter-menu.open {
+        display: block;
+    }
+    .dmrm-filter-options {
+        max-height: 220px;
+        overflow-y: auto;
+        border: 1px solid #e3e6f0;
+        border-radius: 6px;
+        padding: 6px;
+        background: #fff;
+        color: #2f3542;
+    }
+    .dmrm-filter-check {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin: 0;
+        padding: 4px 2px;
+        font-size: .78rem;
+        cursor: pointer;
+        color: #2f3542;
+    }
+    .dmrm-filter-check span {
+        color: #2f3542;
+        overflow-wrap: anywhere;
+    }
+    .dmrm-filter-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 10px;
+    }
+    .dmrm-filter-search {
+        margin-bottom: 8px;
+        background: #fff;
+        color: #2f3542;
+        border-color: #b7c7f4;
+    }
+    .dmrm-filter-search::placeholder {
+        color: #6c757d;
+    }
+    body.dark-mode .dmrm-filter-menu,
+    body.dark-mode .dmrm-filter-options,
+    body.dark-mode .dmrm-filter-check,
+    body.dark-mode .dmrm-filter-check span,
+    body.dark-mode .dmrm-filter-search,
+    [data-bs-theme="dark"] .dmrm-filter-menu,
+    [data-bs-theme="dark"] .dmrm-filter-options,
+    [data-bs-theme="dark"] .dmrm-filter-check,
+    [data-bs-theme="dark"] .dmrm-filter-check span,
+    [data-bs-theme="dark"] .dmrm-filter-search {
+        background: #fff;
+        color: #2f3542;
+    }
     html.theme-glass-solid #tblDataMasterRm thead th,
     html.theme-glass-animated #tblDataMasterRm thead th {
         background: rgba(15, 23, 42, .9) !important;
@@ -251,11 +350,17 @@ $tgl_akhir_default = date('Y-m-d');
         </div>
     </div>
 </div>
+<div id="dmrmFilterMenuLayer"></div>
 
 <?php ob_start(); ?>
 <script>
 let dtDataMaster = null;
 let columnsDataMaster = [];
+let dataDataMaster = [];
+let selectedColumnFilters = {};
+let openFilterKey = null;
+let filterValueCache = {};
+const MAX_FILTER_OPTIONS = 300;
 
 const ID_LANG_DMRM = {
     search: 'Cari:',
@@ -283,6 +388,14 @@ function escapeHtml(value) {
     });
 }
 
+function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') {
+        return window.CSS.escape(value);
+    }
+
+    return String(value).replace(/["\\]/g, '\\$&');
+}
+
 function renderWarnings(warnings) {
     if (!warnings || warnings.length === 0) {
         $('#warningBox').hide().empty();
@@ -297,23 +410,229 @@ function renderWarnings(warnings) {
 function getColumnStyle(title) {
     const normalized = String(title || '').toUpperCase();
     const explicit = {
-        'BATAL': 82,
-        'NO.REGISTRASI': 150,
-        'NO.RI': 132,
-        'NO.RM': 112,
-        'TGL.LAHIR': 126,
-        'UMUR': 96,
-        'KEL.UMUR': 122,
-        'JNS.KELAMIN': 142,
-        'GOL.DARAH': 132,
-        'LOS': 78,
-        'KELAS': 92
+        'BATAL': 104,
+        'NO.REGISTRASI': 170,
+        'NO.PERAWATAN': 170,
+        'NO.RI': 154,
+        'NO.RM': 132,
+        'NAMA PASIEN': 210,
+        'IBU KANDUNG': 190,
+        'TGL.LAHIR': 150,
+        'UMUR': 118,
+        'KEL.UMUR': 150,
+        'JNS.KELAMIN': 168,
+        'GOL.DARAH': 154,
+        'SUKU': 122,
+        'BAHASA': 136,
+        'STATUS KAWIN': 170,
+        'LOS': 100,
+        'KELAS': 112
     };
-    const titleWidth = String(title || '').length * 8 + 54;
-    const width = explicit[normalized] || Math.max(90, Math.min(230, titleWidth));
+    const titleWidth = String(title || '').length * 9 + 76;
+    const width = explicit[normalized] || Math.max(128, Math.min(280, titleWidth));
 
     return { width: width + 'px', className: 'dmrm-ellipsis' };
 }
+
+function getColumnFilterKey(column) {
+    return column.data;
+}
+
+function getColumnFilterTitle(column) {
+    return column.title || column.data;
+}
+
+function getFilterConfig() {
+    return columnsDataMaster.map(column => ({
+        key: getColumnFilterKey(column),
+        label: getColumnFilterTitle(column)
+    }));
+}
+
+function getSelectedFilterList(key) {
+    return selectedColumnFilters[key] || [];
+}
+
+function setFilterValue(key, value, checked) {
+    const values = new Set(getSelectedFilterList(key));
+    if (checked) {
+        values.add(value);
+    } else {
+        values.delete(value);
+    }
+    selectedColumnFilters[key] = Array.from(values);
+}
+
+function filterMatches(row) {
+    return getFilterConfig().every(function(filter) {
+        const selected = getSelectedFilterList(filter.key);
+        if (selected.length === 0) {
+            return true;
+        }
+
+        return selected.includes(String(row[filter.key] || '-'));
+    });
+}
+
+function updateFilterButton(key) {
+    const selected = getSelectedFilterList(key);
+    const $button = $(`.dmrm-filter-btn[data-key="${cssEscape(key)}"]`);
+
+    if (selected.length === 0) {
+        $button.removeClass('active');
+        $button.attr('title', 'Filter ' + ($button.data('label') || key));
+        return;
+    }
+
+    $button.addClass('active');
+    $button.attr('title', ($button.data('label') || key) + ' terfilter: ' + selected.length + ' pilihan');
+}
+
+function applyColumnFilters() {
+    const activeKey = openFilterKey;
+    getFilterConfig().forEach(function(filter) {
+        updateFilterButton(filter.key);
+    });
+
+    if (dtDataMaster) {
+        dtDataMaster.draw();
+    }
+    if (activeKey) {
+        repositionFilterMenu(activeKey);
+    }
+}
+
+function pruneSelectedFilters() {
+    Object.keys(selectedColumnFilters).forEach(function(key) {
+        if (!selectedColumnFilters[key] || selectedColumnFilters[key].length === 0) {
+            return;
+        }
+
+        const values = new Set(dataDataMaster.map(row => String(row[key] || '-')));
+        selectedColumnFilters[key] = selectedColumnFilters[key].filter(value => values.has(value));
+    });
+}
+
+function closeFilterMenus(resetKey = true) {
+    $('.dmrm-filter-menu').removeClass('open');
+    if (resetKey) {
+        openFilterKey = null;
+    }
+}
+
+function repositionFilterMenu(key) {
+    const $button = $(`.dmrm-filter-btn[data-key="${cssEscape(key)}"]`).filter(':visible').first();
+    const $menu = $(`.dmrm-filter-menu[data-key="${cssEscape(key)}"]`);
+    if (!$button.length || !$menu.length) {
+        return;
+    }
+
+    const offset = $button.offset();
+    const menuWidth = $menu.outerWidth() || 280;
+    const left = Math.max(12, Math.min(offset.left, $(window).width() - menuWidth - 12));
+
+    $menu.css({
+        top: offset.top + $button.outerHeight() + 6,
+        left: left
+    });
+}
+
+function openFilterMenu(key) {
+    closeFilterMenus(false);
+    openFilterKey = key;
+    renderFilterOptions(key);
+    repositionFilterMenu(key);
+    const $menu = $(`.dmrm-filter-menu[data-key="${cssEscape(key)}"]`);
+    $menu.addClass('open');
+    $menu.find('.dmrm-filter-search').val('').focus();
+}
+
+function sortFilterValues(key, values) {
+    if (key === 'kel_umur') {
+        const order = ['0-7 hari', '8-28 hari', '29 hari - < 1 tahun', '1-4 tahun', '5-14 tahun', '15-24 tahun', '25-44 tahun', '45-64 tahun', '>= 65 tahun', '-'];
+        return values.sort((a, b) => {
+            const ia = order.indexOf(a);
+            const ib = order.indexOf(b);
+            if (ia !== -1 || ib !== -1) {
+                return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+            }
+            return a.localeCompare(b);
+        });
+    }
+
+    return values.sort((a, b) => a.localeCompare(b, 'id-ID', { numeric: true, sensitivity: 'base' }));
+}
+
+function getFilterValues(key) {
+    if (!filterValueCache[key]) {
+        filterValueCache[key] = sortFilterValues(key, Array.from(new Set(dataDataMaster.map(row => String(row[key] || '-')))));
+    }
+
+    return filterValueCache[key];
+}
+
+function buildFilterMenus() {
+    const html = getFilterConfig().map(function(filter) {
+        return `
+            <div class="dmrm-filter-menu" data-key="${escapeHtml(filter.key)}">
+                <input type="text" class="form-control form-control-sm dmrm-filter-search" placeholder="Cari...">
+                <div class="dmrm-filter-options"></div>
+                <div class="dmrm-filter-actions">
+                    <button type="button" class="btn btn-sm btn-light border btn-filter-close">Close</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-filter-clear">Clear</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    $('#dmrmFilterMenuLayer').html(html);
+}
+
+function renderFilterOptions(key, keyword = '') {
+    const filter = getFilterConfig().find(item => item.key === key);
+    if (!filter) {
+        return;
+    }
+
+    const selected = getSelectedFilterList(key);
+    const normalizedKeyword = String(keyword || '').toLowerCase();
+    const allValues = getFilterValues(key);
+    selectedColumnFilters[key] = selected.filter(value => allValues.includes(value));
+
+    let sortedValues = allValues;
+    if (normalizedKeyword !== '') {
+        sortedValues = sortedValues.filter(value => value.toLowerCase().includes(normalizedKeyword));
+    }
+
+    const selectedFirst = selectedColumnFilters[key].filter(value => sortedValues.includes(value));
+    const visibleValues = Array.from(new Set(selectedFirst.concat(sortedValues))).slice(0, MAX_FILTER_OPTIONS);
+    const hiddenCount = Math.max(0, sortedValues.length - visibleValues.length);
+    const options = visibleValues.map(function(value) {
+        const checked = selectedColumnFilters[key].includes(value) ? 'checked' : '';
+        return `
+            <label class="dmrm-filter-check">
+                <input type="checkbox" value="${escapeHtml(value)}" ${checked}>
+                <span>${escapeHtml(value)}</span>
+            </label>
+        `;
+    }).join('');
+    const note = hiddenCount > 0
+        ? '<div class="text-muted small px-1 mt-1">Menampilkan ' + fmtNum(visibleValues.length) + ' dari ' + fmtNum(sortedValues.length) + ' pilihan. Ketik pencarian untuk mempersempit.</div>'
+        : '';
+
+    const $filter = $(`.dmrm-filter-menu[data-key="${cssEscape(key)}"]`);
+    $filter.find('.dmrm-filter-options').html(options || '<div class="text-muted small px-1">Tidak ada pilihan</div>');
+    $filter.find('.dmrm-filter-options').append(note);
+    updateFilterButton(key);
+}
+
+$.fn.dataTable.ext.search.push(function(settings, searchData, index, rowData) {
+    if (settings.nTable.id !== 'tblDataMasterRm') {
+        return true;
+    }
+
+    return filterMatches(rowData || dataDataMaster[index] || {});
+});
 
 function buildColumnGroup(columnStyles) {
     return '<colgroup>' + columnStyles.map(style => '<col style="width:' + style.width + '">').join('') + '</colgroup>';
@@ -344,6 +663,8 @@ function syncColumnLayout(columnStyles) {
 
 function buildTable(columns, data) {
     columnsDataMaster = columns || [];
+    dataDataMaster = data || [];
+    filterValueCache = {};
     const columnStyles = columnsDataMaster.map(col => getColumnStyle(col.title));
 
     if (dtDataMaster) {
@@ -354,12 +675,22 @@ function buildTable(columns, data) {
 
     $('#dmrmHead').html(columnsDataMaster.map((col, index) => {
         const style = columnStyles[index];
-        return '<th class="' + style.className + '" style="width:' + style.width + '">' + escapeHtml(col.title) + '</th>';
+        const key = getColumnFilterKey(col);
+        const title = getColumnFilterTitle(col);
+        return '<th class="' + style.className + '" style="width:' + style.width + '">' +
+            '<span class="dmrm-th-filter">' +
+                '<span class="dmrm-th-title" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
+                '<button type="button" class="dmrm-filter-btn" data-key="' + escapeHtml(key) + '" data-label="' + escapeHtml(title) + '" title="Filter ' + escapeHtml(title) + '">' +
+                    '<i class="fas fa-filter"></i>' +
+                '</button>' +
+            '</span>' +
+        '</th>';
     }).join(''));
+    buildFilterMenus();
     syncColumnLayout(columnStyles);
 
     dtDataMaster = $('#tblDataMasterRm').DataTable({
-        data: data || [],
+        data: dataDataMaster,
         columns: columnsDataMaster.map((col, index) => {
             const style = columnStyles[index];
             return {
@@ -414,16 +745,27 @@ function buildTable(columns, data) {
             }
         ],
         initComplete: function() {
+            pruneSelectedFilters();
+            applyColumnFilters();
             syncColumnLayout(columnStyles);
             this.api().columns.adjust();
             syncColumnLayout(columnStyles);
         }
     });
 
-    dtDataMaster.on('column-visibility.dt draw.dt', function() {
+    dtDataMaster.on('column-visibility.dt', function() {
+        getFilterConfig().forEach(function(filter) {
+            updateFilterButton(filter.key);
+        });
         syncColumnLayout(columnStyles);
         dtDataMaster.columns.adjust();
         syncColumnLayout(columnStyles);
+    });
+
+    dtDataMaster.on('draw.dt', function() {
+        getFilterConfig().forEach(function(filter) {
+            updateFilterButton(filter.key);
+        });
     });
 }
 
@@ -478,6 +820,43 @@ $('#keyword').on('keydown', function(e) {
         loadDataMaster();
     }
 });
+$(document).on('click', '.dmrm-filter-btn', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const key = $(this).data('key');
+    const $menu = $(`.dmrm-filter-menu[data-key="${cssEscape(key)}"]`);
+
+    if ($menu.hasClass('open')) {
+        closeFilterMenus();
+        return;
+    }
+
+    openFilterMenu(key);
+});
+$('#dmrmFilterMenuLayer').on('click', '.dmrm-filter-menu', function(e) {
+    e.stopPropagation();
+});
+$('#dmrmFilterMenuLayer').on('change', '.dmrm-filter-options input[type="checkbox"]', function() {
+    const key = $(this).closest('.dmrm-filter-menu').data('key');
+    setFilterValue(key, String($(this).val()), this.checked);
+    applyColumnFilters();
+});
+$('#dmrmFilterMenuLayer').on('click', '.btn-filter-clear', function() {
+    const key = $(this).closest('.dmrm-filter-menu').data('key');
+    selectedColumnFilters[key] = [];
+    renderFilterOptions(key, $(this).closest('.dmrm-filter-menu').find('.dmrm-filter-search').val());
+    applyColumnFilters();
+});
+$('#dmrmFilterMenuLayer').on('click', '.btn-filter-close', function() {
+    closeFilterMenus();
+});
+$('#dmrmFilterMenuLayer').on('input', '.dmrm-filter-search', function() {
+    const key = $(this).closest('.dmrm-filter-menu').data('key');
+    renderFilterOptions(key, $(this).val());
+});
+$(document).on('click', function() {
+    closeFilterMenus();
+});
 $('#limitData').on('change', function() {
     $('#stLimit').text(fmtNum($(this).val()));
 });
@@ -489,6 +868,14 @@ $(document).ready(function() {
 $(window).on('resize', function() {
     if (dtDataMaster) {
         dtDataMaster.columns.adjust();
+    }
+    if (openFilterKey) {
+        repositionFilterMenu(openFilterKey);
+    }
+});
+$(window).on('scroll', function() {
+    if (openFilterKey) {
+        repositionFilterMenu(openFilterKey);
     }
 });
 </script>

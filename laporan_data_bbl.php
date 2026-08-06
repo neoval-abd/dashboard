@@ -140,6 +140,7 @@ $tgl_akhir_default = date('Y-m-d');
                         <th>Tgl. Daftar</th>
                         <th>Nama Ibu</th>
                         <th>Umur Ibu</th>
+                        <th>Umur Kehamilan</th>
                         <th>Nama Ayah</th>
                         <th>Umur Ayah</th>
                         <th>Alamat</th>
@@ -231,6 +232,7 @@ function initTable() {
             { data: 'tgl_daftar', render: d => fmtTanggal(d) },
             { data: 'nm_ibu' },
             { data: 'umur_ibu' },
+            { data: 'umur_kehamilan' },
             { data: 'nama_ayah' },
             { data: 'umur_ayah' },
             { data: 'alamat' },

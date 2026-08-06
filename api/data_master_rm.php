@@ -44,7 +44,6 @@ $columns = [
     ['data' => 'no_ktp_nik', 'title' => 'NO.KTP / NIK'],
     ['data' => 'no_bpjs', 'title' => 'NO.BPJS'],
     ['data' => 'no_telpon_hp', 'title' => 'NO.TELPON/HP'],
-    ['data' => 'status', 'title' => 'STATUS'],
     ['data' => 'asal_pasien', 'title' => 'ASAL PASIEN'],
     ['data' => 'ket_asal_pasien', 'title' => 'KET.ASAL PASIEN'],
     ['data' => 'poliklinik_ruang', 'title' => 'POLIKLINIK/RUANG'],
@@ -52,43 +51,27 @@ $columns = [
     ['data' => 'kelas', 'title' => 'KELAS'],
     ['data' => 'cara_bayar', 'title' => 'CARA BAYAR'],
     ['data' => 'no_jaminan', 'title' => 'NO. SEP PASIEN'],
-    ['data' => 'covid19_no_sep', 'title' => 'COVID19_NO_SEP'],
     ['data' => 'tgl_masuk', 'title' => 'TGL.MASUK'],
     ['data' => 'tgl_pulang', 'title' => 'TGL.PULANG'],
     ['data' => 'los', 'title' => 'LOS'],
     ['data' => 'cara_keluar', 'title' => 'CARA KELUAR'],
     ['data' => 'keadaan_keluar', 'title' => 'KEADAAN KELUAR'],
     ['data' => 'bb_lahir', 'title' => 'BB.LAHIR'],
-    ['data' => 'tgl_drm_kembali', 'title' => 'TGL.DRM KEMBALI'],
     ['data' => 'dx_masuk', 'title' => 'DX.MASUK'],
     ['data' => 'dpjp', 'title' => 'DOKTER DPJP'],
-    ['data' => 'no_dtd', 'title' => 'NO.DTD'],
     ['data' => 'diagnosis_01', 'title' => 'DIAGNOSIS_01'],
     ['data' => 'icd10_01', 'title' => 'ICD 10.01'],
     ['data' => 'icd10_02', 'title' => 'ICD 10.02'],
     ['data' => 'icd10_03', 'title' => 'ICD 10.03'],
-    ['data' => 'icd10_04', 'title' => 'ICD 10.04'],
-    ['data' => 'icd10_05', 'title' => 'ICD 10.05'],
-    ['data' => 'icd10_external_causes', 'title' => 'ICD 10.EXTERNAL CAUSES'],
-    ['data' => 'external_causes', 'title' => 'EXTERNAL CAUSES'],
-    ['data' => 'no_dtd_external_causes', 'title' => 'NO.DTD EXTERNAL CAUSES'],
-    ['data' => 'dtd_external_causes', 'title' => 'DTD EXTERNAL CAUSES'],
     ['data' => 'procedure_01', 'title' => 'PROCEDURE_01'],
     ['data' => 'icd9cm_01', 'title' => 'ICD 9CM.01'],
     ['data' => 'icd9cm_02', 'title' => 'ICD 9CM.02'],
     ['data' => 'icd9cm_03', 'title' => 'ICD 9CM.03'],
-    ['data' => 'icd9cm_04', 'title' => 'ICD 9CM.04'],
-    ['data' => 'icd9cm_05', 'title' => 'ICD 9CM.05'],
-    ['data' => 'sp_procedure', 'title' => 'SP.PROCEDURE'],
-    ['data' => 'sp_drug', 'title' => 'SP.DRUG'],
-    ['data' => 'sp_investigation', 'title' => 'SP.INVESTIGATION'],
-    ['data' => 'sp_prosthesis', 'title' => 'SP.PROSTHESIS'],
     ['data' => 'hak_kelas', 'title' => 'HAK KELAS'],
     ['data' => 'kode_inacbg', 'title' => 'KODE INACBG'],
     ['data' => 'deskripsi_inacbg', 'title' => 'DESKRIPSI INACBG'],
     ['data' => 'biaya_rs', 'title' => 'BIAYA RS'],
     ['data' => 'tariff_ina_cbg_hak', 'title' => 'TARIFF INA CBG (HAK)'],
-    ['data' => 'bayar_iur', 'title' => 'BAYAR (IUR)'],
     ['data' => 'selisih', 'title' => 'SELISIH'],
 ];
 
@@ -334,11 +317,6 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-$warnings = [
-    'NO.DTD dan DTD belum ditemukan tabel referensinya pada skema yang terlihat, sehingga kolom disiapkan kosong.',
-    'SP.PROCEDURE/SP.DRUG/SP.INVESTIGATION/SP.PROSTHESIS diambil dari inacbg_grouping_stage2 berdasarkan kolom type; jika type memakai istilah berbeda, hasil bisa kosong.',
-];
-
 echo json_encode([
     'success' => true,
     'data' => $data,
@@ -348,5 +326,4 @@ echo json_encode([
         'limit' => $limit,
         'periode' => $tgl_awal . ' s/d ' . $tgl_akhir,
     ],
-    'warnings' => $warnings,
 ], JSON_UNESCAPED_UNICODE);

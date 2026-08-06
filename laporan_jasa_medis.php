@@ -10,7 +10,7 @@ $res_dr = $koneksi->query("SELECT kd_dokter, nm_dokter FROM dokter WHERE status=
 if ($res_dr) {
     while ($row = $res_dr->fetch_assoc()) { $dokters[] = $row; }
 }
-    
+        
 $petugas = [];
 $res_pt = $koneksi->query("SELECT nip, nama FROM petugas WHERE stts_aktif='AKTIF' ORDER BY nama");
 if ($res_pt) {

@@ -40,6 +40,7 @@ $sql = "
         pasien.tgl_daftar,
         pasien.nm_ibu,
         pasien_bayi.umur_ibu,
+        COALESCE(penilaian_bbl.umur_kehamilan, '') AS umur_kehamilan,
         pasien_bayi.nama_ayah,
         pasien_bayi.umur_ayah,
         CONCAT_WS(', ', pasien.alamat, kelurahan.nm_kel, kecamatan.nm_kec, kabupaten.nm_kab) AS alamat,
@@ -83,6 +84,22 @@ $sql = "
         pasien_bayi.mikonium
     FROM pasien
     INNER JOIN pasien_bayi ON pasien.no_rkm_medis = pasien_bayi.no_rkm_medis
+    LEFT JOIN (
+        SELECT
+            reg_periksa.no_rkm_medis,
+            SUBSTRING_INDEX(
+                GROUP_CONCAT(
+                    penilaian_bayi_baru_lahir.umur_kehamilan
+                    ORDER BY penilaian_bayi_baru_lahir.tanggal DESC
+                    SEPARATOR '||'
+                ),
+                '||',
+                1
+            ) AS umur_kehamilan
+        FROM penilaian_bayi_baru_lahir
+        INNER JOIN reg_periksa ON penilaian_bayi_baru_lahir.no_rawat = reg_periksa.no_rawat
+        GROUP BY reg_periksa.no_rkm_medis
+    ) penilaian_bbl ON pasien.no_rkm_medis = penilaian_bbl.no_rkm_medis
     LEFT JOIN pegawai ON pasien_bayi.penolong = pegawai.nik
     LEFT JOIN kelurahan ON pasien.kd_kel = kelurahan.kd_kel
     LEFT JOIN kecamatan ON pasien.kd_kec = kecamatan.kd_kec
@@ -147,6 +164,7 @@ while ($row = $result->fetch_assoc()) {
         'tgl_daftar' => $row['tgl_daftar'] ?: '-',
         'nm_ibu' => $row['nm_ibu'] ?: '-',
         'umur_ibu' => $row['umur_ibu'] ?: '-',
+        'umur_kehamilan' => $row['umur_kehamilan'] ?: '-',
         'nama_ayah' => $row['nama_ayah'] ?: '-',
         'umur_ayah' => $row['umur_ayah'] ?: '-',
         'alamat' => $row['alamat'] ?: '-',
