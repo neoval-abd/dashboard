@@ -66,9 +66,9 @@ define('DB_PASS', '');
 define('DB_NAME', '');
 define('DB_PORT', '3382'); 
 
-define('BPJS_CONS_ID',  '20642');
-define('BPJS_USER_KEY', 'b1659fea6083cb46fa4ee381cddf0ecc');
-define('BPJS_SECRET',   'aRr221z8mB');
+define('BPJS_CONS_ID',  '');
+define('BPJS_USER_KEY', '');
+define('BPJS_SECRET',   '');
 define('BPJS_API_URL',  'https://apijkn.bpjs-kesehatan.go.id/antreanrs');
 
 // 5. Buat Koneksi menggunakan MySQLi
