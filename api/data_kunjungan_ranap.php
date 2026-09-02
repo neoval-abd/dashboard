@@ -94,7 +94,6 @@ $sql_data = "SELECT ki.no_rawat, ki.tgl_masuk, ki.jam_masuk, ki.stts_pulang,
              d.nm_dokter AS dokter_perujuk,
              b.nm_bangsal, k.kd_kamar, k.kelas,
              bs.klsrawat AS bpjs_kelas,
-             s.kode_inacbg, s.deskripsi AS inacbg_deskripsi, s.kelas AS inacbg_class, s.tarif AS inacbg_tarif,
              pj.png_jawab, pj.kd_pj, rp.biaya_reg
              FROM kamar_inap ki 
              JOIN reg_periksa rp ON ki.no_rawat = rp.no_rawat
@@ -106,7 +105,6 @@ $sql_data = "SELECT ki.no_rawat, ki.tgl_masuk, ki.jam_masuk, ki.stts_pulang,
              LEFT JOIN kamar k ON ki.kd_kamar = k.kd_kamar
              LEFT JOIN bangsal b ON k.kd_bangsal = b.kd_bangsal
              LEFT JOIN bridging_sep bs ON rp.no_rawat = bs.no_rawat
-             LEFT JOIN ranap_inacbg_selection s ON ki.no_rawat = s.no_rawat
              $where
              GROUP BY ki.no_rawat
              ORDER BY ki.tgl_masuk DESC, ki.jam_masuk DESC";
@@ -135,7 +133,6 @@ $q_data->free();
 // 5. FORMAT OUTPUT (TANPA KALKULASI — Lazy Loading v2)
 $data = [];
 foreach ($raw_data as $r) {
-    $selectedTarif = isset($r['inacbg_tarif']) ? intval($r['inacbg_tarif']) : 0;
     $data[] = [
         "waktu"            => $r['tgl_masuk'],
         "no_rawat"         => $r['no_rawat'],
@@ -147,15 +144,11 @@ foreach ($raw_data as $r) {
         "kamar"            => $r['nm_bangsal'],
         "bpjs_kelas"       => $r['bpjs_kelas'],
         "room_kelas"       => $r['kelas'],
-        "selected_inacbg_code"  => $r['kode_inacbg'] ?? '',
-        "selected_inacbg_desc"  => $r['inacbg_deskripsi'] ?? '',
-        "selected_inacbg_class" => $r['inacbg_class'] ?? '',
-        "selected_inacbg_tarif" => $selectedTarif,
         "penjamin"         => $r['png_jawab'],
         "kd_pj"            => $r['kd_pj'],
         // Placeholder — akan diisi async oleh frontend
         "estimasi"         => null,
-        "plafon"           => $selectedTarif > 0 ? number_format($selectedTarif, 0, ',', '.') : null,
+        "plafon"           => null,
         "selisih"          => null,
         "is_over"          => false,
         "status_pulang"    => ($r['stts_pulang'] != '-') ? $r['stts_pulang'] : 'Masih Dirawat'

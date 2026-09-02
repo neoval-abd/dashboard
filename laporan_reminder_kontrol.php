@@ -6,7 +6,7 @@ require_once('includes/header.php');
 // Query: Pasien yang dijadwalkan KONTROL pada range tanggal pilihan user
 // Patokan utama: bridging_surat_kontrol_bpjs (tgl_rencana)
 // Data pelengkap (no RM, nama, jenis kelamin, no HP) diambil dari bridging_sep
-// via no_sep. Status terkirim dicek dari log_kirim_reminder_kontrol.
+// via no_sep. Tidak memakai tabel log/antrean tambahan.
 // ============================================================
 $today = date('Y-m-d');
 $tgl_awal = $_GET['tgl_awal'] ?? $today;
@@ -35,15 +35,9 @@ $sql = "SELECT
     s.nama_pasien,
     s.jkel,
     s.notelep,
-    s.no_kartu,
-    l.tgl_kirim
+    s.no_kartu
 FROM bridging_surat_kontrol_bpjs k
 INNER JOIN bridging_sep s ON k.no_sep = s.no_sep
-LEFT JOIN (
-    SELECT no_sep, MAX(tgl_kirim) AS tgl_kirim
-    FROM log_kirim_reminder_kontrol
-    GROUP BY no_sep
-) l ON l.no_sep = k.no_sep
 WHERE k.tgl_rencana BETWEEN ? AND ?
 ORDER BY s.nama_pasien ASC";
 
@@ -56,7 +50,7 @@ if ($stmt = $koneksi->prepare($sql)) {
     if ($stmt->execute()) {
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
-            $row['is_sent'] = !empty($row['tgl_kirim']) ? 1 : 0;
+            $row['is_sent'] = 0;
 
             // Sanitize nomor HP (sama seperti versi ulang tahun)
             $phone_raw = trim($row['notelep'] ?? '');
@@ -71,7 +65,6 @@ if ($stmt = $koneksi->prepare($sql)) {
                 $row['has_phone'] = true;
             }
 
-            if ($row['is_sent'])    $sent_count++;
             if ($row['has_phone'])  $has_phone_count++;
 
             $kontrol_patients[] = $row;
@@ -549,26 +542,11 @@ $(document).ready(function() {
         applyFilterAndSearch();
     }
 
-    function loadSentStatus() {
-        $.getJSON('api/reminder_kontrol.php', function(res) {
-            const sentList = res.sent || [];
-            const sentSeps = sentList.map(item => String(item.no_sep || ''));
-
-            $('.btn-send-wa').each(function() {
-                const noSep = String($(this).data('no-sep') || '');
-                if (sentSeps.includes(noSep)) {
-                    markCardAsSent(this);
-                }
-            });
-        });
-    }
-
     applyFilterAndSearch();
-    loadSentStatus();
 
     // Default message template
     function getDefaultMsg(name, poli, dokter, tanggal) {
-        return `Yth. Bapak/Ibu *${name}*,\n\nKami mengingatkan bahwa Anda memiliki jadwal *KONTROL* pada tanggal, ${tanggal} di Poli ${poli} dengan dokter ${dokter}.\n\nMohon untuk datang sesuai jadwal yang telah ditentukan. Apabila ada pertanyaan atau perubahan jadwal, silakan hubungi kami.\n\nTerima kasih.\n\nSalam hangat,\nRSU Adella Slawi`;
+        return `Yth. Bapak/Ibu *${name}*,\n\nKami mengingatkan bahwa Anda memiliki jadwal *KONTROL* pada tanggal, ${tanggal} di Poli ${poli} dengan dokter ${dokter}.\n\nMohon untuk datang sesuai jadwal yang telah ditentukan. Apabila ada pertanyaan atau perubahan jadwal, silakan hubungi kami.\n\nTerima kasih.\n\nSalam hangat,\nRSU Assalam`;
     }
 
     // Open message editor modal
@@ -645,7 +623,7 @@ $(document).ready(function() {
             markCardAsSent(cardBtn);
             bootstrap.Modal.getInstance(document.getElementById('msgModal'))?.hide();
             setTimeout(function() {
-                showSuccessNotification('Reminder ' + name + ' berhasil diproses.');
+                showSuccessNotification('Reminder ' + name + ' berhasil dikirim.');
             }, 250);
         }).fail(function(xhr) {
             alert(getAjaxErrorMessage(xhr, 'Reminder gagal dikirim. Silakan coba lagi atau hubungi admin.'));

@@ -269,10 +269,10 @@ if (isset($koneksi)) {
 
     <!-- Credit Footer Login -->
     <div class="login-credit">
-        Dikembangkan oleh <a href="https://saweria.co/" target="_blank" rel="noopener">IT RSU ADELLA SLAWI</a><br>
+        Dikembangkan oleh <a href="https://saweria.co/" target="_blank" rel="noopener">IT RSU ASSALAM</a><br>
         <a href="https://wa.me/085959420216" target="_blank" rel="noopener"><i class="fab fa-whatsapp me-1"></i>085959420216</a>
         &nbsp;|&nbsp;
-        <a href="https://t.me/RsuAdellaSlawi" target="_blank" rel="noopener"><i class="fab fa-telegram me-1"></i>@RsuAdellaSlawi</a>
+        <a href="https://t.me/RsuAssalam" target="_blank" rel="noopener"><i class="fab fa-telegram me-1"></i>@RsuAssalam</a>
     </div>
 </div>
 

@@ -500,7 +500,7 @@ $(document).ready(function() {
 
     // Default message template
     function getDefaultMsg(name, age) {
-        return `Selamat ulang tahun yang ke-${age}, ${name}! \n\nSemoga di usia yang baru ini senantiasa diberikan kesehatan, kebahagiaan, dan panjang umur. Amin YRA.\n\nSalam hangat dari kami,\nRSU Adella`;
+        return `Selamat ulang tahun yang ke-${age}, ${name}! \n\nSemoga di usia yang baru ini senantiasa diberikan kesehatan, kebahagiaan, dan panjang umur. Amin YRA.\n\nSalam hangat dari kami,\nRSU Assalam`;
     }
 
     // Open message editor modal

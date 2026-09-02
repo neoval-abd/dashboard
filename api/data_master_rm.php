@@ -75,6 +75,44 @@ $columns = [
     ['data' => 'selisih', 'title' => 'SELISIH'],
 ];
 
+$has_inacbg_selisihbayar = false;
+$table_check = $koneksi->query("SHOW TABLES LIKE 'inacbg_selisihbayar'");
+if ($table_check instanceof mysqli_result) {
+    $has_inacbg_selisihbayar = ($table_check->num_rows > 0);
+    $table_check->free();
+}
+
+$sel_join = $has_inacbg_selisihbayar ? "
+LEFT JOIN (
+    SELECT no_sep, SUM(biaya) AS bayar_iur
+    FROM inacbg_selisihbayar
+    GROUP BY no_sep
+) sel ON COALESCE(bs.no_sep, bsi.no_sep) = sel.no_sep" : '';
+$sel_bayar_iur = $has_inacbg_selisihbayar ? 'sel.bayar_iur' : '0';
+
+$has_inacbg_grouping_stage2 = false;
+$table_check = $koneksi->query("SHOW TABLES LIKE 'inacbg_grouping_stage2'");
+if ($table_check instanceof mysqli_result) {
+    $has_inacbg_grouping_stage2 = ($table_check->num_rows > 0);
+    $table_check->free();
+}
+
+$cmg_join = $has_inacbg_grouping_stage2 ? "
+LEFT JOIN (
+    SELECT
+        no_sep,
+        GROUP_CONCAT(CASE WHEN LOWER(type) LIKE '%procedure%' THEN CONCAT(code_cbg, ' ', deskripsi) END SEPARATOR ', ') AS sp_procedure,
+        GROUP_CONCAT(CASE WHEN LOWER(type) LIKE '%drug%' THEN CONCAT(code_cbg, ' ', deskripsi) END SEPARATOR ', ') AS sp_drug,
+        GROUP_CONCAT(CASE WHEN LOWER(type) LIKE '%investigation%' THEN CONCAT(code_cbg, ' ', deskripsi) END SEPARATOR ', ') AS sp_investigation,
+        GROUP_CONCAT(CASE WHEN LOWER(type) LIKE '%prosthesis%' THEN CONCAT(code_cbg, ' ', deskripsi) END SEPARATOR ', ') AS sp_prosthesis
+    FROM inacbg_grouping_stage2
+    GROUP BY no_sep
+) cmg ON COALESCE(bs.no_sep, bsi.no_sep) = cmg.no_sep" : '';
+$cmg_procedure = $has_inacbg_grouping_stage2 ? 'cmg.sp_procedure' : "''";
+$cmg_drug = $has_inacbg_grouping_stage2 ? 'cmg.sp_drug' : "''";
+$cmg_investigation = $has_inacbg_grouping_stage2 ? 'cmg.sp_investigation' : "''";
+$cmg_prosthesis = $has_inacbg_grouping_stage2 ? 'cmg.sp_prosthesis' : "''";
+
 $where = "WHERE rp.tgl_registrasi BETWEEN ? AND ?";
 $types = "ss";
 $params = [$tgl_awal, $tgl_akhir];
@@ -174,17 +212,17 @@ SELECT
     pr.icd9cm_05,
     TIMESTAMPDIFF(YEAR, p.tgl_lahir, rp.tgl_registrasi) AS umur_tahun,
     TIMESTAMPDIFF(DAY, p.tgl_lahir, rp.tgl_registrasi) AS umur_hari,
-    cmg.sp_procedure,
-    cmg.sp_drug,
-    cmg.sp_investigation,
-    cmg.sp_prosthesis,
-    COALESCE(bs.klsrawat, bsi.klsrawat, ris.kelas) AS hak_kelas,
-    COALESCE(ris.kode_inacbg, cbg.kode_inacbg) AS kode_inacbg,
-    COALESCE(ris.deskripsi, cbg.deskripsi_inacbg) AS deskripsi_inacbg,
+    $cmg_procedure AS sp_procedure,
+    $cmg_drug AS sp_drug,
+    $cmg_investigation AS sp_investigation,
+    $cmg_prosthesis AS sp_prosthesis,
+    COALESCE(bs.klsrawat, bsi.klsrawat, '') AS hak_kelas,
+    COALESCE(cbg.kode_inacbg, '') AS kode_inacbg,
+    COALESCE(cbg.deskripsi_inacbg, '') AS deskripsi_inacbg,
     billing.biaya_rs,
-    COALESCE(ris.tarif, cbg.tariff_ina_cbg_hak, 0) AS tariff_ina_cbg_hak,
-    COALESCE(sel.bayar_iur, 0) AS bayar_iur,
-    (COALESCE(ris.tarif, cbg.tariff_ina_cbg_hak, 0) + COALESCE(sel.bayar_iur, 0) - COALESCE(billing.biaya_rs, 0)) AS selisih
+    COALESCE(cbg.tariff_ina_cbg_hak, 0) AS tariff_ina_cbg_hak,
+    COALESCE($sel_bayar_iur, 0) AS bayar_iur,
+    (COALESCE(cbg.tariff_ina_cbg_hak, 0) + COALESCE($sel_bayar_iur, 0) - COALESCE(billing.biaya_rs, 0)) AS selisih
 FROM reg_periksa rp
 INNER JOIN pasien p ON rp.no_rkm_medis = p.no_rkm_medis
 LEFT JOIN penjab pj ON rp.kd_pj = pj.kd_pj
@@ -261,10 +299,6 @@ LEFT JOIN (
     GROUP BY no_rawat
 ) billing ON rp.no_rawat = billing.no_rawat
 LEFT JOIN (
-    SELECT no_rawat, kode_inacbg, deskripsi, tarif, kelas
-    FROM ranap_inacbg_selection
-) ris ON rp.no_rawat = ris.no_rawat
-LEFT JOIN (
     SELECT no_rawat, MAX(kode_inacbg) AS kode_inacbg, MAX(deskripsi_inacbg) AS deskripsi_inacbg, SUM(tariff_ina_cbg_hak) AS tariff_ina_cbg_hak
     FROM (
         SELECT bs.no_rawat, gs.no_sep, gs.code_cbg AS kode_inacbg, gs.deskripsi AS deskripsi_inacbg, gs.tarif AS tariff_ina_cbg_hak
@@ -278,21 +312,8 @@ LEFT JOIN (
     ) x
     GROUP BY no_rawat
 ) cbg ON rp.no_rawat = cbg.no_rawat
-LEFT JOIN (
-    SELECT no_sep, SUM(biaya) AS bayar_iur
-    FROM inacbg_selisihbayar
-    GROUP BY no_sep
-) sel ON COALESCE(bs.no_sep, bsi.no_sep) = sel.no_sep
-LEFT JOIN (
-    SELECT
-        no_sep,
-        GROUP_CONCAT(CASE WHEN LOWER(type) LIKE '%procedure%' THEN CONCAT(code_cbg, ' ', deskripsi) END SEPARATOR ', ') AS sp_procedure,
-        GROUP_CONCAT(CASE WHEN LOWER(type) LIKE '%drug%' THEN CONCAT(code_cbg, ' ', deskripsi) END SEPARATOR ', ') AS sp_drug,
-        GROUP_CONCAT(CASE WHEN LOWER(type) LIKE '%investigation%' THEN CONCAT(code_cbg, ' ', deskripsi) END SEPARATOR ', ') AS sp_investigation,
-        GROUP_CONCAT(CASE WHEN LOWER(type) LIKE '%prosthesis%' THEN CONCAT(code_cbg, ' ', deskripsi) END SEPARATOR ', ') AS sp_prosthesis
-    FROM inacbg_grouping_stage2
-    GROUP BY no_sep
-) cmg ON COALESCE(bs.no_sep, bsi.no_sep) = cmg.no_sep
+$sel_join
+$cmg_join
 $where
 ORDER BY rp.tgl_registrasi DESC, rp.jam_reg DESC
 LIMIT $limit";

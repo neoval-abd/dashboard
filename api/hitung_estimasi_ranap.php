@@ -207,24 +207,15 @@ $q_dpjp = safe_q($koneksi, "SELECT d.nm_dokter FROM dpjp_ranap dr JOIN dokter d 
 if ($q_dpjp && $rd = $q_dpjp->fetch_assoc()) $dpjp = $rd['nm_dokter'];
 else $is_dpjp_fallback = true;
 
-// H. Ambil Plafon dari pilihan INA-CBG terlebih dahulu, lalu fallback ke tabel perkiraan_biaya_ranap
+// H. Ambil Plafon dari tabel perkiraan_biaya_ranap
 $plafon_val = 0;
 $has_plafon  = false;
-$q_inacbg = safe_q($koneksi, "SELECT tarif FROM ranap_inacbg_selection WHERE no_rawat='$no_rawat' LIMIT 1");
-if ($q_inacbg && $r_inacbg = $q_inacbg->fetch_assoc()) {
-    if (!is_null($r_inacbg['tarif']) && $r_inacbg['tarif'] !== '') {
-        $plafon_val = safeFloat_r($r_inacbg['tarif']);
-        $has_plafon = ($plafon_val > 0);
-    }
-}
 
-if (!$has_plafon) {
-    $q_plafon = safe_q($koneksi, "SELECT tarif FROM perkiraan_biaya_ranap WHERE no_rawat='$no_rawat' LIMIT 1");
-    if ($q_plafon && $r_plafon = $q_plafon->fetch_assoc()) {
-        if (!is_null($r_plafon['tarif']) && $r_plafon['tarif'] !== '') {
-            $plafon_val = safeFloat_r($r_plafon['tarif']);
-            $has_plafon = ($plafon_val > 0);
-        }
+$q_plafon = safe_q($koneksi, "SELECT tarif FROM perkiraan_biaya_ranap WHERE no_rawat='$no_rawat' LIMIT 1");
+if ($q_plafon && $r_plafon = $q_plafon->fetch_assoc()) {
+    if (!is_null($r_plafon['tarif']) && $r_plafon['tarif'] !== '') {
+        $plafon_val = safeFloat_r($r_plafon['tarif']);
+        $has_plafon = ($plafon_val > 0);
     }
 }
 

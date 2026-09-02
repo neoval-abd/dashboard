@@ -6,7 +6,7 @@
 
 // --- KONFIGURASI AKSES ---
 // Masukkan NIK/Username Super Admin yang diizinkan mengakses halaman ini
-$super_admins = ['rsuadella']; 
+$super_admins = ['rsuassalam']; 
 
 session_start();
 require_once('config/koneksi.php');

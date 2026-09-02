@@ -60,11 +60,11 @@ error_reporting(0);
 ini_set('display_errors', 0);
 
 // 4. Detail Koneksi Database
-define('DB_HOST', '192.168.20.167');
-define('DB_USER', 'client');
-define('DB_PASS', 'clientpass');
-define('DB_NAME', 'sikadella2026');
-define('DB_PORT', '3306'); 
+define('DB_HOST', '192.168.5.52');
+define('DB_USER', 'clientkhanza');
+define('DB_PASS', 'Client1453');
+define('DB_NAME', 'db-sim');
+define('DB_PORT', '3382'); 
 
 define('BPJS_CONS_ID',  '20642');
 define('BPJS_USER_KEY', 'b1659fea6083cb46fa4ee381cddf0ecc');
