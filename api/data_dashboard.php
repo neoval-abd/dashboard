@@ -77,11 +77,13 @@ $response['omzet'] = [
 // ==========================================================================
 // 2. KETERSEDIAAN BED
 // ==========================================================================
+$bed_in = getSkBedInSql($koneksi);
 $sql_bed = "
     SELECT k.kelas, k.status, b.nm_bangsal
     FROM kamar k
     INNER JOIN bangsal b ON k.kd_bangsal = b.kd_bangsal
     WHERE k.statusdata = '1'
+      AND k.kd_kamar IN ($bed_in)
 ";
 $res_bed = $koneksi->query($sql_bed);
 $bed_groups = [];

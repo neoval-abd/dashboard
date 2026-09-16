@@ -8,10 +8,12 @@
 ini_set('display_errors', 0);
 header('Content-Type: application/json');
 require_once(dirname(__DIR__) . '/config/koneksi.php'); 
+require_once(dirname(__DIR__) . '/config/bed_sk_mapping.php');
 
 $req_kelas = isset($_GET['kelas']) ? $_GET['kelas'] : '';
+$bed_in = getSkBedInSql($koneksi);
 
-// Ambil SEMUA pasien aktif
+// Ambil pasien aktif pada bed mapping SK/BPJS
 $sql = "
     SELECT 
         ki.no_rawat, ki.tgl_masuk, ki.jam_masuk, 
@@ -25,6 +27,7 @@ $sql = "
     INNER JOIN kamar k ON ki.kd_kamar = k.kd_kamar
     INNER JOIN bangsal b ON k.kd_bangsal = b.kd_bangsal
     WHERE (ki.stts_pulang = '-' OR ki.stts_pulang = '')
+      AND k.kd_kamar IN ($bed_in)
     ORDER BY ki.tgl_masuk DESC
 ";
 

@@ -48,7 +48,7 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
         
         <div class="tab-pane fade show active" id="global" role="tabpanel">
             <div class="alert alert-info shadow-sm">
-                <h6 class="fw-bold"><i class="fas fa-info-circle me-2"></i>Data Dasar Perhitungan (SK/BPJS):</h6>
+                <h6 class="fw-bold"><i class="fas fa-info-circle me-2"></i>Data Dasar Perhitungan :</h6>
                 <div class="row text-center" id="data-dasar-container">
                     <div class="col">Loading...</div>
                 </div>
@@ -60,7 +60,7 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                         <div class="card-body">
                             <div class="row no-gutters align-items-center">
                                 <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">BOR SK/BPJS (Occupancy)</div>
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">BOR (Occupancy)</div>
                                     <div class="h3 mb-0 font-weight-bold text-gray-800" id="val-bor">...</div>
                                     <small class="text-muted">Target: 60-85%</small>
                                 </div>
