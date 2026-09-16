@@ -13,6 +13,7 @@ header('Content-Type: application/json');
 
 // 2. Include koneksi dan fungsi bantu
 require_once(dirname(__DIR__) . '/config/koneksi.php'); 
+require_once(dirname(__DIR__) . '/config/bed_sk_mapping.php');
 require_once(dirname(__DIR__) . '/includes/functions.php');
 
 // 3. Cek sesi login
@@ -43,50 +44,18 @@ $pasien_mati_48 = 0;    // Mati > 48 Jam (untuk NDR)
 // ---------------------------------------------------------
 // LANGKAH A: Hitung Jumlah Tempat Tidur (TT)
 // ---------------------------------------------------------
-// Kita hitung kamar yang statusdata='1' (Aktif)
-$sql_bed = "SELECT COUNT(kd_kamar) as total FROM kamar WHERE statusdata='1'";
-if (!empty($kd_bangsal)) {
-    $sql_bed .= " AND kd_bangsal = '$kd_bangsal'";
+// Pelaporan BPJS memakai kapasitas SK lokal, bukan seluruh bed operasional Khanza.
+$total_bed = countSkBeds($koneksi, $kd_bangsal);
+if ($total_bed == 0) {
+    $total_bed = 1;
 }
-$res_bed = $koneksi->query($sql_bed);
-if ($res_bed) {
-    $row = $res_bed->fetch_assoc();
-    $total_bed = (int)$row['total'];
-}
-
-// Jika bed 0 (misal data kosong), set 1 untuk menghindari division by zero error
-if ($total_bed == 0) $total_bed = 1; 
 
 
 // ---------------------------------------------------------
 // LANGKAH B: Hitung Hari Perawatan (HP) - NUMERATOR BOR
 // ---------------------------------------------------------
-// Logic: Sum lama rawat semua pasien yang keluar di periode ini.
-// Termasuk 'Pindah Kamar' karena bed-nya terpakai.
-// Rumus hari: Jika masuk & keluar hari sama, hitung 1. Jika beda, hitung selisihnya.
-
-$sql_hp = "
-    SELECT 
-        SUM(
-            IF(
-                DATEDIFF(tgl_keluar, tgl_masuk) = 0, 
-                1, 
-                DATEDIFF(tgl_keluar, tgl_masuk)
-            )
-        ) as total_hp
-    FROM kamar_inap 
-    WHERE tgl_keluar BETWEEN '$tgl_awal' AND '$tgl_akhir'
-";
-
-if (!empty($kd_bangsal)) {
-    $sql_hp .= " AND kd_bangsal = '$kd_bangsal'";
-}
-
-$res_hp = $koneksi->query($sql_hp);
-if ($res_hp) {
-    $row = $res_hp->fetch_assoc();
-    $hari_perawatan = (int)$row['total_hp'];
-}
+// HP dihitung sebagai sensus harian bed yang masuk mapping SK.
+$hari_perawatan = calculateSkHariPerawatan($koneksi, $tgl_awal, $tgl_akhir, $kd_bangsal);
 
 
 // ---------------------------------------------------------
@@ -95,19 +64,24 @@ if ($res_hp) {
 // Logic: Pasien keluar Hidup + Mati.
 // PENTING: Exclude 'Pindah Kamar' agar tidak double count untuk ALOS/BTO.
 
+$bed_in = getSkBedInSql($koneksi);
+$where_bangsal = '';
+if (!empty($kd_bangsal)) {
+    $where_bangsal = " AND k.kd_bangsal = '" . $koneksi->real_escape_string($kd_bangsal) . "'";
+}
+
 $sql_pasien = "
     SELECT 
-        COUNT(no_rawat) as total_keluar,
-        SUM(IF(stts_pulang = 'Meninggal', 1, 0)) as total_mati,
-        SUM(IF(stts_pulang = 'Meninggal' AND DATEDIFF(tgl_keluar, tgl_masuk) >= 2, 1, 0)) as mati_lebih_48
-    FROM kamar_inap 
-    WHERE tgl_keluar BETWEEN '$tgl_awal' AND '$tgl_akhir'
-    AND stts_pulang != 'Pindah Kamar'
+        COUNT(ki.no_rawat) as total_keluar,
+        SUM(IF(ki.stts_pulang = 'Meninggal', 1, 0)) as total_mati,
+        SUM(IF(ki.stts_pulang = 'Meninggal' AND DATEDIFF(ki.tgl_keluar, ki.tgl_masuk) >= 2, 1, 0)) as mati_lebih_48
+    FROM kamar_inap ki
+    INNER JOIN kamar k ON ki.kd_kamar = k.kd_kamar
+    WHERE ki.kd_kamar IN ($bed_in)
+    AND ki.tgl_keluar BETWEEN '$tgl_awal' AND '$tgl_akhir'
+    AND ki.stts_pulang != 'Pindah Kamar'
+    $where_bangsal
 ";
-
-if (!empty($kd_bangsal)) {
-    $sql_pasien .= " AND kd_bangsal = '$kd_bangsal'";
-}
 
 $res_pasien = $koneksi->query($sql_pasien);
 if ($res_pasien) {

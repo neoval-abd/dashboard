@@ -9,6 +9,7 @@ ini_set('display_errors', 0);
 error_reporting(E_ALL);
 header('Content-Type: application/json');
 require_once(dirname(__DIR__) . '/config/koneksi.php'); 
+require_once(dirname(__DIR__) . '/config/bed_sk_mapping.php');
 
 $today = date('Y-m-d');
 $year = date('Y');
@@ -121,15 +122,16 @@ $start = new DateTime($tgl_awal_bulan);
 $end = new DateTime($today);
 $days_period = $end->diff($start)->days + 1;
 
-$sql_hp = "SELECT SUM(IF(DATEDIFF(tgl_keluar, tgl_masuk) = 0, 1, DATEDIFF(tgl_keluar, tgl_masuk))) as total_hp 
-           FROM kamar_inap WHERE tgl_keluar BETWEEN '$tgl_awal_bulan' AND '$today'";
-$res_hp = $koneksi->query($sql_hp);
-$hari_perawatan = ($res_hp && $row = $res_hp->fetch_assoc()) ? (int)$row['total_hp'] : 0;
-$pembagi_bor = ($total_bed_rs * $days_period);
+$hari_perawatan = calculateSkHariPerawatan($koneksi, $tgl_awal_bulan, $today);
+$total_bed_sk = getSkBedCapacity();
+$pembagi_bor = ($total_bed_sk * $days_period);
 $bor_rs = ($pembagi_bor > 0) ? ($hari_perawatan / $pembagi_bor) * 100 : 0;
 
 $response['bed'] = [
     'bor_global' => round($bor_rs, 2),
+    'bor_basis' => 'SK BPJS',
+    'total_bed_sk' => $total_bed_sk,
+    'hari_perawatan_sk' => $hari_perawatan,
     'per_kelas' => $bed_data,
     'total_terisi' => $total_terisi_rs
 ];
