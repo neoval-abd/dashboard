@@ -214,7 +214,9 @@ require_once('includes/header.php');
 
 <?php ob_start(); ?>
 <script>
-    var chartTren, chartOmzet, tableDetailBed;
+    var chartTren, chartOmzet, tableDetailBed, detailBedXhr = null;
+    var detailBedCache = {};
+    var detailBedCacheTtl = 30000;
 
     function formatRupiah(angka) {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
@@ -223,12 +225,12 @@ require_once('includes/header.php');
     $(document).ready(function() {
         // Init DataTables Modal
         tableDetailBed = $('#tableDetailBed').DataTable({
-            "responsive": true, "pageLength": 10,
+            "responsive": true, "pageLength": 10, "processing": true, "deferRender": true, "autoWidth": false, "order": [], "searchDelay": 350,
             "dom": 'Bfrtip', "buttons": ['excel'],
             "columns": [
                 { "data": "waktu_masuk" },
                 { "data": "no_rkm_medis" },
-                { "data": "nm_pasien" },
+                { "data": "nm_pasien", render: function(d,t,r){ return r.is_terisi == 0 ? '<span class="text-success fw-bold">KOSONG</span>' : d; } },
                 { "data": "nm_bangsal", render: function(d,t,r){ return d + ' (' + r.kd_kamar + ')'; } },
                 { "data": "kelas" },
                 { "data": "png_jawab" },
@@ -313,16 +315,43 @@ require_once('includes/header.php');
         $('#container-bed').html(html);
     }
 
+    function renderDetailBedRows(rows) {
+        tableDetailBed.clear().rows.add(rows || []).draw(false);
+    }
+
     function showBedDetail(kelas) {
         $('#modalTitleKelas').text(kelas);
         $('#modalDetailBed').modal('show');
-        
-        $.ajax({
-            url: 'api/data_detail_bed.php', type: 'GET', data: {kelas: kelas}, dataType: 'json',
+
+        if (detailBedCache[kelas] && (Date.now() - detailBedCache[kelas].time) < detailBedCacheTtl) {
+            renderDetailBedRows(detailBedCache[kelas].rows);
+            return;
+        }
+
+        if (detailBedXhr && detailBedXhr.readyState !== 4) {
+            detailBedXhr.abort();
+        }
+
+        renderDetailBedRows([]);
+        if (typeof tableDetailBed.processing === 'function') tableDetailBed.processing(true);
+
+        detailBedXhr = $.ajax({
+            url: 'api/data_detail_bed.php',
+            type: 'GET',
+            data: {kelas: kelas},
+            dataType: 'json',
+            cache: true,
             success: function(res) {
-                tableDetailBed.clear().rows.add(res.data).draw();
+                var rows = res && res.data ? res.data : [];
+                detailBedCache[kelas] = { rows: rows, time: Date.now() };
+                renderDetailBedRows(rows);
             },
-            error: function() { console.error("Gagal memuat detail bed"); }
+            error: function(xhr, status) {
+                if (status !== 'abort') console.error("Gagal memuat detail bed");
+            },
+            complete: function() {
+                if (typeof tableDetailBed.processing === 'function') tableDetailBed.processing(false);
+            }
         });
     }
 
@@ -386,3 +415,4 @@ require_once('includes/header.php');
 </script>
 <?php $page_js = ob_get_clean(); ?>
 <?php require_once('includes/footer.php'); ?>
+
