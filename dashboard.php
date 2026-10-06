@@ -157,7 +157,7 @@ require_once('includes/header.php');
         
         <div class="col-lg-6 mb-4">
             <div class="card shadow mb-4 h-100">
-                <div class="card-header py-3 chart-header-link" onclick="window.location.href='laporan_kinerja_dokter.php'" title="Klik untuk lihat kinerja dokter">
+                <div class="card-header py-3 chart-header-link" onclick="window.location.href='laporan_kinerja_dokter.php'" title="Klik untuk lihat kunjungan dokter">
                     <h6 class="m-0 font-weight-bold text-primary">Top 5 Poliklinik Hari Ini (Live Queue) <i class="fas fa-external-link-alt ms-2 small text-gray-400"></i></h6>
                 </div>
                 <div class="card-body" id="container-top-poli">
@@ -415,4 +415,5 @@ require_once('includes/header.php');
 </script>
 <?php $page_js = ob_get_clean(); ?>
 <?php require_once('includes/footer.php'); ?>
+
 

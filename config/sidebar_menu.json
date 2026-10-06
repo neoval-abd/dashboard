@@ -50,6 +50,12 @@
                 "is_active": true
             },
             {
+                "url": "laporan_jasa_medis_baru.php",
+                "title": "Jasa Medis",
+                "icon": "fas fa-user-nurse",
+                "is_active": true
+            },
+            {
                 "url": "laporan_tindakan.php",
                 "title": "Analisa Tindakan",
                 "icon": "fas fa-stethoscope",
@@ -70,15 +76,15 @@
         "is_active": true,
         "items": [
             {
-                "url": "laporan_absensi.php",
-                "title": "Laporan Absensi",
-                "icon": "fas fa-user-clock",
+                "url": "kepegawaian.php",
+                "title": "Kepegawaian",
+                "icon": "fas fa-id-card",
                 "is_active": true
             },
             {
-                "url": "laporan_jasa_medis_baru.php",
-                "title": "Jasa Medis",
-                "icon": "fas fa-user-nurse",
+                "url": "laporan_absensi.php",
+                "title": "Laporan Absensi",
+                "icon": "fas fa-user-clock",
                 "is_active": true
             }
         ]
@@ -141,7 +147,7 @@
         "items": [
             {
                 "url": "laporan_kinerja_dokter.php",
-                "title": "Kinerja Dokter",
+                "title": "Kunjungan Dokter",
                 "icon": "fas fa-user-md",
                 "is_active": true
             },
@@ -314,4 +320,5 @@
         ]
     }
 ]
+
 

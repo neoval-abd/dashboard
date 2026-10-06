@@ -6,7 +6,7 @@
  * - Menampilkan total pendapatan billing yang dihasilkan dokter tersebut.
  */
 
-$page_title = "Laporan Kinerja Dokter";
+$page_title = "Laporan Kunjungan Dokter";
 require_once('includes/header.php');
 require_once('includes/functions.php');
 
@@ -53,7 +53,7 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
         <div class="col-lg-12 mb-4">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Rincian Kinerja Seluruh Dokter</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Rincian Kunjungan Pasien Seluruh Dokter</h6>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -123,6 +123,26 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
     var myTable; 
     var detailTable;
 
+
+    function sanitizeExportName(value) {
+        return String(value || '')
+            .replace(/[\\/:*?"<>|]+/g, '-')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function getPeriodLabel() {
+        return ($('#tgl_awal').val() || '-') + ' s.d ' + ($('#tgl_akhir').val() || '-');
+    }
+
+    function getSummaryExportFilename() {
+        return sanitizeExportName('Laporan Kunjungan Dokter - RS Assalam - ' + getPeriodLabel());
+    }
+
+    function getDetailExportFilename() {
+        return sanitizeExportName('Detail Kunjungan Dokter - ' + ($('#modalTitleDokter').text() || 'Dokter') + ' - ' + getPeriodLabel());
+    }
+
     // Helper format rupiah
     function formatMoney(amount) {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -138,6 +158,8 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                     extend: 'excelHtml5',
                     className: 'btn btn-success btn-sm',
                     text: '<i class="fas fa-file-excel"></i> Excel Summary',
+                    filename: getSummaryExportFilename,
+                    title: function() { return 'Laporan Kunjungan Dokter - RS Assalam (' + getPeriodLabel() + ')'; },
                     exportOptions: {
                         columns: ':visible:not(:last-child)',
                         format: {
@@ -182,6 +204,8 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                     extend: 'excelHtml5',
                     className: 'btn btn-success btn-sm',
                     text: '<i class="fas fa-file-excel"></i> Export Excel',
+                    filename: getDetailExportFilename,
+                    title: function() { return 'Detail Kunjungan Dokter - ' + ($('#modalTitleDokter').text() || 'Dokter') + ' (' + getPeriodLabel() + ')'; },
                     exportOptions: {
                         columns: ':visible',
                         format: {
@@ -191,7 +215,7 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                         }
                     }
                 },
-                { extend: 'pdfHtml5', className: 'btn btn-danger btn-sm', text: '<i class="fas fa-file-pdf"></i> Export PDF', orientation: 'landscape' }
+                { extend: 'pdfHtml5', className: 'btn btn-danger btn-sm', text: '<i class="fas fa-file-pdf"></i> Export PDF', filename: getDetailExportFilename, title: function() { return 'Detail Kunjungan Dokter - ' + ($('#modalTitleDokter').text() || 'Dokter') + ' (' + getPeriodLabel() + ')'; }, orientation: 'landscape' }
             ],
             "columns": [
                 { "data": "tgl_reg" },
@@ -235,7 +259,7 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
                 renderChart(response.chart);
                 
                 // Inject kode dokter ke dalam data tabel agar bisa diklik
-                // Karena API kinerja dokter mengembalikan array of objects, 
+                // Karena API kunjungan dokter mengembalikan array of objects, 
                 // tapi di loop PHP sebelumnya kita belum memasukkan 'kode' dokter secara eksplisit ke dalam item array.
                 // Mari kita perbaiki data di client side atau server side. 
                 // Server side lebih baik. *Saya sudah update kode PHP di bawah untuk menyertakan 'kode'*.

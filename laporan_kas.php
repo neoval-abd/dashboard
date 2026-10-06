@@ -16,7 +16,6 @@ $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 
 $total_pemasukan_tunai = 0;
 $total_pengeluaran = 0;
-$total_piutang_terbentuk = 0;
 $net_cash_flow = 0;
 
 $shift_times = getShiftTimes($koneksi);
@@ -124,23 +123,6 @@ if ($date_range) {
     }
 }
 
-// E. KUERI PIUTANG TERBENTUK (Tetap, karena piutang biasanya sudah bersih/netto di tabel piutang_pasien)
-$sql_piutang = "SELECT SUM(piutang_pasien.totalpiutang) AS Total FROM piutang_pasien WHERE piutang_pasien.tgl_piutang BETWEEN ? AND ?";
-$stmt_piutang = $koneksi->prepare($sql_piutang);
-if ($stmt_piutang) {
-    $stmt_piutang->bind_param("ss", $tgl_awal, $tgl_akhir);
-    $stmt_piutang->execute();
-    $result_piutang = $stmt_piutang->get_result();
-    if ($result_piutang) {
-        $row_piutang = $result_piutang->fetch_assoc();
-        $total_piutang_terbentuk = (float) $row_piutang['Total'];
-    }
-    $stmt_piutang->close();
-} else {
-    $total_piutang_terbentuk = 0;
-    error_log("Gagal prepare kueri piutang: " . $koneksi->error);
-}
-
 $net_cash_flow = $total_pemasukan_tunai - $total_pengeluaran;
 ?>
 <!-- HTML BAGIAN BAWAH SAMA PERSIS -->
@@ -164,7 +146,7 @@ $net_cash_flow = $total_pemasukan_tunai - $total_pengeluaran;
 </div>
 
 <div class="row">
-    <div class="col-xl-3 col-md-6 mb-4">
+    <div class="col-md-4 mb-4">
         <div class="card border-left-success shadow h-100 py-2">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
@@ -184,7 +166,7 @@ $net_cash_flow = $total_pemasukan_tunai - $total_pengeluaran;
         </div>
     </div>
     <!-- (Sisa KPI dan Grafik sama seperti file sebelumnya) -->
-    <div class="col-xl-3 col-md-6 mb-4">
+    <div class="col-md-4 mb-4">
         <div class="card border-left-danger shadow h-100 py-2">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
@@ -196,7 +178,7 @@ $net_cash_flow = $total_pemasukan_tunai - $total_pengeluaran;
             </div>
         </div>
     </div>
-    <div class="col-xl-3 col-md-6 mb-4">
+    <div class="col-md-4 mb-4">
         <div class="card border-left-info shadow h-100 py-2">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
@@ -207,20 +189,6 @@ $net_cash_flow = $total_pemasukan_tunai - $total_pengeluaran;
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-xl-3 col-md-6 mb-4">
-        <a href="laporan_piutang_detail.php?tgl_awal=<?php echo htmlspecialchars($tgl_awal); ?>&tgl_akhir=<?php echo htmlspecialchars($tgl_akhir); ?>" style="text-decoration: none;">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-title="KLIK UNTUK MELIHAT DETAIL. Total tagihan yang belum dibayar.">Piutang Terbentuk (Klik Detail)</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo formatRupiah($total_piutang_terbentuk); ?></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </a>
     </div>
 </div>
 
