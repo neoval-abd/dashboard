@@ -13,6 +13,8 @@ mysqli_report(MYSQLI_REPORT_OFF);
 
 header('Content-Type: application/json; charset=utf-8');
 require_once(dirname(__DIR__) . '/config/koneksi.php');
+require_once(dirname(__DIR__) . '/config/kendali_biaya.php');
+header('Cache-Control: no-store');
 
 if (!isset($_SESSION['user_id'])) {
     ob_end_clean();
@@ -207,20 +209,18 @@ $q_dpjp = safe_q($koneksi, "SELECT d.nm_dokter FROM dpjp_ranap dr JOIN dokter d 
 if ($q_dpjp && $rd = $q_dpjp->fetch_assoc()) $dpjp = $rd['nm_dokter'];
 else $is_dpjp_fallback = true;
 
-// H. Ambil Plafon dari tabel perkiraan_biaya_ranap
-$plafon_val = 0;
-$has_plafon  = false;
-
-$q_plafon = safe_q($koneksi, "SELECT tarif FROM perkiraan_biaya_ranap WHERE no_rawat='$no_rawat' LIMIT 1");
-if ($q_plafon && $r_plafon = $q_plafon->fetch_assoc()) {
-    if (!is_null($r_plafon['tarif']) && $r_plafon['tarif'] !== '') {
-        $plafon_val = safeFloat_r($r_plafon['tarif']);
-        $has_plafon = ($plafon_val > 0);
-    }
+// H. Plafon manual per nomor rawat, tersimpan di kendali_biaya.
+$plafon_val = null;
+$plafon_error = null;
+try {
+    $plafon_val = kendali_biaya_plafon($koneksi, $no_rawat);
+} catch (Throwable $error) {
+    error_log('[Kendali Biaya] ' . $error->getMessage());
+    $plafon_error = 'Penyimpanan plafon tidak tersedia. Hubungi administrator.';
 }
-
-$selisih_val = $grand_total - $plafon_val;
-$is_over     = ($has_plafon && $grand_total > $plafon_val);
+$has_plafon = $plafon_val !== null;
+$selisih_val = $has_plafon ? $plafon_val - $grand_total : null;
+$is_over = ($has_plafon && $grand_total > $plafon_val);
 
 // Persentase penggunaan plafon (untuk progress bar)
 $pct = ($has_plafon && $plafon_val > 0) ? min(100, round(($grand_total / $plafon_val) * 100)) : 0;
@@ -234,6 +234,7 @@ echo json_encode([
     'plafon'           => $has_plafon ? ('Rp ' . number_format($plafon_val, 0, ',', '.')) : '-',
     'plafon_raw'       => $plafon_val,
     'has_plafon'       => $has_plafon,
+    'plafon_error'     => $plafon_error,
     'selisih'          => $has_plafon ? ('Rp ' . number_format(abs($selisih_val), 0, ',', '.')) : '-',
     'selisih_raw'      => $has_plafon ? $selisih_val : null,
     'is_over'          => $is_over,

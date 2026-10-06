@@ -7,6 +7,9 @@ require_once('includes/header.php');
 if (!isset($koneksi)) {
     require_once('config/koneksi.php');
 }
+if (empty($_SESSION['plafon_csrf'])) {
+    $_SESSION['plafon_csrf'] = bin2hex(random_bytes(32));
+}
 $penjab_list = [];
 $res_pj = $koneksi->query("SELECT kd_pj, png_jawab FROM penjab WHERE status='1' ORDER BY png_jawab ASC");
 if ($res_pj) {
@@ -219,54 +222,9 @@ thead.table-dark th {
     100% { background-position:  200% 0; }
 }
 
-.plafon-cell {
-    cursor: pointer;
-    min-width: 90px;
-    display: inline-block;
-}
-.plafon-cell:hover { text-decoration: underline; }
-
-.plafon-picker-overlay {
-    position: absolute;
-    z-index: 1051;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: var(--picker-bg);
-    border: 1px solid var(--picker-border);
-    box-shadow: var(--shadow-picker);
-    padding: 0.75rem;
-    max-height: 420px;
-    overflow: hidden;
-    border-radius: 0.375rem;
-    transition: background-color var(--transition);
-}
-
-.plafon-picker-overlay .form-control {
-    margin-bottom: 0.5rem;
-    background-color: var(--input-bg) !important;
-    color: var(--input-text) !important;
-    border-color: var(--border-color) !important;
-}
-
-.plafon-picker-results {
-    max-height: 280px;
-    overflow: auto;
-}
-
-.plafon-picker-item {
-    padding: 0.65rem 0.5rem;
-    border-bottom: 1px solid var(--picker-item-border);
-    color: var(--text-primary);
-    transition: background-color 0.1s;
-}
-.plafon-picker-item:last-child { border-bottom: none; }
-.plafon-picker-item:hover { background: var(--picker-hover); }
-.plafon-picker-item.selected { background: var(--picker-hover); outline: 2px solid #0d6efd; }
-.plafon-picker-item small {
-    display: block;
-    color: var(--text-muted);
-}
+.plafon-editor { min-width: 150px; }
+.plafon-editor input { text-align: right; }
+.plafon-status { display: block; font-size: 0.7rem; font-weight: normal; }
 
 .selisih-wrapper { min-width: 110px; }
 .selisih-wrapper .progress {
@@ -390,7 +348,7 @@ html[data-theme="high-contrast"] .page-item.active .page-link {
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center">
-            <h6 class="m-0 font-weight-bold text-primary">Daftar Pasien & Estimasi Biaya</h6>
+            <div><h6 class="m-0 font-weight-bold text-primary">Daftar Pasien & Estimasi Biaya</h6><small class="text-muted">Plafon: isi nominal rupiah, lalu tekan Enter atau klik di luar kolom untuk menyimpan. Selisih = plafon - estimasi biaya RS.</small></div>
             <button onclick="reloadTable()" class="btn btn-sm btn-light border"><i class="fas fa-sync-alt"></i></button>
         </div>
         <div class="card-body">
@@ -486,6 +444,7 @@ html[data-theme="high-contrast"] .page-item.active .page-link {
 })();
 
 var tableKunjungan;
+var plafonCsrf = <?php echo json_encode($_SESSION['plafon_csrf']); ?>;
 
 function formatRupiah(angka) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
@@ -497,7 +456,7 @@ function parseRupiahNilai(teks) {
 }
 
 function renderSelisihHtml(estimasiRaw, plafonRaw) {
-    if (estimasiRaw === null || plafonRaw === null || plafonRaw === 0) return '<span class="selisih-cell text-muted">-</span>';
+    if (estimasiRaw === null || estimasiRaw === undefined || plafonRaw === null || plafonRaw === undefined) return '<span class="selisih-cell text-muted">-</span>';
     var selisih = plafonRaw - estimasiRaw;           // sisa = plafon - estimasi
     var isOver = estimasiRaw > plafonRaw;
     if (isOver) {
@@ -593,13 +552,11 @@ $(document).ready(function() {
             {
                 data: 'plafon',
                 className: 'text-center fw-bold',
-                createdCell: function(td) { $(td).css('position', 'relative'); },
+                orderable: false,
                 render: function(data, type, row) {
-                    if (type === 'export') {
-                        return dtExportNumber(data);
-                    }
-                    if (data === null) return '<span class="skeleton-cell" data-norawat="' + row.no_rawat + '" data-col="plafon"><span class="skeleton-text"></span></span>';
-                    return '<span class="plafon-cell" data-norawat="' + row.no_rawat + '">' + data + '</span>';
+                    var cache = _billingCache[row.no_rawat];
+                    if (type !== 'display') return cache && cache.has_plafon ? cache.plafon_raw : '';
+                    return renderPlafonInput(row.no_rawat, null, true);
                 }
             },
             {
@@ -646,17 +603,95 @@ $(document).ready(function() {
                 }
             }
         ],
-        drawCallback: function() { loadBillingAsync(); }
+        drawCallback: function() { _billingGeneration++; loadBillingAsync(); }
     });
 
 });
 
-function reloadTable() { tableKunjungan.ajax.reload(); }
+function reloadTable() {
+    if (_plafonSaving) { alert('Tunggu sampai plafon selesai disimpan.'); return; }
+    _billingCache = {};
+    tableKunjungan.ajax.reload();
+}
+
+function escapePlafonAttr(value) {
+    return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderPlafonInput(noRawat, nominal, loading, error) {
+    var value = nominal === null || nominal === undefined ? '' : String(nominal);
+    return '<div class="plafon-editor"><input type="text" inputmode="numeric" class="form-control form-control-sm plafon-input"' +
+        ' aria-label="Plafon rupiah untuk ' + escapePlafonAttr(noRawat) + '" data-norawat="' + escapePlafonAttr(noRawat) +
+        '" data-saved="' + value + '" value="' + (value === '' ? '' : Number(value).toLocaleString('id-ID')) +
+        '" placeholder="Isi nominal" maxlength="19"' + (loading || error ? ' disabled' : '') + '>' +
+        '<small class="plafon-status ' + (error ? 'text-danger' : 'text-muted') + '" role="status">' +
+        (error ? escapePlafonAttr(error) : loading ? 'Memuat...' : 'Enter untuk simpan') + '</small></div>';
+}
+
+function updateSelisihRow(input, cache) {
+    var row = $(input).closest('tr');
+    row.children('td').eq(7).html(renderSelisihHtml(cache.estimasi_raw, cache.plafon_raw));
+    row.toggleClass('table-danger', cache.has_plafon && cache.estimasi_raw > cache.plafon_raw);
+}
+
+$(document).on('keydown', '.plafon-input', function(event) {
+    if (event.key === 'Enter') { event.preventDefault(); this.blur(); }
+}).on('change', '.plafon-input', function() {
+    var input = this;
+    var editor = $(input).closest('.plafon-editor');
+    var status = editor.find('.plafon-status');
+    var value = input.value.trim();
+    if (value !== '' && !/^(?:\d+|\d{1,3}(?:\.\d{3})+)$/.test(value)) {
+        status.removeClass('text-muted text-success').addClass('text-danger').text('Gunakan nominal rupiah bulat, minimal 0.');
+        return;
+    }
+    var nominal = value.replace(/\./g, '');
+    if (nominal.length > 15) {
+        status.removeClass('text-muted text-success').addClass('text-danger').text('Nominal maksimal 15 digit.');
+        return;
+    }
+    nominal = nominal === '' ? '' : String(Number(nominal));
+    if (nominal === input.dataset.saved) {
+        input.value = nominal === '' ? '' : Number(nominal).toLocaleString('id-ID');
+        status.removeClass('text-danger text-success').addClass('text-muted').text('Rp - otomatis tersimpan');
+        return;
+    }
+    input.disabled = true;
+    _plafonSaving++;
+    status.removeClass('text-danger text-success').addClass('text-muted').text('Menyimpan...');
+    $.ajax({
+        url: 'api/simpan_plafon_ranap.php', type: 'POST', dataType: 'json', global: false,
+        data: { no_rawat: input.dataset.norawat, nominal: nominal, csrf: plafonCsrf },
+        success: function(res) {
+            if (!res.success) {
+                status.removeClass('text-muted').addClass('text-danger').text(res.message || 'Gagal menyimpan.');
+                return;
+            }
+            input.dataset.saved = nominal;
+            input.value = nominal === '' ? '' : Number(nominal).toLocaleString('id-ID');
+            var cache = _billingCache[input.dataset.norawat];
+            if (cache) {
+                cache.plafon_raw = res.plafon_raw;
+                cache.has_plafon = res.has_plafon;
+                cache.is_over = res.has_plafon && cache.estimasi_raw > res.plafon_raw;
+                cache.selisih_raw = res.has_plafon ? res.plafon_raw - cache.estimasi_raw : null;
+                updateSelisihRow(input, cache);
+            }
+            status.removeClass('text-muted text-danger').addClass('text-success').text('Tersimpan');
+        },
+        error: function(xhr) {
+            status.removeClass('text-muted').addClass('text-danger').text(xhr.responseJSON && xhr.responseJSON.message || 'Gagal menyimpan. Ubah nominal untuk mencoba lagi.');
+        },
+        complete: function() { input.disabled = false; _plafonSaving--; }
+    });
+});
 
 var _billingQueue   = [];
 var _billingRunning = 0;
 var _billingConcurrency = 3;
 var _billingCache   = {};
+var _billingGeneration = 0;
+var _plafonSaving = 0;
 
 function loadBillingAsync() {
     var cells = document.querySelectorAll('.skeleton-cell');
@@ -665,7 +700,7 @@ function loadBillingAsync() {
         var noRawat = el.getAttribute('data-norawat');
         if (!_billingQueue.some(function(i){ return i.no_rawat === noRawat; })) {
             var rowData = tableKunjungan.rows().data().toArray().find(function(r){ return r.no_rawat === noRawat; });
-            _billingQueue.push({ no_rawat: noRawat, kd_pj: rowData ? (rowData.kd_pj || '-') : '-' });
+            _billingQueue.push({ no_rawat: noRawat, kd_pj: rowData ? (rowData.kd_pj || '-') : '-', generation: _billingGeneration });
         }
     });
     _processBillingQueue();
@@ -686,6 +721,7 @@ function _fetchOneBilling(item) {
         data: { no_rawat: item.no_rawat, kd_pj: item.kd_pj },
         dataType: 'json',
         success: function(res) {
+            if (item.generation !== _billingGeneration) return;
             var nr = res.no_rawat;
             _billingCache[nr] = res;
 
@@ -694,14 +730,17 @@ function _fetchOneBilling(item) {
                 el.outerHTML = '<span class="fw-bold text-primary">Rp ' + (res.estimasi || '0') + '</span>';
             });
 
-            // Plafon
-            document.querySelectorAll('.skeleton-cell[data-norawat="' + nr + '"][data-col="plafon"]').forEach(function(el) {
-                el.outerHTML = res.plafon || '-';
+            // Plafon dan selisih memakai angka mentah yang sama dengan export.
+            document.querySelectorAll('.plafon-input').forEach(function(input) {
+                if (input.dataset.norawat !== nr || !input.disabled) return;
+                var editor = input.closest('.plafon-editor');
+                editor.outerHTML = renderPlafonInput(nr, res.plafon_raw, false, res.plafon_error);
             });
-
-            // FIX #3: Selisih 
             document.querySelectorAll('.skeleton-cell[data-norawat="' + nr + '"][data-col="selisih"]').forEach(function(el) {
                 el.outerHTML = renderSelisihHtml(res.estimasi_raw, res.plafon_raw);
+            });
+            document.querySelectorAll('.plafon-input').forEach(function(input) {
+                if (input.dataset.norawat === nr) updateSelisihRow(input, res);
             });
 
             // DPJP
@@ -712,6 +751,12 @@ function _fetchOneBilling(item) {
             });
         },
         error: function() {
+            if (item.generation !== _billingGeneration) return;
+            document.querySelectorAll('.plafon-input').forEach(function(input) {
+                if (input.dataset.norawat === item.no_rawat) {
+                    input.closest('.plafon-editor').outerHTML = renderPlafonInput(item.no_rawat, null, false, 'Gagal memuat. Klik refresh.');
+                }
+            });
             document.querySelectorAll('.skeleton-cell[data-norawat="' + item.no_rawat + '"]').forEach(function(el) {
                 el.outerHTML = '<span class="text-muted">-</span>';
             });
@@ -765,6 +810,7 @@ function showDetailBilling(noRawat, namaPasien) {
 // EXPORT EXCEL — dengan fetch data billing terlebih dahulu
 // ================================================================
 function exportToExcel() {
+    if (_plafonSaving) { alert('Tunggu sampai plafon selesai disimpan sebelum ekspor.'); return; }
     var allRows = tableKunjungan.rows({ search: 'applied' }).data().toArray();
     if (allRows.length === 0) { alert('Tidak ada data untuk diekspor.'); return; }
 
@@ -816,7 +862,7 @@ function _doExport(rows) {
 
     rows.forEach(function(r) {
         var cache  = _billingCache[r.no_rawat] || {};
-        var plafon = cache.plafon_raw ? parseFloat(cache.plafon_raw) : '';
+        var plafon = cache.has_plafon ? Number(cache.plafon_raw) : '';
         var estimasi = cache.estimasi_raw !== undefined ? parseFloat(cache.estimasi_raw) : '';
         var selisih  = '';
         var isOver   = false;
