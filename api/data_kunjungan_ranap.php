@@ -14,6 +14,7 @@ set_time_limit(0);
 mysqli_report(MYSQLI_REPORT_OFF);
 header('Content-Type: application/json; charset=utf-8');
 require_once(dirname(__DIR__) . '/config/koneksi.php'); 
+require_once(dirname(__DIR__) . '/config/bed_sk_mapping.php');
 
 // 1. HELPER FUNCTIONS
 function safeFloat($val) {
@@ -58,7 +59,9 @@ $tgl2   = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 $kd_pj  = isset($_GET['kd_pj']) ? $koneksi->real_escape_string($_GET['kd_pj']) : '';
 
 // 4. QUERY UTAMA
-$where = " WHERE 1=1 ";
+// Gunakan mapping bed yang sama dengan BOR untuk daftar, pencarian, dan pagination.
+$bed_in = getSkBedInSql($koneksi);
+$where = $bed_in !== '' ? " WHERE ki.kd_kamar IN ($bed_in) " : " WHERE 1=0 ";
 if ($mode == 'active') {
     $where .= " AND ki.stts_pulang = '-' ";
 } else {

@@ -94,6 +94,7 @@
             const data = await request('api/data_kepegawaian.php?' + params.toString());
             rows = data.rows;
             loadedDate = data.tanggal;
+            document.getElementById('kpIndexNote').textContent = 'Perhitungan per ' + loadedDate + '. Masa kerja memakai tahun dan bulan yang sudah lengkap; index masa kerja 2 per tahun, maksimal 14. Index lainnya mengikuti nilai master kepegawaian.';
             document.getElementById('kpCount').textContent = number(data.total_pegawai);
             document.getElementById('kpActive').textContent = number(rows.filter(r => r.stts_aktif === 'AKTIF').length);
             document.getElementById('kpUnits').textContent = number(new Set(rows.map(r => r.departemen)).size);

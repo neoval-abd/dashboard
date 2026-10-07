@@ -940,6 +940,15 @@ function get_arrow_class($pages, $current) {
         $sidebar_menus = json_decode($json_data, true);
     }
 
+    require_once __DIR__ . '/kepegawaian.php';
+    $sidebar_pegawai_access = false;
+    try {
+        $sidebar_pegawai_access = kp_can_access($koneksi);
+    } catch (Throwable $error) {
+        error_log('[Kepegawaian Akses] ' . $error->getMessage());
+    }
+    $sidebar_menus = kp_filter_sidebar($sidebar_menus, $sidebar_pegawai_access);
+
     // LOOPING MENU DARI JSON
     if (!empty($sidebar_menus)) {
         foreach ($sidebar_menus as $menu) {

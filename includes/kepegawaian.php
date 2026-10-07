@@ -50,11 +50,34 @@ function kp_rows($db, $sql, $values = [])
     return $rows;
 }
 
-function kp_can_write($db)
+function kp_can_access($db)
 {
+    if (empty($_SESSION['user_id'])) return false;
     if (isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin') return true;
     $rows = kp_rows($db, "SELECT pegawai_admin FROM user WHERE AES_DECRYPT(id_user, 'nur') = ?", [$_SESSION['user_id']]);
     return isset($rows[0]['pegawai_admin']) && $rows[0]['pegawai_admin'] === 'true';
+}
+
+function kp_can_write($db)
+{
+    return kp_can_access($db);
+}
+
+function kp_filter_sidebar($menus, $can_access)
+{
+    if (!is_array($menus)) return [];
+    if ($can_access) return $menus;
+    $visible = [];
+    foreach ($menus as $menu) {
+        $path = parse_url($menu['url'] ?? '', PHP_URL_PATH);
+        if (basename((string) $path) === 'kepegawaian.php') continue;
+        if (!empty($menu['is_group']) && isset($menu['items']) && is_array($menu['items'])) {
+            $menu['items'] = kp_filter_sidebar($menu['items'], false);
+            if (!$menu['items']) continue;
+        }
+        $visible[] = $menu;
+    }
+    return $visible;
 }
 
 function kp_options($db)
@@ -79,11 +102,8 @@ function kp_valid_date($value)
 
 function kp_reference_date($db)
 {
-    $rows = kp_rows($db, 'SELECT tahun, bulan, jmlhr FROM set_tahun LIMIT 1');
-    if ($rows) {
-        $date = sprintf('%04d-%02d-%02d', $rows[0]['tahun'], $rows[0]['bulan'], $rows[0]['jmlhr']);
-        if (kp_valid_date($date)) return $date;
-    }
+    // Dashboard menampilkan kondisi terkini, bukan periode penggajian yang tersimpan.
+    // Tanggal historis tetap dapat dipilih secara eksplisit melalui filter.
     return date('Y-m-d');
 }
 
@@ -160,11 +180,17 @@ function kp_save_index($db, $input)
     kp_query($db, 'UPDATE pegawai SET indek=?, pengurang=?, cuti_diambil=?, dankes=? WHERE id=?', array_merge($data, [$id]))->close();
 }
 
+function kp_service_period($start, $reference)
+{
+    if (!$start || !kp_valid_date($start) || !kp_valid_date($reference)) return null;
+    return (new DateTimeImmutable($start))->diff(new DateTimeImmutable($reference));
+}
+
 function kp_duration($start, $reference)
 {
-    if (!$start || !kp_valid_date($start)) return '-';
-    $months = ((int) substr($reference, 0, 4) - (int) substr($start, 0, 4)) * 12 + (int) substr($reference, 5, 2) - (int) substr($start, 5, 2);
-    return $months < 0 ? 'Belum mulai' : floor($months / 12) . ' Tahun ' . ($months % 12) . ' Bulan';
+    $period = kp_service_period($start, $reference);
+    if (!$period) return '-';
+    return $period->invert ? 'Belum mulai' : $period->y . ' Tahun ' . $period->m . ' Bulan';
 }
 
 function kp_employee_list($db, $status, $keyword, $department, $reference)
@@ -208,9 +234,9 @@ function kp_employee_list($db, $status, $keyword, $department, $reference)
     $rows = kp_rows($db, $sql . ' ORDER BY p.id ASC LIMIT 5001', array_merge([$year . '%', $year . '%', $year . '%'], $params));
     if (count($rows) > 5000) throw new InvalidArgumentException('Data terlalu banyak. Persempit filter departemen atau kata kunci.');
     foreach ($rows as &$row) {
-        $days = ($row['mulai_kerja'] && kp_valid_date($row['mulai_kerja'])) ? (new DateTime($row['mulai_kerja']))->diff(new DateTime($reference)) : null;
-        $years = $days && !$days->invert ? $days->days / 365 : 0;
-        $row['index_masa_kerja'] = min(14, floor($years) * 2);
+        $period = kp_service_period($row['mulai_kerja'], $reference);
+        $years = $period && !$period->invert ? $period->y : 0;
+        $row['index_masa_kerja'] = min(14, $years * 2);
         $row['lama_kerja'] = kp_duration($row['mulai_kerja'], $reference);
         $row['lama_kontrak'] = kp_duration($row['mulai_kontrak'], $reference);
         $base = (float) $row['indek'] + $row['index_masa_kerja'];

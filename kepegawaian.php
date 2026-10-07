@@ -1,7 +1,24 @@
 <?php
 $page_title = 'Kepegawaian';
-require_once __DIR__ . '/includes/header.php';
+require_once __DIR__ . '/config/koneksi.php';
 require_once __DIR__ . '/includes/kepegawaian.php';
+if (empty($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit;
+}
+$kp_access = false;
+try {
+    $kp_access = kp_can_access($koneksi);
+} catch (Throwable $error) {
+    error_log('[Kepegawaian Akses] ' . $error->getMessage());
+}
+if (!$kp_access) {
+    http_response_code(403);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><html lang="id"><meta charset="utf-8"><title>Akses Ditolak</title><h3>Akses Kepegawaian ditolak.</h3><p>Anda tidak memiliki hak akses admin pegawai.</p><a href="dashboard.php">Kembali ke dashboard</a></html>';
+    exit;
+}
+require_once __DIR__ . '/includes/header.php';
 $kp_error = '';
 $kp_options = [];
 $kp_write = false;
@@ -46,11 +63,11 @@ function kp_escape($value) { return htmlspecialchars((string) $value, ENT_QUOTES
     <form id="kpFilters" class="row g-2 align-items-end">
         <div class="col-md-2"><label class="form-label small fw-bold" for="kpStatus">Status</label><select id="kpStatus" class="form-select form-select-sm"><option value="">Semua Status</option><?php foreach (kp_fields()['stts_aktif'][2] as $status): ?><option value="<?php echo kp_escape($status); ?>" <?php echo $status === 'AKTIF' ? 'selected' : ''; ?>><?php echo kp_escape($status); ?></option><?php endforeach; ?></select></div>
         <div class="col-md-3"><label class="form-label small fw-bold" for="kpDepartment">Departemen</label><select id="kpDepartment" class="form-select form-select-sm"><option value="">Semua Departemen</option><?php foreach ($kp_options['departemen'] ?? [] as $option): ?><option value="<?php echo kp_escape($option['value']); ?>"><?php echo kp_escape($option['label']); ?></option><?php endforeach; ?></select></div>
-        <div class="col-md-2"><label class="form-label small fw-bold" for="kpDate">Tanggal Acuan Index</label><input id="kpDate" type="date" class="form-control form-control-sm" required value="<?php echo kp_escape($kp_date); ?>"></div>
+        <div class="col-md-2"><label class="form-label small fw-bold" for="kpDate">Tanggal Acuan Perhitungan</label><input id="kpDate" type="date" class="form-control form-control-sm" required value="<?php echo kp_escape($kp_date); ?>"></div>
         <div class="col-md-3"><label class="form-label small fw-bold" for="kpKeyword">Kata Kunci</label><input id="kpKeyword" class="form-control form-control-sm" maxlength="150" placeholder="NIP, nama, jabatan, pendidikan..."></div>
         <div class="col-md-2 d-flex gap-2"><button class="btn btn-primary btn-sm flex-grow-1" id="kpLoad" type="submit"><i class="fas fa-check me-1"></i>Tampilkan</button><button type="button" class="btn btn-success btn-sm" id="kpExport" title="Export CSV" aria-label="Export CSV"><i class="fas fa-file-excel"></i></button></div>
     </form>
-    <small class="text-muted d-block mt-2" id="kpReferenceHelp">Tanggal awal mengikuti periode penggajian Khanza: <?php echo kp_escape($kp_date); ?>. Pilih tanggal acuan lain untuk menghitung masa kerja dan index pada tanggal tersebut.</small>
+    <small class="text-muted d-block mt-2" id="kpReferenceHelp">Tanggal acuan awal memakai hari ini: <?php echo kp_escape($kp_date); ?>. Pilih tanggal lain untuk melihat perhitungan pada periode tersebut. Index pendidikan, status, dan jabatan mengikuti nilai master kepegawaian.</small>
 </div></div>
 <div id="kpDataPanel" role="tabpanel" aria-labelledby="kpListTab">
     <div class="row g-3 mb-3">

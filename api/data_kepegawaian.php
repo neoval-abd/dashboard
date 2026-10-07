@@ -9,16 +9,16 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 try {
+    if (!kp_can_access($koneksi)) {
+        http_response_code(403);
+        throw new InvalidArgumentException('Anda tidak memiliki hak akses admin pegawai.');
+    }
     $action = $_POST['action'] ?? $_GET['action'] ?? 'list';
     if (!is_string($action)) throw new InvalidArgumentException('Permintaan tidak valid.');
     if ($action === 'save' || $action === 'save_index') {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
             throw new InvalidArgumentException('Gunakan metode POST.');
-        }
-        if (!kp_can_write($koneksi)) {
-            http_response_code(403);
-            throw new InvalidArgumentException('Anda tidak memiliki izin mengelola pegawai.');
         }
         $token = $_POST['csrf'] ?? '';
         if (!is_string($token) || empty($_SESSION['kp_csrf']) || !hash_equals($_SESSION['kp_csrf'], $token)) {
