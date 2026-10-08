@@ -77,9 +77,14 @@ function getSkBedCapacity()
 
 function getSkBedInSql(mysqli $koneksi)
 {
+    $bed_list = getSkBedKamarList();
+    if (empty($bed_list)) {
+        return '';
+    }
+
     $escaped = array_map(function ($kd_kamar) use ($koneksi) {
         return "'" . $koneksi->real_escape_string($kd_kamar) . "'";
-    }, getSkBedKamarList());
+    }, $bed_list);
 
     return implode(',', $escaped);
 }

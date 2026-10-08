@@ -8,14 +8,19 @@
 $page_title = "Laporan Kunjungan Pasien";
 require_once('includes/header.php');
 require_once('includes/functions.php');
+require_once('config/bed_sk_mapping.php');
+
+// Hanya tampilkan kunjungan pada kamar yang terdaftar pada mapping bed SK.
+$sk_bed_in = getSkBedInSql($koneksi);
+$has_sk_bed_filter = ($sk_bed_in !== '');
 
 // 2. Parameter Filter
 $tgl_awal = isset($_GET['tgl_awal']) ? htmlspecialchars($_GET['tgl_awal']) : date('Y-m-d');
 $jam_awal = isset($_GET['jam_awal']) ? htmlspecialchars($_GET['jam_awal']) : '00:00:00';
 $tgl_akhir = isset($_GET['tgl_akhir']) ? htmlspecialchars($_GET['tgl_akhir']) : date('Y-m-d');
 $jam_akhir = isset($_GET['jam_akhir']) ? htmlspecialchars($_GET['jam_akhir']) : '23:59:59';
-$kd_pj = isset($_GET['kd_pj']) ? htmlspecialchars($_GET['kd_pj']) : ''; 
-$action = isset($_GET['action']) ? $_GET['action'] : ''; 
+$kd_pj = isset($_GET['kd_pj']) ? htmlspecialchars($_GET['kd_pj']) : '';
+$action = isset($_GET['action']) ? $_GET['action'] : '';
 
 $datetime_awal = $tgl_awal . ' ' . $jam_awal;
 $datetime_akhir = $tgl_akhir . ' ' . $jam_akhir;
@@ -66,9 +71,11 @@ if ($is_search) {
     if ($stmt) {
         $bind_names = [];
         $bind_names[] = $types;
-        for ($i=0; $i<count($params);$i++) { $bind_names[] = &$params[$i]; }
+        for ($i = 0; $i < count($params); $i++) {
+            $bind_names[] = &$params[$i];
+        }
         call_user_func_array(array($stmt, 'bind_param'), $bind_names);
-        
+
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
@@ -78,17 +85,56 @@ if ($is_search) {
     }
 
     // --- Query Ranap ---
+    $ranap_kamar_filter = $has_sk_bed_filter
+        ? " AND kamar_fo.kd_kamar IN ($sk_bed_in)"
+        : " AND 1 = 0";
+
     $sql_ranap = "
         SELECT 
             reg_periksa.no_rawat, reg_periksa.tgl_registrasi, reg_periksa.jam_reg, 
             reg_periksa.no_rkm_medis, pasien.nm_pasien, 
-            dokter.nm_dokter, poliklinik.nm_poli, penjab.png_jawab, reg_periksa.stts_daftar
+            COALESCE(
+                (
+                    SELECT dokter_dpjp.nm_dokter
+                    FROM dpjp_ranap
+                    INNER JOIN dokter AS dokter_dpjp ON dokter_dpjp.kd_dokter = dpjp_ranap.kd_dokter
+                    WHERE dpjp_ranap.no_rawat = reg_periksa.no_rawat
+                    ORDER BY dpjp_ranap.kd_dokter
+                    LIMIT 1
+                ),
+                dokter.nm_dokter
+            ) AS nm_dpjp,
+            poliklinik.nm_poli,
+            CONCAT(kamar_fo.kd_kamar, ' - ', bangsal_fo.nm_bangsal) AS kamar_fo,
+            penjab.png_jawab,
+            COALESCE(
+                NULLIF(
+                    (
+                        SELECT kamar_inap_status.stts_pulang
+                        FROM kamar_inap AS kamar_inap_status
+                        WHERE kamar_inap_status.no_rawat = reg_periksa.no_rawat
+                        ORDER BY kamar_inap_status.tgl_masuk DESC, kamar_inap_status.jam_masuk DESC
+                        LIMIT 1
+                    ),
+                    ''
+                ),
+                '-'
+            ) AS stts_pulang
         FROM reg_periksa
         INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
         INNER JOIN dokter ON reg_periksa.kd_dokter = dokter.kd_dokter
         INNER JOIN poliklinik ON reg_periksa.kd_poli = poliklinik.kd_poli
         INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj
+        INNER JOIN kamar kamar_fo ON kamar_fo.kd_kamar = (
+            SELECT kamar_inap.kd_kamar
+            FROM kamar_inap
+            WHERE kamar_inap.no_rawat = reg_periksa.no_rawat
+            ORDER BY kamar_inap.tgl_masuk ASC, kamar_inap.jam_masuk ASC
+            LIMIT 1
+        )
+        LEFT JOIN bangsal bangsal_fo ON bangsal_fo.kd_bangsal = kamar_fo.kd_bangsal
         $where_base AND reg_periksa.status_lanjut = 'Ranap'
+        $ranap_kamar_filter
         ORDER BY reg_periksa.tgl_registrasi DESC, reg_periksa.jam_reg DESC
     ";
 
@@ -96,9 +142,11 @@ if ($is_search) {
     if ($stmt) {
         $bind_names = [];
         $bind_names[] = $types;
-        for ($i=0; $i<count($params);$i++) { $bind_names[] = &$params[$i]; }
+        for ($i = 0; $i < count($params); $i++) {
+            $bind_names[] = &$params[$i];
+        }
         call_user_func_array(array($stmt, 'bind_param'), $bind_names);
-        
+
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
@@ -136,7 +184,7 @@ if ($is_search) {
                         <label class="form-label">Penjamin</label>
                         <select name="kd_pj" class="form-select">
                             <option value="">-- Semua Penjamin --</option>
-                            <?php foreach($penjabs as $p): ?>
+                            <?php foreach ($penjabs as $p): ?>
                                 <option value="<?php echo $p['kd_pj']; ?>" <?php echo ($kd_pj == $p['kd_pj']) ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($p['png_jawab']); ?>
                                 </option>
@@ -154,134 +202,142 @@ if ($is_search) {
     </div>
 
     <?php if ($is_search): ?>
-    
-    <div class="alert alert-info shadow-sm mb-4">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="mb-0">Total Kunjungan: <strong><?php echo count($data_ralan) + count($data_ranap); ?></strong></h5>
-                <small>Rawat Jalan: <?php echo count($data_ralan); ?> | Rawat Inap: <?php echo count($data_ranap); ?></small>
+
+        <div class="alert alert-info shadow-sm mb-4">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h5 class="mb-0">Total Kunjungan: <strong><?php echo count($data_ralan) + count($data_ranap); ?></strong></h5>
+                    <small>Rawat Jalan: <?php echo count($data_ralan); ?> | Rawat Inap: <?php echo count($data_ranap); ?></small>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="row mb-4">
-        <div class="col-lg-4 col-md-12 mb-3">
-            <div class="card shadow-sm h-100">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Proporsi Kunjungan per Penjamin</h6>
+        <div class="row mb-4">
+            <div class="col-lg-4 col-md-12 mb-3">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Proporsi Kunjungan per Penjamin</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-pie pt-4 pb-2" style="height: 300px;">
+                            <canvas id="chartPieKunjungan"></canvas>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="chart-pie pt-4 pb-2" style="height: 300px;">
-                        <canvas id="chartPieKunjungan"></canvas>
+            </div>
+            <div class="col-lg-8 col-md-12 mb-3">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Tren Kunjungan Harian</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-area" style="height: 300px;">
+                            <canvas id="chartLineKunjungan"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-lg-8 col-md-12 mb-3">
-            <div class="card shadow-sm h-100">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Tren Kunjungan Harian</h6>
-                </div>
-                <div class="card-body">
-                    <div class="chart-area" style="height: 300px;">
-                        <canvas id="chartLineKunjungan"></canvas>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="ralan-tab" data-bs-toggle="tab" data-bs-target="#ralan" type="button" role="tab" aria-controls="ralan" aria-selected="true">
+                            Rawat Jalan (<?php echo count($data_ralan); ?>)
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="ranap-tab" data-bs-toggle="tab" data-bs-target="#ranap" type="button" role="tab" aria-controls="ranap" aria-selected="false">
+                            Rawat Inap (<?php echo count($data_ranap); ?>)
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="myTabContent">
+
+                    <div class="tab-pane fade show active" id="ralan" role="tabpanel" aria-labelledby="ralan-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered table-sm dt-table" width="100%">
+                                <thead>
+                                    <tr>
+                                        <th>No. Rawat</th>
+                                        <th>Tgl Reg</th>
+                                        <th>Jam</th>
+                                        <th>No. RM</th>
+                                        <th>Pasien</th>
+                                        <th>Poliklinik</th>
+                                        <th>Dokter</th>
+                                        <th>Penjamin</th>
+                                        <th>Jns Kunjungan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($data_ralan as $row): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($row['no_rawat']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['tgl_registrasi']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['jam_reg']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['no_rkm_medis']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['nm_pasien']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['nm_poli']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['nm_dokter']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['png_jawab']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['stts_daftar']); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
+
+                    <div class="tab-pane fade" id="ranap" role="tabpanel" aria-labelledby="ranap-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered table-sm dt-table" width="100%">
+                                <thead>
+                                    <tr>
+                                        <th>No. Rawat</th>
+                                        <th>Tgl Masuk</th>
+                                        <th>Jam</th>
+                                        <th>No. RM</th>
+                                        <th>Pasien</th>
+                                        <th>Asal Poli/IGD</th>
+                                        <th>Kamar</th>
+                                        <th>Dokter DPJP</th>
+                                        <th>Penjamin</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($data_ranap as $row): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($row['no_rawat']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['tgl_registrasi']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['jam_reg']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['no_rkm_medis']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['nm_pasien']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['nm_poli']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['kamar_fo']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['nm_dpjp']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['png_jawab']); ?></td>
+                                            <td>
+                                                <?php if ($row['stts_pulang'] === '-'): ?>
+                                                    <span class="badge bg-info text-dark">Dirawat</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-warning text-dark"><?php echo htmlspecialchars($row['stts_pulang']); ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="card shadow-sm mb-4">
-        <div class="card-header">
-            <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="ralan-tab" data-bs-toggle="tab" data-bs-target="#ralan" type="button" role="tab" aria-controls="ralan" aria-selected="true">
-                        Rawat Jalan (<?php echo count($data_ralan); ?>)
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="ranap-tab" data-bs-toggle="tab" data-bs-target="#ranap" type="button" role="tab" aria-controls="ranap" aria-selected="false">
-                        Rawat Inap (<?php echo count($data_ranap); ?>)
-                    </button>
-                </li>
-            </ul>
-        </div>
-        <div class="card-body">
-            <div class="tab-content" id="myTabContent">
-                
-                <div class="tab-pane fade show active" id="ralan" role="tabpanel" aria-labelledby="ralan-tab">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-bordered table-sm dt-table" width="100%">
-                            <thead>
-                                <tr>
-                                    <th>No. Rawat</th>
-                                    <th>Tgl Reg</th>
-                                    <th>Jam</th>
-                                    <th>No. RM</th>
-                                    <th>Pasien</th>
-                                    <th>Poliklinik</th>
-                                    <th>Dokter</th>
-                                    <th>Penjamin</th>
-                                    <th>Jns Kunjungan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($data_ralan as $row): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($row['no_rawat']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['tgl_registrasi']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['jam_reg']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['no_rkm_medis']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['nm_pasien']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['nm_poli']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['nm_dokter']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['png_jawab']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['stts_daftar']); ?></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="ranap" role="tabpanel" aria-labelledby="ranap-tab">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-bordered table-sm dt-table" width="100%">
-                            <thead>
-                                <tr>
-                                    <th>No. Rawat</th>
-                                    <th>Tgl Masuk</th>
-                                    <th>Jam</th>
-                                    <th>No. RM</th>
-                                    <th>Pasien</th>
-                                    <th>Asal Poli/IGD</th>
-                                    <th>Dokter</th>
-                                    <th>Penjamin</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($data_ranap as $row): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($row['no_rawat']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['tgl_registrasi']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['jam_reg']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['no_rkm_medis']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['nm_pasien']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['nm_poli']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['nm_dokter']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['png_jawab']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['stts']); ?></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </div>
 
     <?php else: ?>
         <div class="alert alert-secondary text-center p-5">
@@ -298,13 +354,15 @@ if ($is_search) {
         // Init DataTables
         $('.dt-table').DataTable({
             "responsive": true,
-            "order": [[ 1, "desc" ], [ 2, "desc" ]],
+            "order": [
+                [1, "desc"],
+                [2, "desc"]
+            ],
             "pageLength": 10,
             "lengthChange": true,
             // --- TAMBAHAN UNTUK EXPORT ---
             "dom": 'Bfrtip', // B = Buttons, f = filtering, r = processing, t = table, i = info, p = pagination
-            "buttons": [
-                {
+            "buttons": [{
                     extend: 'excelHtml5',
                     text: '<i class="fas fa-file-excel"></i> Export Excel',
                     className: 'btn btn-success btn-sm',
@@ -339,8 +397,17 @@ if ($is_search) {
 
         // Load Charts
         <?php if ($is_search): ?>
-        loadCharts();
+            loadCharts();
         <?php endif; ?>
+    });
+
+    $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
+        $.fn.dataTable.tables({
+                visible: true,
+                api: true
+            })
+            .columns.adjust()
+            .responsive.recalc();
     });
 
     function loadCharts() {
@@ -370,10 +437,10 @@ if ($is_search) {
 
     function renderPieChart(pieData) {
         var ctx = document.getElementById("chartPieKunjungan");
-        if(!ctx) return;
-        
+        if (!ctx) return;
+
         var backgroundColors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69', '#2e59d9', '#17a673', '#2c9faf'];
-        
+
         new Chart(ctx, {
             type: 'doughnut',
             data: {
@@ -388,7 +455,10 @@ if ($is_search) {
             options: {
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: true, position: 'bottom' },
+                    legend: {
+                        display: true,
+                        position: 'bottom'
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
@@ -404,7 +474,7 @@ if ($is_search) {
 
     function renderLineChart(lineData) {
         var ctx = document.getElementById("chartLineKunjungan");
-        if(!ctx) return;
+        if (!ctx) return;
 
         new Chart(ctx, {
             type: 'line',
@@ -414,9 +484,19 @@ if ($is_search) {
             },
             options: {
                 maintainAspectRatio: false,
-                layout: { padding: { left: 10, right: 25, top: 25, bottom: 0 } },
+                layout: {
+                    padding: {
+                        left: 10,
+                        right: 25,
+                        top: 25,
+                        bottom: 0
+                    }
+                },
                 plugins: {
-                    legend: { display: true, position: 'top' },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
                     tooltip: {
                         mode: 'index',
                         intersect: false,
@@ -424,20 +504,27 @@ if ($is_search) {
                 },
                 scales: {
                     x: {
-                        grid: { display: false, drawBorder: false },
-                        ticks: { maxTicksLimit: 7 }
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        },
+                        ticks: {
+                            maxTicksLimit: 7
+                        }
                     },
                     y: {
                         ticks: {
                             maxTicksLimit: 5,
                             padding: 10,
-                            callback: function(value) { return value; } 
+                            callback: function(value) {
+                                return value;
+                            }
                         },
-                        grid: { 
-                            color: "rgb(234, 236, 244)", 
-                            drawBorder: false, 
-                            borderDash: [2], 
-                            zeroLineBorderDash: [2] 
+                        grid: {
+                            color: "rgb(234, 236, 244)",
+                            drawBorder: false,
+                            borderDash: [2],
+                            zeroLineBorderDash: [2]
                         }
                     },
                 }
