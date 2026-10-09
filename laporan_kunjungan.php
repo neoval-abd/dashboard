@@ -20,6 +20,8 @@ $jam_awal = isset($_GET['jam_awal']) ? htmlspecialchars($_GET['jam_awal']) : '00
 $tgl_akhir = isset($_GET['tgl_akhir']) ? htmlspecialchars($_GET['tgl_akhir']) : date('Y-m-d');
 $jam_akhir = isset($_GET['jam_akhir']) ? htmlspecialchars($_GET['jam_akhir']) : '23:59:59';
 $kd_pj = isset($_GET['kd_pj']) ? htmlspecialchars($_GET['kd_pj']) : '';
+$kd_kamar_filter = isset($_GET['kd_kamar']) ? htmlspecialchars($_GET['kd_kamar']) : '';
+$stts_pulang_filter = isset($_GET['stts_pulang']) ? htmlspecialchars($_GET['stts_pulang']) : '';
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 $datetime_awal = $tgl_awal . ' ' . $jam_awal;
@@ -32,6 +34,25 @@ $result_penjab = $koneksi->query($sql_penjab);
 if ($result_penjab) {
     while ($row = $result_penjab->fetch_assoc()) {
         $penjabs[] = $row;
+    }
+}
+
+// 3b. Data Kamar SK (Dropdown Filter Ranap)
+$kamar_options = [];
+if ($has_sk_bed_filter) {
+    $sql_kamar = "
+        SELECT k.kd_kamar, b.kd_bangsal, b.nm_bangsal, k.kelas
+        FROM kamar k
+        INNER JOIN bangsal b ON k.kd_bangsal = b.kd_bangsal
+        WHERE k.statusdata = '1'
+          AND k.kd_kamar IN ($sk_bed_in)
+        ORDER BY b.nm_bangsal ASC, k.kd_kamar ASC
+    ";
+    $result_kamar = $koneksi->query($sql_kamar);
+    if ($result_kamar) {
+        while ($row = $result_kamar->fetch_assoc()) {
+            $kamar_options[] = $row;
+        }
     }
 }
 
@@ -89,6 +110,42 @@ if ($is_search) {
         ? " AND kamar_fo.kd_kamar IN ($sk_bed_in)"
         : " AND 1 = 0";
 
+    $params_ranap = $params;
+    $types_ranap  = $types;
+
+    // Filter Kamar / Bangsal Ranap Tambahan
+    if (!empty($kd_kamar_filter)) {
+        if (strpos($kd_kamar_filter, 'BANGSAL:') === 0) {
+            $kd_b = substr($kd_kamar_filter, 8);
+            $ranap_kamar_filter .= " AND kamar_fo.kd_bangsal = ? ";
+            $params_ranap[] = $kd_b;
+            $types_ranap .= "s";
+        } else {
+            $ranap_kamar_filter .= " AND kamar_fo.kd_kamar = ? ";
+            $params_ranap[] = $kd_kamar_filter;
+            $types_ranap .= "s";
+        }
+    }
+
+    // Filter Status Pulang Ranap Tambahan (Lengkap Sesuai Master SIMRS Khanza)
+    $ranap_status_filter = "";
+    if (!empty($stts_pulang_filter)) {
+        $sub_stts = "COALESCE(NULLIF((SELECT kamar_inap_status.stts_pulang FROM kamar_inap AS kamar_inap_status WHERE kamar_inap_status.no_rawat = reg_periksa.no_rawat ORDER BY kamar_inap_status.tgl_masuk DESC, kamar_inap_status.jam_masuk DESC LIMIT 1), ''), '-')";
+        if ($stts_pulang_filter === 'dirawat' || $stts_pulang_filter === '-') {
+            $ranap_status_filter = " AND $sub_stts = '-' ";
+        } elseif ($stts_pulang_filter === 'pulang') {
+            $ranap_status_filter = " AND $sub_stts != '-' ";
+        } elseif ($stts_pulang_filter === 'Meninggal' || $stts_pulang_filter === '+') {
+            $ranap_status_filter = " AND ($sub_stts = 'Meninggal' OR $sub_stts = '+') ";
+        } elseif ($stts_pulang_filter === 'APS') {
+            $ranap_status_filter = " AND ($sub_stts = 'APS' OR $sub_stts = 'Atas Permintaan Sendiri') ";
+        } else {
+            $ranap_status_filter = " AND $sub_stts = ? ";
+            $params_ranap[] = $stts_pulang_filter;
+            $types_ranap .= "s";
+        }
+    }
+
     $sql_ranap = "
         SELECT 
             reg_periksa.no_rawat, reg_periksa.tgl_registrasi, reg_periksa.jam_reg, 
@@ -135,15 +192,16 @@ if ($is_search) {
         LEFT JOIN bangsal bangsal_fo ON bangsal_fo.kd_bangsal = kamar_fo.kd_bangsal
         $where_base AND reg_periksa.status_lanjut = 'Ranap'
         $ranap_kamar_filter
+        $ranap_status_filter
         ORDER BY reg_periksa.tgl_registrasi DESC, reg_periksa.jam_reg DESC
     ";
 
     $stmt = $koneksi->prepare($sql_ranap);
     if ($stmt) {
         $bind_names = [];
-        $bind_names[] = $types;
-        for ($i = 0; $i < count($params); $i++) {
-            $bind_names[] = &$params[$i];
+        $bind_names[] = $types_ranap;
+        for ($i = 0; $i < count($params_ranap); $i++) {
+            $bind_names[] = &$params_ranap[$i];
         }
         call_user_func_array(array($stmt, 'bind_param'), $bind_names);
 
@@ -164,24 +222,24 @@ if ($is_search) {
             <form action="laporan_kunjungan.php" method="GET">
                 <input type="hidden" name="action" value="cari">
                 <div class="row g-3">
-                    <div class="col-md-2">
-                        <label class="form-label">Dari Tanggal</label>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-bold">Dari Tanggal</label>
                         <input type="date" class="form-control" name="tgl_awal" value="<?php echo $tgl_awal; ?>">
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Jam</label>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-bold">Jam</label>
                         <input type="time" class="form-control" name="jam_awal" value="<?php echo $jam_awal; ?>">
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Sampai Tanggal</label>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-bold">Sampai Tanggal</label>
                         <input type="date" class="form-control" name="tgl_akhir" value="<?php echo $tgl_akhir; ?>">
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Jam</label>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-bold">Jam</label>
                         <input type="time" class="form-control" name="jam_akhir" value="<?php echo $jam_akhir; ?>">
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Penjamin</label>
+                    <div class="col-md-2 col-sm-12">
+                        <label class="form-label small fw-bold">Penjamin</label>
                         <select name="kd_pj" class="form-select">
                             <option value="">-- Semua Penjamin --</option>
                             <?php foreach ($penjabs as $p): ?>
@@ -191,10 +249,64 @@ if ($is_search) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="fas fa-search me-2"></i> Tampilkan
+
+                    <!-- Filter Khusus Ranap -->
+                    <div class="col-md-4 col-sm-6">
+                        <label class="form-label small fw-bold text-info"><i class="fas fa-bed me-1"></i>Filter Kamar (Ranap)</label>
+                        <select name="kd_kamar" class="form-select">
+                            <option value="">-- Semua Kamar / Bangsal --</option>
+                            <?php
+                            $grouped_kamar = [];
+                            foreach ($kamar_options as $km) {
+                                $grouped_kamar[$km['nm_bangsal']][] = $km;
+                            }
+                            foreach ($grouped_kamar as $nm_bangsal => $beds):
+                                $first_bed = $beds[0];
+                                $val_bangsal = 'BANGSAL:' . $first_bed['kd_bangsal'];
+                            ?>
+                                <optgroup label="<?php echo htmlspecialchars($nm_bangsal); ?>">
+                                    <option value="<?php echo htmlspecialchars($val_bangsal); ?>" <?php echo ($kd_kamar_filter === $val_bangsal) ? 'selected' : ''; ?>>
+                                        [Semua di <?php echo htmlspecialchars($nm_bangsal); ?> - <?php echo count($beds); ?> Bed]
+                                    </option>
+                                    <?php foreach ($beds as $bed): ?>
+                                        <option value="<?php echo htmlspecialchars($bed['kd_kamar']); ?>" <?php echo ($kd_kamar_filter === $bed['kd_kamar']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($bed['kd_kamar']); ?> (<?php echo htmlspecialchars($bed['kelas']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4 col-sm-6">
+                        <label class="form-label small fw-bold text-info"><i class="fas fa-user-check me-1"></i>Status Pulang (Ranap)</label>
+                        <select name="stts_pulang" class="form-select">
+                            <option value="">-- Semua Status --</option>
+                            <option value="dirawat" <?php echo ($stts_pulang_filter === 'dirawat' || $stts_pulang_filter === '-') ? 'selected' : ''; ?>>Masih Dirawat</option>
+                            <option value="Atas Persetujuan Dokter" <?php echo ($stts_pulang_filter === 'Atas Persetujuan Dokter') ? 'selected' : ''; ?>>Atas Persetujuan Dokter</option>
+                            <option value="Sehat" <?php echo ($stts_pulang_filter === 'Sehat') ? 'selected' : ''; ?>>Sehat</option>
+                            <option value="Sembuh" <?php echo ($stts_pulang_filter === 'Sembuh') ? 'selected' : ''; ?>>Sembuh</option>
+                            <option value="Membaik" <?php echo ($stts_pulang_filter === 'Membaik') ? 'selected' : ''; ?>>Membaik</option>
+                            <option value="Rujuk" <?php echo ($stts_pulang_filter === 'Rujuk') ? 'selected' : ''; ?>>Rujuk</option>
+                            <option value="APS" <?php echo ($stts_pulang_filter === 'APS') ? 'selected' : ''; ?>>APS</option>
+                            <option value="Atas Permintaan Sendiri" <?php echo ($stts_pulang_filter === 'Atas Permintaan Sendiri') ? 'selected' : ''; ?>>Atas Permintaan Sendiri</option>
+                            <option value="Pulang Paksa" <?php echo ($stts_pulang_filter === 'Pulang Paksa') ? 'selected' : ''; ?>>Pulang Paksa</option>
+                            <option value="Meninggal" <?php echo ($stts_pulang_filter === 'Meninggal') ? 'selected' : ''; ?>>Meninggal</option>
+                            <option value="+" <?php echo ($stts_pulang_filter === '+') ? 'selected' : ''; ?>>+ (Meninggal)</option>
+                            <option value="Pindah Kamar" <?php echo ($stts_pulang_filter === 'Pindah Kamar') ? 'selected' : ''; ?>>Pindah Kamar</option>
+                            <option value="Status Belum Lengkap" <?php echo ($stts_pulang_filter === 'Status Belum Lengkap') ? 'selected' : ''; ?>>Status Belum Lengkap</option>
+                            <option value="Isoman" <?php echo ($stts_pulang_filter === 'Isoman') ? 'selected' : ''; ?>>Isoman</option>
+                            <option value="Lain-lain" <?php echo ($stts_pulang_filter === 'Lain-lain') ? 'selected' : ''; ?>>Lain-lain</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4 col-sm-12 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1">
+                            <i class="fas fa-search me-1"></i> Tampilkan
                         </button>
+                        <a href="laporan_kunjungan.php" class="btn btn-outline-secondary" title="Reset Filter">
+                            <i class="fas fa-undo me-1"></i> Reset
+                        </a>
                     </div>
                 </div>
             </form>
@@ -239,16 +351,19 @@ if ($is_search) {
             </div>
         </div>
 
+        <?php
+        $active_tab = (!empty($stts_pulang_filter) || !empty($kd_kamar_filter)) ? 'ranap' : 'ralan';
+        ?>
         <div class="card shadow-sm mb-4">
             <div class="card-header">
                 <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="ralan-tab" data-bs-toggle="tab" data-bs-target="#ralan" type="button" role="tab" aria-controls="ralan" aria-selected="true">
+                        <button class="nav-link <?php echo ($active_tab === 'ralan') ? 'active' : ''; ?>" id="ralan-tab" data-bs-toggle="tab" data-bs-target="#ralan" type="button" role="tab" aria-controls="ralan" aria-selected="<?php echo ($active_tab === 'ralan') ? 'true' : 'false'; ?>">
                             Rawat Jalan (<?php echo count($data_ralan); ?>)
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="ranap-tab" data-bs-toggle="tab" data-bs-target="#ranap" type="button" role="tab" aria-controls="ranap" aria-selected="false">
+                        <button class="nav-link <?php echo ($active_tab === 'ranap') ? 'active' : ''; ?>" id="ranap-tab" data-bs-toggle="tab" data-bs-target="#ranap" type="button" role="tab" aria-controls="ranap" aria-selected="<?php echo ($active_tab === 'ranap') ? 'true' : 'false'; ?>">
                             Rawat Inap (<?php echo count($data_ranap); ?>)
                         </button>
                     </li>
@@ -257,7 +372,7 @@ if ($is_search) {
             <div class="card-body">
                 <div class="tab-content" id="myTabContent">
 
-                    <div class="tab-pane fade show active" id="ralan" role="tabpanel" aria-labelledby="ralan-tab">
+                    <div class="tab-pane fade <?php echo ($active_tab === 'ralan') ? 'show active' : ''; ?>" id="ralan" role="tabpanel" aria-labelledby="ralan-tab">
                         <div class="table-responsive">
                             <table class="table table-striped table-bordered table-sm dt-table" width="100%">
                                 <thead>
@@ -292,7 +407,7 @@ if ($is_search) {
                         </div>
                     </div>
 
-                    <div class="tab-pane fade" id="ranap" role="tabpanel" aria-labelledby="ranap-tab">
+                    <div class="tab-pane fade <?php echo ($active_tab === 'ranap') ? 'show active' : ''; ?>" id="ranap" role="tabpanel" aria-labelledby="ranap-tab">
                         <div class="table-responsive">
                             <table class="table table-striped table-bordered table-sm dt-table" width="100%">
                                 <thead>
@@ -324,6 +439,10 @@ if ($is_search) {
                                             <td>
                                                 <?php if ($row['stts_pulang'] === '-'): ?>
                                                     <span class="badge bg-info text-dark">Dirawat</span>
+                                                <?php elseif ($row['stts_pulang'] === 'Meninggal' || $row['stts_pulang'] === '+'): ?>
+                                                    <span class="badge bg-danger text-white"><?php echo htmlspecialchars($row['stts_pulang']); ?></span>
+                                                <?php elseif (in_array($row['stts_pulang'], ['Sehat', 'Sembuh', 'Membaik', 'Atas Persetujuan Dokter'])): ?>
+                                                    <span class="badge bg-success text-white"><?php echo htmlspecialchars($row['stts_pulang']); ?></span>
                                                 <?php else: ?>
                                                     <span class="badge bg-warning text-dark"><?php echo htmlspecialchars($row['stts_pulang']); ?></span>
                                                 <?php endif; ?>

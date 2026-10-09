@@ -141,15 +141,37 @@ $response['bed'] = [
 // ==========================================================================
 // 3. KUNJUNGAN HARI INI
 // ==========================================================================
-$sql_visit = "SELECT status_lanjut, COUNT(*) as jumlah FROM reg_periksa WHERE tgl_registrasi = '$today' AND stts != 'Batal' GROUP BY status_lanjut";
-$res_visit = $koneksi->query($sql_visit);
 $visit = ['Ralan' => 0, 'Ranap' => 0, 'Total' => 0];
-if ($res_visit) {
-    while($row = $res_visit->fetch_assoc()) {
-        $visit[$row['status_lanjut']] = (int)$row['jumlah'];
-        $visit['Total'] += (int)$row['jumlah'];
-    }
+
+// Ralan langsung dari reg_periksa
+$q_ralan = $koneksi->query("SELECT COUNT(*) as jumlah FROM reg_periksa WHERE tgl_registrasi = '$today' AND stts != 'Batal' AND status_lanjut = 'Ralan'");
+if ($q_ralan && $row = $q_ralan->fetch_assoc()) {
+    $visit['Ralan'] = (int)$row['jumlah'];
 }
+
+// Ranap difilter hanya yang menempati Bed terdaftar SK (sinkron dengan laporan_kunjungan.php)
+$ranap_kamar_filter = ($bed_in !== '') ? " AND kamar_fo.kd_kamar IN ($bed_in)" : " AND 1 = 0";
+$sql_ranap = "
+    SELECT COUNT(DISTINCT rp.no_rawat) as jumlah
+    FROM reg_periksa rp
+    INNER JOIN kamar kamar_fo ON kamar_fo.kd_kamar = (
+        SELECT kamar_inap.kd_kamar
+        FROM kamar_inap
+        WHERE kamar_inap.no_rawat = rp.no_rawat
+        ORDER BY kamar_inap.tgl_masuk ASC, kamar_inap.jam_masuk ASC
+        LIMIT 1
+    )
+    WHERE rp.tgl_registrasi = '$today'
+      AND rp.stts != 'Batal'
+      AND rp.status_lanjut = 'Ranap'
+      $ranap_kamar_filter
+";
+$q_ranap = $koneksi->query($sql_ranap);
+if ($q_ranap && $row = $q_ranap->fetch_assoc()) {
+    $visit['Ranap'] = (int)$row['jumlah'];
+}
+
+$visit['Total'] = $visit['Ralan'] + $visit['Ranap'];
 $response['kunjungan'] = $visit;
 
 // ==========================================================================
