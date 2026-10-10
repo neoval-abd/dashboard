@@ -16,6 +16,7 @@ require_once('includes/header.php');
     .icon-circle {
         height: 3rem; width: 3rem; border-radius: 50%; display: flex; 
         align-items: center; justify-content: center; font-size: 1.5rem; color: white;
+        flex-shrink: 0;
     }
     .bg-gradient-primary { background: linear-gradient(45deg, #4e73df, #224abe); }
     .bg-gradient-success { background: linear-gradient(45deg, #1cc88a, #13855c); }
@@ -29,92 +30,132 @@ require_once('includes/header.php');
     /* Style untuk Link Header Chart */
     .chart-header-link { cursor: pointer; transition: color 0.2s; }
     .chart-header-link:hover h6 { color: #2e59d9 !important; text-decoration: underline; }
+
+    /* ==============================================================
+       RESPONSIVE TABLET & MEDIUM SCREEN OPTIMIZATIONS (<= 991.98px)
+       ============================================================== */
+    @media (max-width: 991.98px) {
+        .card-body {
+            padding: 0.85rem !important;
+        }
+        .icon-circle {
+            height: 2.35rem;
+            width: 2.35rem;
+            font-size: 1.15rem;
+        }
+        .card-metric .h5 {
+            font-size: 1.15rem;
+        }
+        .card-metric .text-xs {
+            font-size: 0.7rem;
+        }
+
+        /* Modal Detail Bed Responsif Tablet: Lebar 96vw agar tabel 7 kolom leluasa */
+        #modalDetailBed .modal-dialog {
+            max-width: 96vw !important;
+            margin: 0.75rem auto !important;
+        }
+        #modalDetailBed .modal-body {
+            padding: 0.75rem !important;
+        }
+        #modalDetailBed table#tableDetailBed th,
+        #modalDetailBed table#tableDetailBed td {
+            white-space: nowrap;
+            font-size: 0.8rem;
+            padding: 6px 8px !important;
+        }
+
+        /* Credit Bar Bawah: Icon-only agar pas satu baris tanpa scrollbar horizontal */
+        #dev-credit-bar {
+            padding: 0 8px;
+            gap: 6px;
+        }
+        #dev-credit-bar .dev-link-btn span {
+            display: none !important;
+        }
+        #dev-credit-bar .dev-credit-brand .dev-role {
+            display: none !important;
+        }
+    }
 </style>
 
 <div class="container-fluid">
 
     <div class="row mb-4">
         
+        <!-- CARD 1: OMZET HARI INI -->
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-start border-4 border-primary shadow h-100 py-2 card-metric" onclick="window.location.href='laporan_billing_global.php'">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="me-2" style="min-width: 0;">
                             <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Omzet Hari Ini</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="val-omzet-total">...</div>
-                            <div class="mt-2">
-                                <span class="badge bg-success me-1" title="Tunai"><i class="fas fa-money-bill me-1"></i><span id="val-omzet-tunai">0</span></span>
-                                <span class="badge bg-warning text-dark" title="Piutang"><i class="fas fa-file-invoice me-1"></i><span id="val-omzet-piutang">0</span></span>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800 text-truncate" id="val-omzet-total">...</div>
+                            <div class="d-flex flex-wrap gap-1 mt-2">
+                                <span class="badge bg-success" style="font-size: 0.7rem;" title="Tunai"><i class="fas fa-money-bill me-1"></i><span id="val-omzet-tunai">0</span></span>
+                                <span class="badge bg-warning text-dark" style="font-size: 0.7rem;" title="Piutang"><i class="fas fa-file-invoice me-1"></i><span id="val-omzet-piutang">0</span></span>
                             </div>
                         </div>
-                        <div class="col-auto">
-                            <div class="icon-circle bg-gradient-primary"><i class="fas fa-cash-register"></i></div>
-                        </div>
+                        <div class="icon-circle bg-gradient-primary ms-1"><i class="fas fa-cash-register"></i></div>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- CARD 2: PASIEN REGISTRASI MASUK -->
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-start border-4 border-success shadow h-100 py-2 card-metric" onclick="window.location.href='laporan_kunjungan.php'">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="me-2" style="min-width: 0;">
                             <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Pasien Registrasi Masuk</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800" id="val-visit-total">...</div>
-                            <div class="row mt-2 text-xs-bold text-muted">
-                                <div class="col-6 border-end">Ralan: <span id="val-visit-ralan" class="text-success">0</span></div>
-                                <div class="col-6">Ranap: <span id="val-visit-ranap" class="text-warning">0</span></div>
+                            <div class="d-flex align-items-center flex-wrap gap-2 mt-2 text-xs-bold text-muted">
+                                <span class="text-nowrap">Ralan: <span id="val-visit-ralan" class="text-success fw-bold">0</span></span>
+                                <span class="text-muted opacity-50">|</span>
+                                <span class="text-nowrap">Ranap: <span id="val-visit-ranap" class="text-warning fw-bold">0</span></span>
                             </div>
                         </div>
-                        <div class="col-auto">
-                            <div class="icon-circle bg-gradient-success"><i class="fas fa-user-plus"></i></div>
-                        </div>
+                        <div class="icon-circle bg-gradient-success ms-1"><i class="fas fa-user-plus"></i></div>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- CARD 3: BOR BULAN INI -->
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-start border-4 border-info shadow h-100 py-2 card-metric" onclick="window.location.href='laporan_indikator_ranap.php'">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="me-2 flex-grow-1" style="min-width: 0;">
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">BOR Bulan Ini</div>
-                            <div class="row no-gutters align-items-center">
-                                <div class="col-auto">
-                                    <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800" id="val-bor">...%</div>
-                                </div>
-                                <div class="col">
-                                    <div class="progress progress-sm mr-2">
-                                        <div class="progress-bar bg-info" role="progressbar" id="bar-bor" style="width: 0%"></div>
-                                    </div>
+                            <div class="d-flex align-items-center gap-2 mt-1">
+                                <div class="h5 mb-0 font-weight-bold text-gray-800 text-nowrap" id="val-bor">...%</div>
+                                <div class="progress flex-grow-1" style="height: 8px; min-width: 45px;">
+                                    <div class="progress-bar bg-info" role="progressbar" id="bar-bor" style="width: 0%"></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-auto">
-                            <div class="icon-circle bg-gradient-info"><i class="fas fa-procedures"></i></div>
-                        </div>
+                        <div class="icon-circle bg-gradient-info ms-2"><i class="fas fa-procedures"></i></div>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- CARD 4: KUNJUNGAN AKTIF -->
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-start border-4 border-danger shadow h-100 py-2">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="me-2" style="min-width: 0;">
                             <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Kunjungan Aktif (Blm Bayar)</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800" id="val-aktif">...</div>
-                            <div class="mt-2">
-                                <a href="kunjungan_ralan.php" class="btn btn-sm btn-outline-danger py-0" style="font-size: 0.7rem;">Ralan</a>
-                                <a href="kunjungan_ranap.php" class="btn btn-sm btn-outline-warning text-dark py-0" style="font-size: 0.7rem;">Ranap</a>
+                            <div class="d-flex gap-1 mt-2">
+                                <a href="kunjungan_ralan.php" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.7rem;">Ralan</a>
+                                <a href="kunjungan_ranap.php" class="btn btn-sm btn-outline-warning text-dark py-0 px-2" style="font-size: 0.7rem;">Ranap</a>
                             </div>
                         </div>
-                        <div class="col-auto">
-                            <div class="icon-circle bg-gradient-danger"><i class="fas fa-file-invoice-dollar"></i></div>
-                        </div>
+                        <div class="icon-circle bg-gradient-danger ms-1"><i class="fas fa-file-invoice-dollar"></i></div>
                     </div>
                 </div>
             </div>
@@ -238,6 +279,13 @@ require_once('includes/header.php');
             ]
         });
 
+        // Rekalkulasi kolom DataTables saat modal bed terbuka di mode tablet/desktop
+        $('#modalDetailBed').on('shown.bs.modal', function () {
+            if (tableDetailBed) {
+                tableDetailBed.columns.adjust().responsive.recalc();
+            }
+        });
+
         loadDashboardData();
     });
 
@@ -317,6 +365,9 @@ require_once('includes/header.php');
 
     function renderDetailBedRows(rows) {
         tableDetailBed.clear().rows.add(rows || []).draw(false);
+        if (typeof tableDetailBed.columns === 'function') {
+            tableDetailBed.columns.adjust().responsive.recalc();
+        }
     }
 
     function showBedDetail(kelas) {
@@ -358,9 +409,70 @@ require_once('includes/header.php');
     function renderChartTren(data) {
         var ctx = document.getElementById("chartTren").getContext('2d');
         if(chartTren) chartTren.destroy();
+
+        var pluginDataLabels = {
+            id: 'trendDataLabels',
+            afterDatasetsDraw: function(chart) {
+                var ctx = chart.ctx;
+                ctx.save();
+                
+                var theme = localStorage.getItem('app_theme') || 'theme-glass-animated';
+                var isDark = theme.includes('glass') || document.documentElement.classList.contains('theme-glass');
+                
+                chart.data.datasets.forEach(function(dataset, datasetIndex) {
+                    var meta = chart.getDatasetMeta(datasetIndex);
+                    if (meta.hidden) return; // Lewati jika dataset disembunyikan via legend
+                    
+                    meta.data.forEach(function(element, index) {
+                        var val = dataset.data[index];
+                        if (val === null || val === undefined || val <= 0) return; // Hanya tampilkan angka jika ada kunjungan
+                        
+                        var x = element.x;
+                        var y = element.y;
+                        var text = Number(val).toLocaleString('id-ID');
+                        
+                        // Posisi teks: titik paling kiri (Jan) digeser sedikit ke kanan agar tidak menempel sumbu Y
+                        var textX = x;
+                        if (index === 0) {
+                            ctx.textAlign = 'left';
+                            textX = x + 3;
+                        } else if (index === dataset.data.length - 1) {
+                            ctx.textAlign = 'right';
+                            textX = x - 3;
+                        } else {
+                            ctx.textAlign = 'center';
+                        }
+                        ctx.textBaseline = 'bottom';
+                        
+                        // Outline kontras untuk tema gelap maupun terang
+                        ctx.strokeStyle = isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)';
+                        ctx.lineWidth = 3;
+                        ctx.strokeText(text, textX, y - 6);
+                        
+                        // Warna angka sesuai dataset
+                        var textColor = dataset.borderColor;
+                        if (isDark) {
+                            if (datasetIndex === 0) textColor = '#7096fe';
+                            else if (datasetIndex === 1) textColor = '#facc15';
+                            else if (datasetIndex === 2) textColor = '#34d399';
+                        } else {
+                            if (datasetIndex === 0) textColor = '#2e59d9';
+                            else if (datasetIndex === 1) textColor = '#d97706';
+                            else if (datasetIndex === 2) textColor = '#059669';
+                        }
+                        
+                        ctx.fillStyle = textColor;
+                        ctx.fillText(text, textX, y - 6);
+                    });
+                });
+                
+                ctx.restore();
+            }
+        };
         
         chartTren = new Chart(ctx, {
             type: 'line',
+            plugins: [pluginDataLabels],
             data: {
                 labels: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"],
                 datasets: [
@@ -368,31 +480,65 @@ require_once('includes/header.php');
                         label: "Total",
                         data: data.total,
                         borderColor: "#4e73df",
-                        borderWidth: 4,
+                        backgroundColor: "#4e73df",
+                        borderWidth: 3,
                         tension: 0.3,
-                        pointRadius: 0
+                        pointRadius: function(c) {
+                            var v = c.dataset.data[c.dataIndex];
+                            return (v && v > 0) ? 4 : 0;
+                        },
+                        pointHoverRadius: 6
                     },
                     {
                         label: "Rawat Jalan",
                         data: data.ralan,
-                        borderColor: "rgba(246, 194, 62, 0.5)",
+                        borderColor: "rgba(246, 194, 62, 0.85)",
+                        backgroundColor: "rgba(246, 194, 62, 0.85)",
                         borderWidth: 2,
                         borderDash: [5, 5],
                         tension: 0.3,
-                        pointRadius: 0
+                        pointRadius: function(c) {
+                            var v = c.dataset.data[c.dataIndex];
+                            return (v && v > 0) ? 4 : 0;
+                        },
+                        pointHoverRadius: 6
                     },
                     {
                         label: "Rawat Inap",
                         data: data.ranap,
-                        borderColor: "rgba(28, 200, 138, 0.5)",
+                        borderColor: "rgba(28, 200, 138, 0.85)",
+                        backgroundColor: "rgba(28, 200, 138, 0.85)",
                         borderWidth: 2,
                         borderDash: [5, 5],
                         tension: 0.3,
-                        pointRadius: 0
+                        pointRadius: function(c) {
+                            var v = c.dataset.data[c.dataIndex];
+                            return (v && v > 0) ? 4 : 0;
+                        },
+                        pointHoverRadius: 6
                     }
                 ],
             },
-            options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: {display: true} } }
+            options: { 
+                maintainAspectRatio: false, 
+                layout: {
+                    padding: {
+                        top: 25,
+                        right: 15,
+                        left: 18,
+                        bottom: 5
+                    }
+                },
+                scales: { 
+                    y: { 
+                        beginAtZero: true,
+                        grace: '10%'
+                    } 
+                }, 
+                plugins: { 
+                    legend: { display: true } 
+                } 
+            }
         });
     }
 
