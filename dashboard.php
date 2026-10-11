@@ -25,7 +25,12 @@ require_once('includes/header.php');
     .bg-gradient-danger { background: linear-gradient(45deg, #e74a3b, #be2617); }
     .text-xs-bold { font-size: 0.75rem; font-weight: 700; }
     
-    .bed-row:hover { background-color: #f8f9fa; cursor: pointer; }
+    .bed-row { transition: all .2s ease; cursor: pointer; border: 1px solid rgba(0,0,0,0.06); }
+    .bed-row:hover { background-color: rgba(78, 115, 223, 0.08) !important; transform: translateY(-2px); box-shadow: 0 .25rem .75rem rgba(0,0,0,.08) !important; }
+    .room-chip { transition: all .15s ease; border: 1px solid rgba(0,0,0,0.08); }
+    .room-chip:hover { transform: scale(1.05); filter: brightness(0.95); }
+    .theme-glass .bed-row, .theme-dark .bed-row { border-color: rgba(255, 255, 255, 0.1) !important; }
+    .theme-glass .bed-row:hover, .theme-dark .bed-row:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
     
     /* Style untuk Link Header Chart */
     .chart-header-link { cursor: pointer; transition: color 0.2s; }
@@ -151,8 +156,8 @@ require_once('includes/header.php');
                             <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Kunjungan Aktif (Blm Bayar)</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800" id="val-aktif">...</div>
                             <div class="d-flex gap-1 mt-2">
-                                <a href="kunjungan_ralan.php" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.7rem;">Ralan</a>
-                                <a href="kunjungan_ranap.php" class="btn btn-sm btn-outline-warning text-dark py-0 px-2" style="font-size: 0.7rem;">Ranap</a>
+                                <a href="kunjungan_ralan.php" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.7rem;"><i class="fas fa-walking me-1"></i>Ralan</a>
+                                <a href="kunjungan_ranap.php" class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size: 0.7rem;"><i class="fas fa-bed me-1"></i>Ranap</a>
                             </div>
                         </div>
                         <div class="icon-circle bg-gradient-danger ms-1"><i class="fas fa-file-invoice-dollar"></i></div>
@@ -196,8 +201,10 @@ require_once('includes/header.php');
 
     <div class="row mb-4">
         
+        <!-- KOLOM KIRI: Top 5 Poli & Ketersediaan Bed per Lantai -->
         <div class="col-lg-6 mb-4">
-            <div class="card shadow mb-4 h-100">
+            <!-- 1. TOP 5 POLI -->
+            <div class="card shadow mb-4">
                 <div class="card-header py-3 chart-header-link" onclick="window.location.href='laporan_kinerja_dokter.php'" title="Klik untuk lihat kunjungan dokter">
                     <h6 class="m-0 font-weight-bold text-primary">Top 5 Poliklinik Hari Ini (Live Queue) <i class="fas fa-external-link-alt ms-2 small text-gray-400"></i></h6>
                 </div>
@@ -205,12 +212,25 @@ require_once('includes/header.php');
                     <div class="text-center p-3">Loading...</div>
                 </div>
             </div>
+
+            <!-- 2. KETERSEDIAAN BED PER LANTAI (REALTIME) -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-layer-group me-2"></i>Ketersediaan Bed per Lantai (Realtime)</h6>
+                    <span class="badge bg-primary text-white"><i class="fas fa-hospital me-1"></i>Total 60 Bed</span>
+                </div>
+                <div class="card-body" id="container-bed-lantai">
+                    <div class="text-center p-3">Loading...</div>
+                </div>
+            </div>
         </div>
 
+        <!-- KOLOM KANAN: Ketersediaan Bed per Kelas (Realtime) -->
         <div class="col-lg-6 mb-4">
             <div class="card shadow mb-4 h-100">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Ketersediaan Bed per Kelas (Realtime)</h6>
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-procedures me-2"></i>Ketersediaan Bed per Kelas (Realtime)</h6>
+                    <span class="badge bg-primary text-white"><i class="fas fa-bed me-1"></i>Total 60 Bed</span>
                 </div>
                 <div class="card-body" id="container-bed">
                     <div class="text-center p-3">Loading...</div>
@@ -221,6 +241,7 @@ require_once('includes/header.php');
 
 </div>
 
+<!-- MODAL DETAIL BED RAWAT INAP -->
 <div class="modal fade" id="modalDetailBed" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -228,22 +249,37 @@ require_once('includes/header.php');
                 <h5 class="modal-title"><i class="fas fa-procedures me-2"></i>Pasien Rawat Inap: <span id="modalTitleKelas" class="fw-bold"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div class="table-responsive">
-                    <table id="tableDetailBed" class="table table-bordered table-striped table-sm w-100">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Masuk</th>
-                                <th>No. RM</th>
-                                <th>Nama Pasien</th>
-                                <th>Bangsal / Kamar</th>
-                                <th>Kelas</th>
-                                <th>Penjamin</th>
-                                <th>Lama (Hari)</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+            <div class="modal-body position-relative">
+                <!-- State Loading Otomatis -->
+                <div id="modalDetailBedLoading" class="text-center py-5">
+                    <div class="spinner-border text-info" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="mt-3 fw-bold text-gray-800" id="modalLoadingText" style="font-size: 1.05rem;">Memuat data tempat tidur...</div>
+                    <div class="text-muted small">Mengambil status bed dan data pasien aktif secara realtime</div>
+                </div>
+
+                <!-- State Error -->
+                <div id="modalDetailBedError" class="alert alert-danger my-3" style="display: none;"></div>
+
+                <!-- Konten Data Tabel -->
+                <div id="modalDetailBedContent" style="display: none;">
+                    <div class="table-responsive">
+                        <table id="tableDetailBed" class="table table-bordered table-striped table-sm w-100">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Masuk</th>
+                                    <th>No. RM</th>
+                                    <th>Nama Pasien</th>
+                                    <th>Bangsal / Kamar</th>
+                                    <th>Kelas</th>
+                                    <th>Penjamin</th>
+                                    <th>Lama (Hari)</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -264,25 +300,71 @@ require_once('includes/header.php');
     }
 
     $(document).ready(function() {
-        // Init DataTables Modal
+        // Init DataTables Modal dengan custom language agar tidak muncul pesan default 'data tidak dimuat otomatis'
         tableDetailBed = $('#tableDetailBed').DataTable({
-            "responsive": true, "pageLength": 10, "processing": true, "deferRender": true, "autoWidth": false, "order": [], "searchDelay": 350,
-            "dom": 'Bfrtip', "buttons": ['excel'],
+            "pageLength": 10, 
+            "processing": false,
+            "deferRender": true, 
+            "autoWidth": false, 
+            "order": [], 
+            "searchDelay": 350,
+            "dom": 'Bfrtip', 
+            "buttons": ['excel'],
+            "language": {
+                "emptyTable": '<div class="text-center py-4 text-muted"><i class="fas fa-bed fa-2x mb-2 d-block text-secondary"></i>Tidak ada data tempat tidur / pasien pada kategori ini.</div>',
+                "zeroRecords": '<div class="text-center py-4 text-muted"><i class="fas fa-search fa-2x mb-2 d-block text-secondary"></i>Tidak ada data yang cocok dengan pencarian.</div>',
+                "search": "Cari:",
+                "paginate": {
+                    "previous": "Previous",
+                    "next": "Next"
+                }
+            },
             "columns": [
-                { "data": "waktu_masuk" },
-                { "data": "no_rkm_medis" },
-                { "data": "nm_pasien", render: function(d,t,r){ return r.is_terisi == 0 ? '<span class="text-success fw-bold">KOSONG</span>' : d; } },
-                { "data": "nm_bangsal", render: function(d,t,r){ return d + ' (' + r.kd_kamar + ')'; } },
-                { "data": "kelas" },
-                { "data": "png_jawab" },
-                { "data": "lama_hari", className: "text-center fw-bold" }
+                { "data": "waktu_masuk", "defaultContent": "-" },
+                { "data": "no_rkm_medis", "defaultContent": "-" },
+                { 
+                    "data": "nm_pasien", 
+                    "defaultContent": "-",
+                    render: function(d, t, r) { 
+                        if (!r || r.is_terisi == 0) {
+                            var stts = (r && r.status_bed ? r.status_bed : 'KOSONG').toUpperCase();
+                            if (stts === 'DIBOOKING') {
+                                return '<span class="badge bg-warning text-dark"><i class="fas fa-bookmark me-1"></i>DIBOOKING</span>';
+                            }
+                            return '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>BED KOSONG</span>';
+                        }
+                        return '<span class="fw-bold">' + (d || '-') + '</span>'; 
+                    } 
+                },
+                { 
+                    "data": "nm_bangsal", 
+                    "defaultContent": "-",
+                    render: function(d, t, r) { 
+                        if (!r) return d || '-';
+                        var ltBadge = r.lantai ? '<span class="badge bg-secondary me-1">Lt. ' + r.lantai + '</span>' : '';
+                        var krisBadge = r.is_kris ? '<span class="badge bg-info text-white ms-1" title="KRIS">KRIS</span>' : '';
+                        var rName = r.nama_ruangan || d || '-';
+                        return ltBadge + rName + ' <small class="text-muted">(' + (r.kd_kamar || '-') + ')</small>' + krisBadge; 
+                    } 
+                },
+                { 
+                    "data": "kelas",
+                    "defaultContent": "-",
+                    render: function(d, t, r) {
+                        return (r && r.kelas_sk) ? r.kelas_sk : (d || '-');
+                    }
+                },
+                { "data": "png_jawab", "defaultContent": "-" },
+                { "data": "lama_hari", "defaultContent": "-", className: "text-center fw-bold" }
             ]
         });
 
         // Rekalkulasi kolom DataTables saat modal bed terbuka di mode tablet/desktop
         $('#modalDetailBed').on('shown.bs.modal', function () {
             if (tableDetailBed) {
-                tableDetailBed.columns.adjust().responsive.recalc();
+                try {
+                    tableDetailBed.columns.adjust();
+                } catch(e) {}
             }
         });
 
@@ -292,6 +374,7 @@ require_once('includes/header.php');
     function loadDashboardData() {
         $.ajax({
             url: 'api/data_dashboard.php', type: 'GET', dataType: 'json',
+            global: false,   // ← Jangan trigger globalLoadingOverlay saat refresh dashboard
             success: function(res) {
                 // 1. Omzet
                 $('#val-omzet-total').text(formatRupiah(res.omzet.total));
@@ -314,6 +397,7 @@ require_once('includes/header.php');
                 renderChartTren(res.tren);
                 renderChartOmzet(res.omzet);
                 renderTopPoli(res.top_poli, res.kunjungan.Total);
+                renderBedLantaiMonitor(res.bed.per_lantai);
                 renderBedMonitor(res.bed.per_kelas);
             },
             error: function() { console.error("Gagal memuat data dashboard"); }
@@ -334,6 +418,65 @@ require_once('includes/header.php');
             });
         } else { html = '<div class="text-center text-muted">Belum ada kunjungan hari ini</div>'; }
         $('#container-top-poli').html(html);
+    }
+
+    function renderBedLantaiMonitor(data) {
+        var html = '';
+        if (data && data.length > 0) {
+            data.forEach(function(item) {
+                var bor = item.bor || 0;
+                var color = bor > 85 ? 'bg-danger' : (bor > 60 ? 'bg-warning' : 'bg-success');
+                var badgeClass = bor > 85 ? 'bg-danger' : (bor > 60 ? 'bg-warning text-dark' : 'bg-success');
+                
+                var groupsHtml = '';
+                if (item.groups && item.groups.length > 0) {
+                    groupsHtml += '<div class="d-flex flex-wrap gap-1 mt-2 pt-2 border-top border-light">';
+                    item.groups.forEach(function(g) {
+                        var gKosong = g.kosong;
+                        var gTerisi = g.terisi;
+                        var gBadge = gKosong > 0 ? 'bg-light text-dark border' : 'bg-secondary text-white';
+                        var gTitle = g.nama + ' (' + g.kelas + '): Terisi ' + gTerisi + ' dari ' + g.total + ' Bed, Kosong ' + gKosong;
+                        groupsHtml += `
+                            <span class="badge ${gBadge} py-1 px-2 room-chip" 
+                                  title="${gTitle}"
+                                  onclick="event.stopPropagation(); showBedDetail({type: 'ruangan', val: '${g.nama}', title: '${g.nama} (Lt. ${item.lantai})'})">
+                                ${g.nama} <span class="fw-bold ${gKosong > 0 ? 'text-success' : 'text-danger'}">(${gKosong} ksg)</span>
+                            </span>
+                        `;
+                    });
+                    groupsHtml += '</div>';
+                }
+
+                html += `
+                    <div class="mb-3 p-3 rounded bed-row shadow-sm" 
+                         onclick="showBedDetail({type: 'lantai', val: ${item.lantai}, title: '${item.nama} (${item.sublabel})'})">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary fs-6 px-2 py-1"><i class="fas fa-layer-group me-1"></i>${item.nama}</span>
+                                <span class="small text-muted fw-bold">${item.sublabel}</span>
+                            </div>
+                            <div>
+                                <span class="badge ${badgeClass}">${Math.round(bor)}% Terisi</span>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between small font-weight-bold mt-2">
+                            <span class="text-secondary">Terisi ${item.terisi} dari ${item.total} Bed</span>
+                            <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Kosong: ${item.kosong} Bed</span>
+                        </div>
+                        
+                        <div class="progress mt-1" style="height: 10px;">
+                            <div class="progress-bar ${color}" role="progressbar" style="width: ${bor}%"></div>
+                        </div>
+                        
+                        ${groupsHtml}
+                    </div>
+                `;
+            });
+        } else {
+            html = '<div class="text-center text-muted p-3">Data ketersediaan per lantai tidak tersedia</div>';
+        }
+        $('#container-bed-lantai').html(html);
     }
 
     function renderBedMonitor(data) {
@@ -364,18 +507,63 @@ require_once('includes/header.php');
     }
 
     function renderDetailBedRows(rows) {
-        tableDetailBed.clear().rows.add(rows || []).draw(false);
-        if (typeof tableDetailBed.columns === 'function') {
-            tableDetailBed.columns.adjust().responsive.recalc();
+        try {
+            if (tableDetailBed) {
+                tableDetailBed.clear();
+                if (rows && rows.length > 0) {
+                    tableDetailBed.rows.add(rows);
+                }
+                tableDetailBed.draw(false);
+            }
+        } catch(e) {
+            console.warn('DataTable draw error:', e);
         }
     }
 
-    function showBedDetail(kelas) {
-        $('#modalTitleKelas').text(kelas);
+    function showBedDetail(param) {
+        var queryData = {};
+        var displayTitle = '';
+        var cacheKey = '';
+
+        if (typeof param === 'string') {
+            queryData = { kelas: param };
+            displayTitle = param;
+            cacheKey = 'kelas_' + param;
+        } else if (typeof param === 'object' && param !== null) {
+            if (param.type === 'lantai') {
+                queryData = { lantai: param.val };
+                displayTitle = param.title || ('Lantai ' + param.val);
+                cacheKey = 'lantai_' + param.val;
+            } else if (param.type === 'ruangan') {
+                queryData = { ruangan: param.val };
+                displayTitle = param.title || ('Ruang ' + param.val);
+                cacheKey = 'ruangan_' + param.val;
+            } else {
+                queryData = { kelas: param.val };
+                displayTitle = param.title || param.val;
+                cacheKey = 'kelas_' + param.val;
+            }
+        }
+
+        $('#modalTitleKelas').text(displayTitle);
+        
+        // Reset state modal
+        $('#modalDetailBedError').hide();
+        $('#modalDetailBedContent').hide();
+        $('#modalDetailBedLoading').show();
+        $('#modalLoadingText').text('Memuat data tempat tidur: ' + displayTitle + '...');
         $('#modalDetailBed').modal('show');
 
-        if (detailBedCache[kelas] && (Date.now() - detailBedCache[kelas].time) < detailBedCacheTtl) {
-            renderDetailBedRows(detailBedCache[kelas].rows);
+        // Gunakan cache jika masih valid
+        if (detailBedCache[cacheKey] && (Date.now() - detailBedCache[cacheKey].time) < detailBedCacheTtl) {
+            renderDetailBedRows(detailBedCache[cacheKey].rows);
+            $('#modalDetailBedLoading').hide();
+            $('#modalDetailBedContent').show();
+            setTimeout(function() {
+                try {
+                    if (tableDetailBed) tableDetailBed.columns.adjust();
+                } catch(e) {}
+            }, 50);
             return;
         }
 
@@ -383,25 +571,39 @@ require_once('includes/header.php');
             detailBedXhr.abort();
         }
 
-        renderDetailBedRows([]);
-        if (typeof tableDetailBed.processing === 'function') tableDetailBed.processing(true);
-
         detailBedXhr = $.ajax({
             url: 'api/data_detail_bed.php',
             type: 'GET',
-            data: {kelas: kelas},
+            data: queryData,
             dataType: 'json',
-            cache: true,
+            cache: false,
+            global: false,
+            timeout: 20000,
             success: function(res) {
-                var rows = res && res.data ? res.data : [];
-                detailBedCache[kelas] = { rows: rows, time: Date.now() };
+                var rows = (res && res.data && Array.isArray(res.data)) ? res.data : [];
+                detailBedCache[cacheKey] = { rows: rows, time: Date.now() };
+                
+                $('#modalDetailBedLoading').hide();
+                $('#modalDetailBedError').hide();
+                $('#modalDetailBedContent').show();
+                
                 renderDetailBedRows(rows);
+                
+                setTimeout(function() {
+                    try {
+                        if (tableDetailBed) tableDetailBed.columns.adjust();
+                    } catch(e) {}
+                }, 50);
             },
             error: function(xhr, status) {
-                if (status !== 'abort') console.error("Gagal memuat detail bed");
-            },
-            complete: function() {
-                if (typeof tableDetailBed.processing === 'function') tableDetailBed.processing(false);
+                if (status !== 'abort') {
+                    var pesanError = (status === 'timeout')
+                        ? 'Request timeout. Koneksi terlalu lambat, silakan coba lagi.'
+                        : 'Gagal memuat data tempat tidur (status: ' + status + ').';
+                    $('#modalDetailBedLoading').hide();
+                    $('#modalDetailBedContent').hide();
+                    $('#modalDetailBedError').html('<i class="fas fa-exclamation-triangle me-2"></i>' + pesanError).show();
+                }
             }
         });
     }

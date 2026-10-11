@@ -42,15 +42,20 @@
             btn.setAttribute('aria-selected', String(selected));
         });
         document.getElementById('kpInputPanel').classList.toggle('d-none', tab !== 'input');
-        document.getElementById('kpDataPanel').classList.toggle('d-none', tab === 'input');
-        document.getElementById('kpFilters').classList.toggle('d-none', tab === 'input');
-        document.getElementById('kpReferenceHelp').classList.toggle('d-none', tab === 'input');
+        document.getElementById('kpDataPanel').classList.toggle('d-none', tab === 'input' || tab === 'berkas');
+        document.getElementById('kpFilters').classList.toggle('d-none', tab === 'input' || tab === 'berkas');
+        document.getElementById('kpReferenceHelp').classList.toggle('d-none', tab === 'input' || tab === 'berkas');
         document.getElementById('kpIndexEditor').classList.add('d-none');
-        if (tab !== 'input') {
+        const berkasPanel = document.getElementById('kpBerkasPanel');
+        if (berkasPanel) berkasPanel.classList.toggle('d-none', tab !== 'berkas');
+        if (tab !== 'input' && tab !== 'berkas') {
             document.getElementById('kpDataPanel').setAttribute('aria-labelledby', tab === 'index' ? 'kpIndexTab' : 'kpListTab');
             renderTable();
+        } else if (tab === 'berkas' && window.kpBerkas && typeof window.kpBerkas.init === 'function') {
+            window.kpBerkas.init();
         }
     }
+    window.setKpTab = setTab;
     function renderTable() {
         if (mode === 'input') return;
         const index = mode === 'index';
@@ -58,9 +63,14 @@
         document.getElementById('kpIndexNote').classList.toggle('d-none', !index);
         if (table) { table.destroy(); table = null; }
         $('#kpTable').empty();
-        const columns = [{ title: 'Proses', data: 'id', orderable: false, searchable: false, render: id => {
+        const columns = [{ title: 'Proses', data: 'id', orderable: false, searchable: false, render: (id, type, row) => {
             const safeId = Number(id);
-            return '<button type="button" class="btn btn-outline-primary btn-sm kp-detail" data-id="' + safeId + '">' + (cfg.canWrite ? 'Edit Data' : 'Detail') + '</button>' + (index && cfg.canWrite ? ' <button type="button" class="btn btn-outline-info btn-sm kp-edit-index" data-id="' + safeId + '">Edit Index</button>' : '');
+            const safeNik = esc(row ? row.nik : '');
+            return '<div class="d-flex gap-1">' +
+                   '<button type="button" class="btn btn-outline-primary btn-sm kp-detail py-0 px-2" data-id="' + safeId + '">' + (cfg.canWrite ? 'Edit Data' : 'Detail') + '</button>' +
+                   '<button type="button" class="btn btn-outline-success btn-sm kp-open-berkas py-0 px-2" data-nik="' + safeNik + '" title="Kelola Berkas Pegawai"><i class="fas fa-paperclip me-1"></i>Berkas</button>' +
+                   (index && cfg.canWrite ? '<button type="button" class="btn btn-outline-info btn-sm kp-edit-index py-0 px-2" data-id="' + safeId + '">Edit Index</button>' : '') +
+                   '</div>';
         }}];
         (index ? indexColumns : listColumns).forEach(def => columns.push({
             title: def[1], data: def[0], defaultContent: '', render: (value, type) => {
@@ -171,8 +181,17 @@
     document.getElementById('kpCancelIndex').addEventListener('click', () => { if (!saving) document.getElementById('kpIndexEditor').classList.add('d-none'); });
     form.addEventListener('submit', event => save(event, form, 'save'));
     indexForm.addEventListener('submit', event => save(event, indexForm, 'save_index'));
-    $('#kpTable').on('click', '.kp-detail, .kp-edit-index', function () {
+    $('#kpTable').on('click', '.kp-detail, .kp-edit-index, .kp-open-berkas', function () {
         if (saving) return;
+        if (this.classList.contains('kp-open-berkas')) {
+            const nik = this.dataset.nik;
+            if (window.kpBerkas && typeof window.kpBerkas.openEmployee === 'function') {
+                window.kpBerkas.openEmployee(nik);
+            } else {
+                setTab('berkas');
+            }
+            return;
+        }
         const row = rows.find(r => Number(r.id) === Number(this.dataset.id));
         if (!row) return;
         if (this.classList.contains('kp-detail')) { openEmployee(row); return; }

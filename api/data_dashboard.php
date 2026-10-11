@@ -75,11 +75,12 @@ $response['omzet'] = [
 
 
 // ==========================================================================
-// 2. KETERSEDIAAN BED
+// 2. KETERSEDIAAN BED (PER KELAS & PER LANTAI)
 // ==========================================================================
+$floor_map = getSkBedFloorMapping();
 $bed_in = getSkBedInSql($koneksi);
 $sql_bed = "
-    SELECT k.kelas, k.status, b.nm_bangsal
+    SELECT k.kd_kamar, k.kelas, k.status, b.nm_bangsal
     FROM kamar k
     INNER JOIN bangsal b ON k.kd_bangsal = b.kd_bangsal
     WHERE k.statusdata = '1'
@@ -87,14 +88,38 @@ $sql_bed = "
 ";
 $res_bed = $koneksi->query($sql_bed);
 $bed_groups = [];
+
+$lantai_groups = [
+    2 => [
+        'lantai' => 2,
+        'nama' => 'Lantai 2',
+        'sublabel' => 'Rawat Inap & NICU',
+        'total' => 0,
+        'terisi' => 0,
+        'kosong' => 0,
+        'groups' => []
+    ],
+    3 => [
+        'lantai' => 3,
+        'nama' => 'Lantai 3',
+        'sublabel' => 'Rawat Inap & ICU',
+        'total' => 0,
+        'terisi' => 0,
+        'kosong' => 0,
+        'groups' => []
+    ]
+];
+
 $total_bed_rs = 0;
 $total_terisi_rs = 0;
 
 if ($res_bed) {
     while($row = $res_bed->fetch_assoc()) {
+        $kd_kamar = $row['kd_kamar'];
         $nm = strtoupper($row['nm_bangsal']);
         $status = $row['status']; 
         $kategori = $row['kelas'];
+        $is_terisi = ($status == 'ISI');
         
         if (strpos($nm, 'ISOLASI') !== false || strpos($nm, 'ICU') !== false || 
             strpos($nm, 'NICU') !== false || strpos($nm, 'PICU') !== false || 
@@ -107,17 +132,58 @@ if ($res_bed) {
         }
 
         $bed_groups[$kategori]['total']++;
-        if ($status == 'ISI') {
+        if ($is_terisi) {
             $bed_groups[$kategori]['terisi']++;
             $total_terisi_rs++;
         } else {
             $bed_groups[$kategori]['kosong']++;
         }
         $total_bed_rs++;
+
+        // Mapping per Lantai & Ruang Group
+        if (isset($floor_map[$kd_kamar])) {
+            $finfo = $floor_map[$kd_kamar];
+            $fl = (int)$finfo['lantai'];
+            $grp = $finfo['ruangan_group'];
+
+            if (isset($lantai_groups[$fl])) {
+                $lantai_groups[$fl]['total']++;
+                if ($is_terisi) {
+                    $lantai_groups[$fl]['terisi']++;
+                } else {
+                    $lantai_groups[$fl]['kosong']++;
+                }
+
+                if (!isset($lantai_groups[$fl]['groups'][$grp])) {
+                    $lantai_groups[$fl]['groups'][$grp] = [
+                        'nama' => $grp,
+                        'kelas' => $finfo['kelas'],
+                        'total' => 0,
+                        'terisi' => 0,
+                        'kosong' => 0
+                    ];
+                }
+
+                $lantai_groups[$fl]['groups'][$grp]['total']++;
+                if ($is_terisi) {
+                    $lantai_groups[$fl]['groups'][$grp]['terisi']++;
+                } else {
+                    $lantai_groups[$fl]['groups'][$grp]['kosong']++;
+                }
+            }
+        }
     }
 }
 ksort($bed_groups);
 $bed_data = array_values($bed_groups);
+
+// Hitung persentase BOR per lantai dan format groups
+foreach ($lantai_groups as $fl => &$ldata) {
+    $bor = ($ldata['total'] > 0) ? round(($ldata['terisi'] / $ldata['total']) * 100, 1) : 0;
+    $ldata['bor'] = $bor;
+    $ldata['groups'] = array_values($ldata['groups']);
+}
+unset($ldata);
 
 // Hitung BOR Global
 $start = new DateTime($tgl_awal_bulan);
@@ -135,6 +201,7 @@ $response['bed'] = [
     'total_bed_sk' => $total_bed_sk,
     'hari_perawatan_sk' => $hari_perawatan,
     'per_kelas' => $bed_data,
+    'per_lantai' => array_values($lantai_groups),
     'total_terisi' => $total_terisi_rs
 ];
 

@@ -477,6 +477,106 @@ function get_arrow_class($pages, $current) {
             color: var(--table-text) !important;
         }
         
+        /* [KONTRAS] Elemen berlatar kuning/terang tetap pakai teks gelap di tema gelap/glass */
+        html.theme-glass-solid .bg-warning, html.theme-glass-animated .bg-warning,
+        html.theme-glass-solid .bg-warning.text-dark, html.theme-glass-animated .bg-warning.text-dark,
+        html.theme-glass-solid .bg-light.text-dark, html.theme-glass-animated .bg-light.text-dark,
+        html.theme-glass-solid .bg-info.text-dark, html.theme-glass-animated .bg-info.text-dark {
+            color: #1f2937 !important;
+        }
+
+        /* [SOFT BADGE] Badge kuning di tema gelap/glass: latar amber transparan + teks amber */
+        html.theme-glass-solid .badge.bg-warning, html.theme-glass-animated .badge.bg-warning,
+        html.theme-glass-solid .badge.bg-warning.text-dark, html.theme-glass-animated .badge.bg-warning.text-dark {
+            background-color: rgba(251, 191, 36, 0.15) !important;
+            color: #fbbf24 !important;
+            border: 1px solid rgba(251, 191, 36, 0.45) !important;
+        }
+        html.theme-glass-solid .badge.bg-warning i, html.theme-glass-animated .badge.bg-warning i {
+            color: inherit !important;
+        }
+
+        /* [SOFT BADGE] Badge hijau di tema gelap/glass: latar emerald transparan + teks emerald */
+        html.theme-glass-solid .badge.bg-success, html.theme-glass-animated .badge.bg-success {
+            background-color: rgba(16, 185, 129, 0.15) !important;
+            color: #34d399 !important;
+            border: 1px solid rgba(52, 211, 153, 0.45) !important;
+        }
+        html.theme-glass-solid .badge.bg-success i, html.theme-glass-animated .badge.bg-success i {
+            color: inherit !important;
+        }
+
+        /* [SOFT BADGE] Badge merah di tema gelap/glass: latar rose transparan + teks rose */
+        html.theme-glass-solid .badge.bg-danger, html.theme-glass-animated .badge.bg-danger {
+            background-color: rgba(239, 68, 68, 0.15) !important;
+            color: #f87171 !important;
+            border: 1px solid rgba(248, 113, 113, 0.45) !important;
+        }
+        html.theme-glass-solid .badge.bg-danger i, html.theme-glass-animated .badge.bg-danger i {
+            color: inherit !important;
+        }
+
+        /* [SOFT BADGE] Badge biru di tema gelap/glass: latar sky transparan + teks sky */
+        html.theme-glass-solid .badge.bg-primary, html.theme-glass-animated .badge.bg-primary,
+        html.theme-glass-solid .badge.bg-primary.text-white, html.theme-glass-animated .badge.bg-primary.text-white {
+            background-color: rgba(56, 189, 248, 0.15) !important;
+            color: #38bdf8 !important;
+            border: 1px solid rgba(56, 189, 248, 0.45) !important;
+        }
+        html.theme-glass-solid .badge.bg-primary i, html.theme-glass-animated .badge.bg-primary i,
+        html.theme-glass-solid .badge.bg-primary.text-white i, html.theme-glass-animated .badge.bg-primary.text-white i {
+            color: inherit !important;
+        }
+
+        /* [SOFT BADGE] Badge cyan/info di tema gelap/glass: latar cyan transparan + teks cyan */
+        html.theme-glass-solid .badge.bg-info, html.theme-glass-animated .badge.bg-info,
+        html.theme-glass-solid .badge.bg-info.text-white, html.theme-glass-animated .badge.bg-info.text-white {
+            background-color: rgba(6, 182, 212, 0.15) !important;
+            color: #22d3ee !important;
+            border: 1px solid rgba(34, 211, 238, 0.45) !important;
+        }
+        html.theme-glass-solid .badge.bg-info i, html.theme-glass-animated .badge.bg-info i,
+        html.theme-glass-solid .badge.bg-info.text-white i, html.theme-glass-animated .badge.bg-info.text-white i {
+            color: inherit !important;
+        }
+
+        /* [TEXT PRIMARY] Kontras cerah untuk teks primary/biru di tema gelap */
+        html.theme-glass-solid .text-primary, html.theme-glass-animated .text-primary {
+            color: #38bdf8 !important;
+        }
+
+        /* [TEXT DANGER] Kontras tinggi untuk teks bahaya/merah di tema gelap */
+        html.theme-glass-solid .text-danger, html.theme-glass-animated .text-danger {
+            color: #f87171 !important;
+        }
+
+        /* [SOFT BUTTON OUTLINE] Selaraskan tombol outline merah & kuning di kartu Kunjungan Aktif */
+        html.theme-glass-solid .btn-outline-danger, html.theme-glass-animated .btn-outline-danger {
+            background-color: rgba(239, 68, 68, 0.15) !important;
+            color: #f87171 !important;
+            border: 1px solid rgba(248, 113, 113, 0.45) !important;
+            transition: all 0.2s ease;
+        }
+        html.theme-glass-solid .btn-outline-danger:hover, html.theme-glass-animated .btn-outline-danger:hover {
+            background-color: rgba(239, 68, 68, 0.3) !important;
+            color: #ffffff !important;
+            border-color: rgba(248, 113, 113, 0.7) !important;
+            transform: translateY(-1px);
+        }
+
+        html.theme-glass-solid .btn-outline-warning, html.theme-glass-animated .btn-outline-warning {
+            background-color: rgba(251, 191, 36, 0.15) !important;
+            color: #fbbf24 !important;
+            border: 1px solid rgba(251, 191, 36, 0.45) !important;
+            transition: all 0.2s ease;
+        }
+        html.theme-glass-solid .btn-outline-warning:hover, html.theme-glass-animated .btn-outline-warning:hover {
+            background-color: rgba(251, 191, 36, 0.3) !important;
+            color: #ffffff !important;
+            border-color: rgba(251, 191, 36, 0.7) !important;
+            transform: translateY(-1px);
+        }
+
         html.theme-glass-solid .alert-info, html.theme-glass-animated .alert-info {
             background-color: rgba(13, 202, 240, 0.1) !important;
             color: #bae6fd !important;
@@ -505,20 +605,82 @@ function get_arrow_class($pages, $current) {
         }
 
         /* --- NAVBAR (FIXED TOP) --- */
-        .navbar {
+        .navbar.app-navbar {
             height: var(--header-height);
             z-index: 1040; /* Pastikan navbar selalu di atas konten */
+            display: flex;
+            flex-wrap: nowrap !important;
+            align-items: center;
+            padding: 0 !important;
         }
-        .navbar-brand {
-            padding-top: .75rem;
-            padding-bottom: .75rem;
+        .app-navbar .navbar-brand {
+            display: flex;
+            align-items: center;
+            height: var(--header-height);
+            padding: 0 1rem;
+            margin: 0;
             font-size: 1rem;
             background-color: rgba(0, 0, 0, .25);
             box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
             width: var(--sidebar-width);
+            flex-shrink: 0;
             white-space: nowrap;
             overflow: hidden;
-            text-overflow: ellipsis;
+            transition: width var(--transition-speed) ease-in-out, padding var(--transition-speed) ease-in-out, opacity .2s ease;
+        }
+        .app-navbar .navbar-brand img { flex-shrink: 0; border-radius: 4px; }
+        .app-navbar .brand-text { overflow: hidden; text-overflow: ellipsis; }
+
+        /* Tombol hamburger seragam (desktop, tablet, HP) */
+        .sidebar-toggle-btn {
+            width: 40px; height: 40px;
+            flex-shrink: 0;
+            display: inline-flex; align-items: center; justify-content: center;
+            margin: 0 .5rem;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.15);
+            background: rgba(255,255,255,.06);
+            color: #fff;
+            cursor: pointer;
+            transition: background .2s, border-color .2s, transform .15s;
+        }
+        .sidebar-toggle-btn:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.3); }
+        .sidebar-toggle-btn:active { transform: scale(.94); }
+        .sidebar-toggle-btn:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+
+        /* Grup kanan navbar */
+        .navbar-right {
+            display: flex; align-items: center; flex-wrap: nowrap;
+            margin-left: auto; padding-right: .5rem; gap: .15rem;
+            flex-shrink: 0;
+        }
+        .navbar-right .nav-link { padding: .5rem .6rem; background: transparent !important; border: 0 !important; }
+        .navbar-right .nav-user-name { color: #fff; font-size: .85rem; font-weight: 600; white-space: nowrap; padding: 0 .5rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+        .navbar-right .btn-logout { color: #f87171 !important; }
+        .navbar-right .btn-logout:hover { color: #ef4444 !important; }
+        .navbar-right .btn-user { color: #fff !important; font-size: 1.25rem; }
+        .navbar-right .dropdown-menu { position: absolute; }
+
+        /* Desktop: sembunyikan logo/brand saat sidebar ditutup → tinggal hamburger */
+        @media (min-width: 992px) {
+            body.sidebar-closed .app-navbar .navbar-brand {
+                width: 0; padding-left: 0; padding-right: 0; opacity: 0; box-shadow: none;
+            }
+        }
+
+        /* Tablet & HP: hamburger di kiri, brand ringkas */
+        @media (max-width: 991.98px) {
+            .sidebar-toggle-btn { order: 0; margin-left: .6rem; }
+            .app-navbar .navbar-brand {
+                order: 1; width: auto; min-width: 0; flex-shrink: 1;
+                background: transparent; box-shadow: none; padding: 0 .5rem;
+            }
+            .navbar-right { order: 2; }
+        }
+        @media (max-width: 575.98px) {
+            .app-navbar .navbar-brand { font-size: .92rem; padding: 0 .35rem; }
+            .navbar-right { padding-right: .25rem; }
+            .navbar-right .nav-link { padding: .5rem .5rem; }
         }
 
         /* --- SIDEBAR (INDEPENDENT) --- */
@@ -571,16 +733,20 @@ function get_arrow_class($pages, $current) {
         }
 
         /* --- LOGIKA TOGGLE DESKTOP --- */
-        body.sidebar-closed .sidebar { transform: translateX(-100%); }
-        body.sidebar-closed main    { margin-left: 0; }
+        @media (min-width: 992px) {
+            body.sidebar-closed .sidebar { transform: translateX(-100%); }
+            body.sidebar-closed main    { margin-left: 0; }
+        }
+        .sidebar-overlay { display: none; }
 
-        /* --- LOGIKA TOGGLE MOBILE --- */
-        @media (max-width: 767.98px) {
-            .sidebar { transform: translateX(-100%); }
-            main { margin-left: 0; }
-            body.sidebar-open .sidebar { transform: translateX(0); box-shadow: 0 0 15px rgba(0,0,0,0.2); }
-            .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; }
+        /* --- LOGIKA TOGGLE TABLET & MOBILE (off-canvas) --- */
+        @media (max-width: 991.98px) {
+            .sidebar { transform: translateX(-100%); width: min(var(--sidebar-width), 85vw); z-index: 1035; }
+            main { margin-left: 0; padding: 14px; padding-bottom: calc(var(--credit-bar-height) + 14px); }
+            body.sidebar-open .sidebar { transform: translateX(0); box-shadow: 0 0 25px rgba(0,0,0,0.4); }
+            .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1030; backdrop-filter: blur(2px); }
             body.sidebar-open .sidebar-overlay { display: block; }
+            body.sidebar-open { overflow: hidden; }
         }
 
         .nav-link { color: #333; padding: 8px 16px; font-weight: 500; }
@@ -643,9 +809,11 @@ function get_arrow_class($pages, $current) {
             box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
         }
         /* Sesuaikan posisi saat sidebar ditutup */
-        body.sidebar-closed #dev-credit-bar { left: 0; }
+        @media (min-width: 992px) {
+            body.sidebar-closed #dev-credit-bar { left: 0; }
+        }
 
-        @media (max-width: 767.98px) {
+        @media (max-width: 991.98px) {
             #dev-credit-bar { left: 0; }
         }
 
@@ -815,26 +983,21 @@ function get_arrow_class($pages, $current) {
 </div>
 <!-- ===== END LOADING OVERLAY ===== -->
 
-<header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
-  <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="#">
-      <img src="<?php echo $logo_src; ?>" alt="Logo" width="25" height="25" class="d-inline-block align-text-top me-2">
-      <?php echo $nama_instansi; ?>
+<header class="navbar app-navbar navbar-dark sticky-top bg-dark shadow">
+  <a class="navbar-brand" href="dashboard.php" title="<?php echo htmlspecialchars($nama_instansi); ?>">
+      <img src="<?php echo $logo_src; ?>" alt="Logo" width="26" height="26" class="me-2">
+      <span class="brand-text"><?php echo $nama_instansi; ?></span>
   </a>
 
-  <button class="btn btn-link text-white d-none d-md-block ms-2" type="button" id="sidebarToggleDesktop" style="z-index:1050; cursor:pointer;">
-      <i class="fas fa-bars fa-lg"></i>
+  <!-- Satu tombol hamburger untuk desktop, tablet & HP -->
+  <button class="sidebar-toggle-btn" type="button" id="sidebarToggleDesktop" aria-label="Buka/tutup menu" aria-controls="sidebarMenu">
+      <i class="fas fa-bars"></i>
   </button>
 
-  <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" id="sidebarToggleMobile" style="right: 10px; top: 15px; z-index:1050; cursor:pointer;">
-    <span class="navbar-toggler-icon"></span>
-  </button>
-
-  <div class="w-100"></div>
-
-  <div class="navbar-nav d-flex flex-row align-items-center">
+  <div class="navbar-right">
     
     <!-- [THEME ENGINE] Dropdown Switcher Tema -->
-    <div class="nav-item dropdown me-2">
+    <div class="nav-item dropdown position-relative">
       <a class="nav-link dropdown-toggle text-warning" href="#" id="themeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Ganti Tema">
         <i class="fas fa-palette"></i>
       </a>
@@ -905,11 +1068,26 @@ function get_arrow_class($pages, $current) {
             })();
         </script>
 
-    <div class="nav-item text-nowrap">
-      <span class="nav-link px-3 text-white small">Halo, <?php echo htmlspecialchars($_SESSION['nama_user']); ?></span>
+    <!-- Nama user: tampil teks di tablet/desktop -->
+    <div class="nav-item d-none d-sm-flex align-items-center">
+      <span class="nav-user-name" title="<?php echo htmlspecialchars($_SESSION['nama_user']); ?>">Halo, <?php echo htmlspecialchars($_SESSION['nama_user']); ?></span>
     </div>
-    <div class="nav-item text-nowrap">
-      <a class="nav-link px-3 text-danger" href="core/logout.php" title="Keluar"><i class="fas fa-sign-out-alt"></i></a>
+
+    <!-- Nama user: di HP jadi ikon + dropdown -->
+    <div class="nav-item dropdown position-relative d-sm-none">
+      <a class="nav-link btn-user" href="#" id="userDropdownMobile" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Akun">
+        <i class="fas fa-user-circle"></i>
+      </a>
+      <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userDropdownMobile" style="font-size: 0.85rem; min-width: 200px;">
+        <li><h6 class="dropdown-header">Login sebagai</h6></li>
+        <li><span class="dropdown-item-text fw-bold"><?php echo htmlspecialchars($_SESSION['nama_user']); ?></span></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="core/logout.php"><i class="fas fa-sign-out-alt me-2"></i>Keluar</a></li>
+      </ul>
+    </div>
+
+    <div class="nav-item">
+      <a class="nav-link btn-logout" href="core/logout.php" title="Keluar"><i class="fas fa-sign-out-alt"></i></a>
     </div>
   </div>
 </header>
@@ -1108,50 +1286,38 @@ document.addEventListener("DOMContentLoaded", function() {
         // Hindari double-binding jika dipanggil lebih dari sekali
         if (_sidebarToggleAttached) return;
 
-        var btnDesktop = document.getElementById('sidebarToggleDesktop');
-        var btnMobile  = document.getElementById('sidebarToggleMobile');
-        var overlay    = document.getElementById('mobileOverlay');
+        var btnToggle = document.getElementById('sidebarToggleDesktop');
+        var overlay   = document.getElementById('mobileOverlay');
+        var MOBILE_BP = 992; // < 992px = tablet & HP (mode off-canvas)
 
         // Jika element belum ada di DOM, batalkan (akan dicoba lagi via event)
-        if (!btnDesktop && !btnMobile) return;
+        if (!btnToggle) return;
 
         _sidebarToggleAttached = true;
 
-        // --- Restore state awal dari localStorage saat halaman dibuka ---
+        function isMobileView() { return window.innerWidth < MOBILE_BP; }
+
+        // --- Restore state awal dari localStorage saat halaman dibuka (khusus desktop) ---
         try {
             if (localStorage.getItem('sidebarState') === 'closed') {
                 document.body.classList.add('sidebar-closed');
             }
         } catch(e) { /* Abaikan jika localStorage tidak tersedia */ }
 
-        // --- Desktop Toggle: tambah/hapus class sidebar-closed pada body ---
-        if (btnDesktop) {
-            btnDesktop.addEventListener('click', function(e) {
-                e.stopPropagation();
-                if (document.body.classList.contains('sidebar-closed')) {
-                    document.body.classList.remove('sidebar-closed');
-                } else {
-                    document.body.classList.add('sidebar-closed');
-                }
+        // --- Satu tombol: desktop = collapse sidebar, tablet/HP = off-canvas ---
+        btnToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (isMobileView()) {
+                document.body.classList.toggle('sidebar-open');
+            } else {
+                document.body.classList.toggle('sidebar-closed');
                 try {
                     localStorage.setItem('sidebarState',
                         document.body.classList.contains('sidebar-closed') ? 'closed' : 'open'
                     );
                 } catch(e) { /* Abaikan */ }
-            });
-        }
-
-        // --- Mobile Toggle: tambah/hapus class sidebar-open pada body ---
-        if (btnMobile) {
-            btnMobile.addEventListener('click', function(e) {
-                e.stopPropagation();
-                if (document.body.classList.contains('sidebar-open')) {
-                    document.body.classList.remove('sidebar-open');
-                } else {
-                    document.body.classList.add('sidebar-open');
-                }
-            });
-        }
+            }
+        });
 
         // --- Tutup sidebar mobile saat overlay diklik ---
         if (overlay) {
@@ -1159,6 +1325,14 @@ document.addEventListener("DOMContentLoaded", function() {
                 document.body.classList.remove('sidebar-open');
             });
         }
+
+        // --- Tutup off-canvas otomatis saat layar diperbesar ke desktop / tekan ESC ---
+        window.addEventListener('resize', function() {
+            if (!isMobileView()) document.body.classList.remove('sidebar-open');
+        });
+        document.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Escape') document.body.classList.remove('sidebar-open');
+        });
     }
 
     // Strategy 1: Langsung (jika script ada di akhir body & DOM sudah ready)
