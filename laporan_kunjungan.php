@@ -59,6 +59,7 @@ if ($has_sk_bed_filter) {
 // 4. Logika Pengambilan Data Tabel (Hanya jika ada action cari)
 $data_ralan = [];
 $data_ranap = [];
+$data_ranap_pulang = [];
 $is_search = ($action == 'cari');
 
 if ($is_search) {
@@ -212,6 +213,102 @@ if ($is_search) {
         }
         $stmt->close();
     }
+
+    // --- Query Ranap Pulang / Keluar ---
+    $where_keluar = " WHERE CONCAT(ki.tgl_keluar, ' ', ki.jam_keluar) BETWEEN ? AND ? 
+                      AND ki.stts_pulang NOT IN ('-', 'Pindah Kamar')
+                      AND reg_periksa.stts != 'Batal' ";
+    $params_keluar = [$datetime_awal, $datetime_akhir];
+    $types_keluar  = "ss";
+
+    if (!empty($kd_pj)) {
+        $where_keluar .= " AND reg_periksa.kd_pj = ? ";
+        $params_keluar[] = $kd_pj;
+        $types_keluar .= "s";
+    }
+
+    $ranap_keluar_kamar_filter = $has_sk_bed_filter
+        ? " AND k.kd_kamar IN ($sk_bed_in)"
+        : " AND 1 = 0";
+
+    if (!empty($kd_kamar_filter)) {
+        if (strpos($kd_kamar_filter, 'BANGSAL:') === 0) {
+            $kd_b = substr($kd_kamar_filter, 8);
+            $ranap_keluar_kamar_filter .= " AND k.kd_bangsal = ? ";
+            $params_keluar[] = $kd_b;
+            $types_keluar .= "s";
+        } else {
+            $ranap_keluar_kamar_filter .= " AND ki.kd_kamar = ? ";
+            $params_keluar[] = $kd_kamar_filter;
+            $types_keluar .= "s";
+        }
+    }
+
+    $ranap_keluar_status_filter = "";
+    if (!empty($stts_pulang_filter)) {
+        if ($stts_pulang_filter === 'dirawat' || $stts_pulang_filter === '-') {
+            $ranap_keluar_status_filter = " AND 1 = 0 ";
+        } elseif ($stts_pulang_filter === 'pulang') {
+            // Semua pasien keluar sudah pulang
+        } elseif ($stts_pulang_filter === 'Meninggal' || $stts_pulang_filter === '+') {
+            $ranap_keluar_status_filter = " AND (ki.stts_pulang = 'Meninggal' OR ki.stts_pulang = '+') ";
+        } elseif ($stts_pulang_filter === 'APS') {
+            $ranap_keluar_status_filter = " AND (ki.stts_pulang = 'APS' OR ki.stts_pulang = 'Atas Permintaan Sendiri') ";
+        } else {
+            $ranap_keluar_status_filter = " AND ki.stts_pulang = ? ";
+            $params_keluar[] = $stts_pulang_filter;
+            $types_keluar .= "s";
+        }
+    }
+
+    $sql_ranap_pulang = "
+        SELECT 
+            reg_periksa.no_rawat, ki.tgl_masuk, ki.jam_masuk, ki.tgl_keluar, ki.jam_keluar, ki.lama, ki.stts_pulang,
+            reg_periksa.no_rkm_medis, pasien.nm_pasien,
+            COALESCE(
+                (
+                    SELECT dokter_dpjp.nm_dokter
+                    FROM dpjp_ranap
+                    INNER JOIN dokter AS dokter_dpjp ON dokter_dpjp.kd_dokter = dpjp_ranap.kd_dokter
+                    WHERE dpjp_ranap.no_rawat = reg_periksa.no_rawat
+                    ORDER BY dpjp_ranap.kd_dokter
+                    LIMIT 1
+                ),
+                dokter.nm_dokter
+            ) AS nm_dpjp,
+            poliklinik.nm_poli,
+            CONCAT(k.kd_kamar, ' - ', b.nm_bangsal) AS kamar_fo,
+            penjab.png_jawab
+        FROM kamar_inap ki
+        INNER JOIN reg_periksa ON ki.no_rawat = reg_periksa.no_rawat
+        INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis
+        INNER JOIN dokter ON reg_periksa.kd_dokter = dokter.kd_dokter
+        LEFT JOIN poliklinik ON reg_periksa.kd_poli = poliklinik.kd_poli
+        INNER JOIN penjab ON reg_periksa.kd_pj = penjab.kd_pj
+        INNER JOIN kamar k ON ki.kd_kamar = k.kd_kamar
+        LEFT JOIN bangsal b ON k.kd_bangsal = b.kd_bangsal
+        $where_keluar
+        $ranap_keluar_kamar_filter
+        $ranap_keluar_status_filter
+        ORDER BY ki.tgl_keluar DESC, ki.jam_keluar DESC
+    ";
+
+    $stmt_pulang = $koneksi->prepare($sql_ranap_pulang);
+    if ($stmt_pulang) {
+        $bind_names_p = [];
+        $bind_names_p[] = $types_keluar;
+        for ($i = 0; $i < count($params_keluar); $i++) {
+            $bind_names_p[] = &$params_keluar[$i];
+        }
+        call_user_func_array(array($stmt_pulang, 'bind_param'), $bind_names_p);
+
+        $stmt_pulang->execute();
+        $result_p = $stmt_pulang->get_result();
+        while ($row_p = $result_p->fetch_assoc()) {
+            $data_ranap_pulang[] = $row_p;
+        }
+        $stmt_pulang->close();
+    }
 }
 ?>
 
@@ -319,7 +416,7 @@ if ($is_search) {
             <div class="row align-items-center">
                 <div class="col">
                     <h5 class="mb-0">Total Kunjungan: <strong><?php echo count($data_ralan) + count($data_ranap); ?></strong></h5>
-                    <small>Rawat Jalan: <?php echo count($data_ralan); ?> | Rawat Inap: <?php echo count($data_ranap); ?></small>
+                    <small>Rawat Jalan: <?php echo count($data_ralan); ?> | Rawat Inap (Masuk): <?php echo count($data_ranap); ?> | Pasien Keluar Ranap: <?php echo count($data_ranap_pulang); ?></small>
                 </div>
             </div>
         </div>
@@ -352,7 +449,14 @@ if ($is_search) {
         </div>
 
         <?php
-        $active_tab = (!empty($stts_pulang_filter) || !empty($kd_kamar_filter)) ? 'ranap' : 'ralan';
+        $active_tab = 'ralan';
+        if (isset($_GET['tab']) && in_array($_GET['tab'], ['ralan', 'ranap', 'ranap_pulang'])) {
+            $active_tab = $_GET['tab'];
+        } elseif (!empty($stts_pulang_filter) && !in_array($stts_pulang_filter, ['dirawat', '-'])) {
+            $active_tab = 'ranap_pulang';
+        } elseif (!empty($stts_pulang_filter) || !empty($kd_kamar_filter)) {
+            $active_tab = 'ranap';
+        }
         ?>
         <div class="card shadow-sm mb-4">
             <div class="card-header">
@@ -365,6 +469,11 @@ if ($is_search) {
                     <li class="nav-item" role="presentation">
                         <button class="nav-link <?php echo ($active_tab === 'ranap') ? 'active' : ''; ?>" id="ranap-tab" data-bs-toggle="tab" data-bs-target="#ranap" type="button" role="tab" aria-controls="ranap" aria-selected="<?php echo ($active_tab === 'ranap') ? 'true' : 'false'; ?>">
                             Rawat Inap (<?php echo count($data_ranap); ?>)
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link <?php echo ($active_tab === 'ranap_pulang') ? 'active' : ''; ?>" id="ranap-pulang-tab" data-bs-toggle="tab" data-bs-target="#ranap-pulang" type="button" role="tab" aria-controls="ranap-pulang" aria-selected="<?php echo ($active_tab === 'ranap_pulang') ? 'true' : 'false'; ?>">
+                            Pasien Keluar Ranap (<?php echo count($data_ranap_pulang); ?>)
                         </button>
                     </li>
                 </ul>
@@ -433,6 +542,55 @@ if ($is_search) {
                                             <td><?php echo htmlspecialchars($row['no_rkm_medis']); ?></td>
                                             <td><?php echo htmlspecialchars($row['nm_pasien']); ?></td>
                                             <td><?php echo htmlspecialchars($row['nm_poli']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['kamar_fo']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['nm_dpjp']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['png_jawab']); ?></td>
+                                            <td>
+                                                <?php if ($row['stts_pulang'] === '-'): ?>
+                                                    <span class="badge bg-info text-dark">Dirawat</span>
+                                                <?php elseif ($row['stts_pulang'] === 'Meninggal' || $row['stts_pulang'] === '+'): ?>
+                                                    <span class="badge bg-danger text-white"><?php echo htmlspecialchars($row['stts_pulang']); ?></span>
+                                                <?php elseif (in_array($row['stts_pulang'], ['Sehat', 'Sembuh', 'Membaik', 'Atas Persetujuan Dokter'])): ?>
+                                                    <span class="badge bg-success text-white"><?php echo htmlspecialchars($row['stts_pulang']); ?></span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-warning text-dark"><?php echo htmlspecialchars($row['stts_pulang']); ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade <?php echo ($active_tab === 'ranap_pulang') ? 'show active' : ''; ?>" id="ranap-pulang" role="tabpanel" aria-labelledby="ranap-pulang-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered table-sm dt-table" width="100%">
+                                <thead>
+                                    <tr>
+                                        <th>No. Rawat</th>
+                                        <th>Tgl Keluar</th>
+                                        <th>Jam</th>
+                                        <th>Tgl Masuk</th>
+                                        <th>Lama</th>
+                                        <th>No. RM</th>
+                                        <th>Pasien</th>
+                                        <th>Kamar Terakhir</th>
+                                        <th>Dokter DPJP</th>
+                                        <th>Penjamin</th>
+                                        <th>Status Pulang</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($data_ranap_pulang as $row): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($row['no_rawat']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['tgl_keluar']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['jam_keluar']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['tgl_masuk']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['lama']); ?> Hari</td>
+                                            <td><?php echo htmlspecialchars($row['no_rkm_medis']); ?></td>
+                                            <td><?php echo htmlspecialchars($row['nm_pasien']); ?></td>
                                             <td><?php echo htmlspecialchars($row['kamar_fo']); ?></td>
                                             <td><?php echo htmlspecialchars($row['nm_dpjp']); ?></td>
                                             <td><?php echo htmlspecialchars($row['png_jawab']); ?></td>
