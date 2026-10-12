@@ -142,16 +142,24 @@ function kpb_summary($db)
 function kpb_storage_dir($create = false)
 {
     $root = realpath(KP_BERKAS_ROOT);
-    if ($root === false || !is_dir($root)) throw new KpbStorageException('Folder webapps penggajian Khanza tidak ditemukan.');
+    if ($root === false || !is_dir($root)) {
+        if (is_dir(KP_BERKAS_ROOT)) {
+            $root = rtrim(KP_BERKAS_ROOT, '/\\');
+        } else {
+            throw new KpbStorageException('Folder webapps penggajian Khanza tidak ditemukan (' . KP_BERKAS_ROOT . ').');
+        }
+    }
     $dir = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, rtrim(KPB_DIR, '/'));
-    if (!is_dir($dir) && (!$create || !@mkdir($dir, 0775, true))) throw new KpbStorageException('Folder berkas pegawai Khanza tidak ditemukan.');
+    if (!is_dir($dir) && (!$create || !@mkdir($dir, 0775, true))) throw new KpbStorageException('Folder berkas pegawai Khanza tidak ditemukan (' . $dir . ').');
     return $dir;
 }
 
 // Hanya path di dalam folder berkas Khanza yang boleh dibaca/dihapus.
 function kpb_file_path($berkas)
 {
-    if (!is_string($berkas) || strpos($berkas, KPB_DIR) !== 0) return null;
+    if (!is_string($berkas)) return null;
+    $berkas = str_replace('\\', '/', trim($berkas));
+    if (strpos($berkas, KPB_DIR) !== 0) return null;
     $name = substr($berkas, strlen(KPB_DIR));
     if ($name === '' || $name === '.' || $name === '..' || $name !== basename($name) || strpbrk($name, "\\/:*?\"<>|\0") !== false) return null;
     try { $dir = kpb_storage_dir(); } catch (KpbStorageException $error) { return null; }
@@ -162,9 +170,11 @@ function kpb_file_path($berkas)
 function kpb_file_info($row)
 {
     $name = substr($row['berkas'], strrpos($row['berkas'], '/') !== false ? strrpos($row['berkas'], '/') + 1 : 0);
+    $localFile = kpb_file_path($row['berkas']);
+    $hasFile = ($localFile !== null) || (defined('KP_BERKAS_URL') && !empty(KP_BERKAS_URL));
     return [
         'tgl' => $row['tgl_uploud'], 'berkas' => $row['berkas'], 'nama_file' => $name,
-        'ext' => strtolower(pathinfo($name, PATHINFO_EXTENSION)), 'ada' => kpb_file_path($row['berkas']) !== null,
+        'ext' => strtolower(pathinfo($name, PATHINFO_EXTENSION)), 'ada' => $hasFile,
     ];
 }
 
@@ -191,7 +201,12 @@ function kpb_detail($db, $nik, $category = '')
     $others = [];
     foreach ($per as $name => $item) if ($name !== $category) $others[$name] = $item['files'];
     $storage = true;
-    try { kpb_storage_dir(); } catch (KpbStorageException $error) { $storage = false; }
+    try { 
+        kpb_storage_dir(true); 
+    } catch (KpbStorageException $error) { 
+        // Jika folder fisik lokal tidak ada di server ini, cek apakah remote host URL aktif
+        $storage = (defined('KP_BERKAS_URL') && !empty(KP_BERKAS_URL));
+    }
     $employee['dokter'] = !empty($employee['nm_dokter']);
     unset($employee['nm_dokter']);
     return ['pegawai' => $employee, 'kategori' => $category, 'sumber' => $source, 'groups' => array_values($groups), 'kategori_lain' => $others, 'storage' => $storage];
@@ -249,26 +264,117 @@ function kpb_upload($db, $nik, $code, $date, $input)
         if ($mime !== 'application/pdf' && @getimagesize($file['tmp_name']) === false) throw new InvalidArgumentException('Gambar ' . $label . ' rusak atau tidak dapat dibaca.');
         $prepared[] = [$file['tmp_name'], $ext === 'jpeg' ? 'jpg' : $ext];
     }
-    $dir = kpb_storage_dir(true);
-    if (!is_writable($dir)) throw new KpbStorageException('Folder berkas pegawai Khanza tidak dapat ditulis.');
+    $dir = null;
+    $useRemoteBridge = false;
+    try {
+        $dir = kpb_storage_dir(true);
+        if (!is_writable($dir)) $dir = null;
+    } catch (Throwable $e) {
+        $dir = null;
+    }
+
+    if (!$dir) {
+        if (defined('KP_BRIDGE_URL') && !empty(KP_BRIDGE_URL)) {
+            $useRemoteBridge = true;
+        } else {
+            throw new KpbStorageException('Folder berkas pegawai Khanza tidak dapat ditulis dan URL bridge belum terkonfigurasi.');
+        }
+    }
+
     $saved = [];
+    $savedRemote = [];
     if (!$db->begin_transaction()) throw new RuntimeException('Transaksi tidak dapat dimulai.');
     try {
         foreach ($prepared as $item) {
             // Nama unik: Khanza memakai nama asli sehingga file bernama sama saling menimpa.
             $name = kpb_safe_name($employee['nik']) . '_' . kpb_safe_name($code) . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $item[1];
-            $target = $dir . DIRECTORY_SEPARATOR . $name;
-            if (!move_uploaded_file($item[0], $target)) throw new KpbStorageException('File gagal disimpan ke folder berkas Khanza.');
-            $saved[] = $target;
+
+            if ($useRemoteBridge) {
+                // Unggah via cURL multipart bridge ke server Linux Mint (192.168.5.52:8820)
+                if (!kpb_upload_remote($item[0], $name)) {
+                    throw new KpbStorageException('Gagal mengirim file ke server Linux Mint (192.168.5.52:8820). Pastikan upload_receiver.php sudah dipasang di /var/www/html/khanzaapps/penggajian/pages/berkaspegawai/upload_receiver.php');
+                }
+                $savedRemote[] = $name;
+            } else {
+                $target = $dir . DIRECTORY_SEPARATOR . $name;
+                if (!move_uploaded_file($item[0], $target)) throw new KpbStorageException('File gagal disimpan ke folder berkas Khanza.');
+                $saved[] = $target;
+            }
+
             kp_query($db, 'INSERT INTO berkas_pegawai (nik, tgl_uploud, kode_berkas, berkas) VALUES (?, ?, ?, ?)', [$employee['nik'], $date, $code, KPB_DIR . $name])->close();
         }
         if (!$db->commit()) throw new RuntimeException('Commit gagal.');
     } catch (Throwable $error) {
         $db->rollback();
         foreach ($saved as $path) @unlink($path);
+        foreach ($savedRemote as $rName) kpb_delete_remote($rName);
         throw $error;
     }
-    return count($saved);
+    return count($prepared);
+}
+
+function kpb_upload_remote($tmpFile, $filename)
+{
+    $url = defined('KP_BRIDGE_URL') ? KP_BRIDGE_URL : '';
+    $token = defined('KP_BRIDGE_KEY') ? KP_BRIDGE_KEY : '';
+    if (!$url || !$token) return false;
+
+    $cfile = new CURLFile($tmpFile, kpb_mime($tmpFile) ?: 'application/octet-stream', $filename);
+    $postData = [
+        'token'    => $token,
+        'action'   => 'upload',
+        'filename' => $filename,
+        'file'     => $cfile,
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $postData,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($httpCode === 200 && $response) {
+        $json = json_decode($response, true);
+        return !empty($json['success']);
+    }
+
+    error_log("[Berkas Bridge] Upload error ke $url: HTTP $httpCode " . ($err ?: $response));
+    return false;
+}
+
+function kpb_delete_remote($filename)
+{
+    $url = defined('KP_BRIDGE_URL') ? KP_BRIDGE_URL : '';
+    $token = defined('KP_BRIDGE_KEY') ? KP_BRIDGE_KEY : '';
+    if (!$url || !$token) return false;
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => [
+            'token'    => $token,
+            'action'   => 'delete',
+            'filename' => $filename,
+        ],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+    ]);
+    $response = curl_exec($ch);
+    curl_close($ch);
+    return true;
 }
 
 function kpb_delete($db, $nik, $code, $berkas)
@@ -284,7 +390,10 @@ function kpb_delete($db, $nik, $code, $berkas)
     // File fisik hanya dihapus jika tidak lagi dirujuk baris lain.
     if (kp_rows($db, 'SELECT 1 FROM berkas_pegawai WHERE berkas = ? LIMIT 1', [$berkas])) return false;
     $path = kpb_file_path($berkas);
-    return $path ? @unlink($path) : false;
+    if ($path) {
+        return @unlink($path);
+    }
+    return kpb_delete_remote(basename($berkas));
 }
 
 function kpb_stream($db, $nik, $code, $berkas, $download)
@@ -293,15 +402,68 @@ function kpb_stream($db, $nik, $code, $berkas, $download)
     $code = kpb_text($code, 'Jenis berkas', 10);
     $berkas = kpb_text($berkas, 'Berkas', 500);
     if (!kp_rows($db, 'SELECT 1 FROM berkas_pegawai WHERE nik = ? AND kode_berkas = ? AND berkas = ? LIMIT 1', [$nik, $code, $berkas])) return false;
+
+    // 1. Prioritaskan file fisik lokal jika ada
     $path = kpb_file_path($berkas);
-    if (!$path) return false;
-    $mime = kpb_mime($path);
-    $inline = in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true) && !$download;
-    $name = basename($path);
-    header('Content-Type: ' . ($inline || in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true) ? $mime : 'application/octet-stream'));
-    header('Content-Length: ' . filesize($path));
+    if ($path && is_file($path)) {
+        $mime = kpb_mime($path);
+        $inline = in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true) && !$download;
+        $name = basename($path);
+        header('Content-Type: ' . ($inline || in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true) ? $mime : 'application/octet-stream'));
+        header('Content-Length: ' . filesize($path));
+        header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . kpb_safe_name($name) . '"; filename*=UTF-8\'\'' . rawurlencode($name));
+        header('Cache-Control: private, max-age=300');
+        readfile($path);
+        return true;
+    }
+
+    // 2. Ambil dari Remote Server Khanza (host DB_HOST: 192.168.5.52)
+    if (defined('KP_BERKAS_URL') && !empty(KP_BERKAS_URL)) {
+        $cleanBerkas = ltrim(str_replace('\\', '/', $berkas), '/');
+        $remoteUrl = rtrim(KP_BERKAS_URL, '/') . '/' . $cleanBerkas;
+        return kpb_stream_remote($remoteUrl, basename($cleanBerkas), $download);
+    }
+
+    return false;
+}
+
+function kpb_stream_remote($url, $name, $download)
+{
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 25,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+    ]);
+    $data = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($httpCode !== 200 || $data === false || $data === '') {
+        error_log("[Berkas Pegawai] Gagal mengambil file dari host remote ($url): HTTP $httpCode " . ($err ?: ''));
+        return false;
+    }
+
+    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    $mimeMap = [
+        'pdf'  => 'application/pdf',
+        'jpg'  => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png'  => 'image/png',
+    ];
+    $mime = $mimeMap[$ext] ?? ($contentType ?: 'application/octet-stream');
+    $inline = in_array($ext, ['pdf', 'jpg', 'jpeg', 'png'], true) && !$download;
+
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . strlen($data));
     header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . kpb_safe_name($name) . '"; filename*=UTF-8\'\'' . rawurlencode($name));
     header('Cache-Control: private, max-age=300');
-    readfile($path);
+    echo $data;
     return true;
 }
+

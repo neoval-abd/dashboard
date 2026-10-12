@@ -27,10 +27,201 @@ require_once('includes/header.php');
     
     .bed-row { transition: all .2s ease; cursor: pointer; border: 1px solid rgba(0,0,0,0.06); }
     .bed-row:hover { background-color: rgba(78, 115, 223, 0.08) !important; transform: translateY(-2px); box-shadow: 0 .25rem .75rem rgba(0,0,0,.08) !important; }
-    .room-chip { transition: all .15s ease; border: 1px solid rgba(0,0,0,0.08); }
-    .room-chip:hover { transform: scale(1.05); filter: brightness(0.95); }
-    .theme-glass .bed-row, .theme-dark .bed-row { border-color: rgba(255, 255, 255, 0.1) !important; }
-    .theme-glass .bed-row:hover, .theme-dark .bed-row:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
+    
+    /* ==============================================================
+       NEON BADGE & ROOM CHIP STYLES (Light & Dark Mode Compatible)
+       ============================================================== */
+    .badge-neon-cyan {
+        background: rgba(14, 165, 233, 0.12) !important;
+        border: 1px solid #0284c7 !important;
+        color: #38bdf8 !important;
+        box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+        font-weight: 600;
+        letter-spacing: 0.2px;
+    }
+    .badge-neon-emerald {
+        background: rgba(16, 185, 129, 0.12) !important;
+        border: 1px solid #10b981 !important;
+        color: #34d399 !important;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.25);
+        font-weight: 600;
+    }
+    .badge-neon-amber {
+        background: rgba(245, 158, 11, 0.12) !important;
+        border: 1px solid #f59e0b !important;
+        color: #fbbf24 !important;
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.25);
+        font-weight: 600;
+    }
+    .badge-neon-rose {
+        background: rgba(239, 68, 68, 0.12) !important;
+        border: 1px solid #ef4444 !important;
+        color: #f87171 !important;
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.25);
+        font-weight: 600;
+    }
+    .badge-neon-blue {
+        background: rgba(59, 130, 246, 0.15) !important;
+        border: 1px solid #3b82f6 !important;
+        color: #60a5fa !important;
+        box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
+        font-weight: 600;
+    }
+
+    /* Room Chip Base */
+    .room-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 9px;
+        font-size: 0.74rem;
+        font-weight: 500;
+        border-radius: 6px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        user-select: none;
+        line-height: 1.35;
+        text-decoration: none;
+    }
+    .room-chip:hover {
+        transform: translateY(-1px) scale(1.03);
+    }
+
+    /* Room Chip - Available (Kamar ada Bed Kosong) */
+    .room-chip-available {
+        background: rgba(16, 185, 129, 0.08);
+        border: 1px solid rgba(16, 185, 129, 0.45);
+        color: #1e293b;
+    }
+    .room-chip-available .room-chip-name {
+        color: #0f172a;
+    }
+    .room-chip-available .room-chip-count {
+        color: #059669;
+        font-weight: 700;
+    }
+    .room-chip-available:hover {
+        background: rgba(16, 185, 129, 0.18);
+        border-color: #10b981;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
+    }
+
+    /* Room Chip - Full (Kamar Penuh 0 ksg) */
+    .room-chip-full {
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #7f1d1d;
+    }
+    .room-chip-full .room-chip-name {
+        color: #7f1d1d;
+    }
+    .room-chip-full .room-chip-count {
+        color: #dc2626;
+        font-weight: 700;
+    }
+    .room-chip-full:hover {
+        background: rgba(239, 68, 68, 0.18);
+        border-color: #ef4444;
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
+    }
+
+    .room-divider {
+        border-top: 1px solid rgba(0, 0, 0, 0.07);
+    }
+
+    /* Dark Theme / Glass Overrides (Tampilan Neon Khusus Mode Gelap) */
+    html.theme-glass-solid .bed-row,
+    html.theme-glass-animated .bed-row,
+    [class*="theme-glass"] .bed-row,
+    .theme-dark .bed-row {
+        background-color: rgba(30, 41, 59, 0.5) !important;
+        border-color: rgba(255, 255, 255, 0.08) !important;
+    }
+    html.theme-glass-solid .bed-row:hover,
+    html.theme-glass-animated .bed-row:hover,
+    [class*="theme-glass"] .bed-row:hover,
+    .theme-dark .bed-row:hover {
+        background-color: rgba(51, 65, 85, 0.65) !important;
+        border-color: rgba(56, 189, 248, 0.35) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+    }
+
+    html.theme-glass-solid .room-divider,
+    html.theme-glass-animated .room-divider,
+    [class*="theme-glass"] .room-divider,
+    .theme-dark .room-divider {
+        border-top: 1px solid rgba(255, 255, 255, 0.09) !important;
+    }
+
+    html.theme-glass-solid .bed-info-text,
+    html.theme-glass-animated .bed-info-text,
+    [class*="theme-glass"] .bed-info-text,
+    .theme-dark .bed-info-text {
+        color: #cbd5e1 !important;
+    }
+
+    /* Neon Glow Room Chips di Mode Dark */
+    html.theme-glass-solid .room-chip-available,
+    html.theme-glass-animated .room-chip-available,
+    [class*="theme-glass"] .room-chip-available,
+    .theme-dark .room-chip-available {
+        background: rgba(16, 185, 129, 0.12) !important;
+        border: 1px solid rgba(16, 185, 129, 0.5) !important;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.16) !important;
+    }
+    html.theme-glass-solid .room-chip-available .room-chip-name,
+    html.theme-glass-animated .room-chip-available .room-chip-name,
+    [class*="theme-glass"] .room-chip-available .room-chip-name,
+    .theme-dark .room-chip-available .room-chip-name {
+        color: #f1f5f9 !important;
+        font-weight: 500 !important;
+    }
+    html.theme-glass-solid .room-chip-available .room-chip-count,
+    html.theme-glass-animated .room-chip-available .room-chip-count,
+    [class*="theme-glass"] .room-chip-available .room-chip-count,
+    .theme-dark .room-chip-available .room-chip-count {
+        color: #34d399 !important;
+        text-shadow: 0 0 8px rgba(52, 211, 153, 0.5) !important;
+    }
+    html.theme-glass-solid .room-chip-available:hover,
+    html.theme-glass-animated .room-chip-available:hover,
+    [class*="theme-glass"] .room-chip-available:hover,
+    .theme-dark .room-chip-available:hover {
+        background: rgba(16, 185, 129, 0.22) !important;
+        border-color: #34d399 !important;
+        box-shadow: 0 0 14px rgba(52, 211, 153, 0.45) !important;
+    }
+
+    html.theme-glass-solid .room-chip-full,
+    html.theme-glass-animated .room-chip-full,
+    [class*="theme-glass"] .room-chip-full,
+    .theme-dark .room-chip-full {
+        background: rgba(239, 68, 68, 0.15) !important;
+        border: 1px solid rgba(239, 68, 68, 0.55) !important;
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.18) !important;
+    }
+    html.theme-glass-solid .room-chip-full .room-chip-name,
+    html.theme-glass-animated .room-chip-full .room-chip-name,
+    [class*="theme-glass"] .room-chip-full .room-chip-name,
+    .theme-dark .room-chip-full .room-chip-name {
+        color: #fecaca !important;
+        font-weight: 500 !important;
+    }
+    html.theme-glass-solid .room-chip-full .room-chip-count,
+    html.theme-glass-animated .room-chip-full .room-chip-count,
+    [class*="theme-glass"] .room-chip-full .room-chip-count,
+    .theme-dark .room-chip-full .room-chip-count {
+        color: #f87171 !important;
+        text-shadow: 0 0 8px rgba(248, 113, 113, 0.6) !important;
+    }
+    html.theme-glass-solid .room-chip-full:hover,
+    html.theme-glass-animated .room-chip-full:hover,
+    [class*="theme-glass"] .room-chip-full:hover,
+    .theme-dark .room-chip-full:hover {
+        background: rgba(239, 68, 68, 0.25) !important;
+        border-color: #f87171 !important;
+        box-shadow: 0 0 14px rgba(239, 68, 68, 0.5) !important;
+    }
     
     /* Style untuk Link Header Chart */
     .chart-header-link { cursor: pointer; transition: color 0.2s; }
@@ -217,7 +408,7 @@ require_once('includes/header.php');
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                     <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-layer-group me-2"></i>Ketersediaan Bed per Lantai (Realtime)</h6>
-                    <span class="badge bg-primary text-white"><i class="fas fa-hospital me-1"></i>Total 60 Bed</span>
+                    <span class="badge badge-neon-cyan"><i class="fas fa-hospital me-1"></i>Total 60 Bed</span>
                 </div>
                 <div class="card-body" id="container-bed-lantai">
                     <div class="text-center p-3">Loading...</div>
@@ -230,7 +421,7 @@ require_once('includes/header.php');
             <div class="card shadow mb-4 h-100">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                     <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-procedures me-2"></i>Ketersediaan Bed per Kelas (Realtime)</h6>
-                    <span class="badge bg-primary text-white"><i class="fas fa-bed me-1"></i>Total 60 Bed</span>
+                    <span class="badge badge-neon-cyan"><i class="fas fa-bed me-1"></i>Total 60 Bed</span>
                 </div>
                 <div class="card-body" id="container-bed">
                     <div class="text-center p-3">Loading...</div>
@@ -426,21 +617,22 @@ require_once('includes/header.php');
             data.forEach(function(item) {
                 var bor = item.bor || 0;
                 var color = bor > 85 ? 'bg-danger' : (bor > 60 ? 'bg-warning' : 'bg-success');
-                var badgeClass = bor > 85 ? 'bg-danger' : (bor > 60 ? 'bg-warning text-dark' : 'bg-success');
+                var badgeClass = bor > 85 ? 'badge-neon-rose' : (bor > 60 ? 'badge-neon-amber' : 'badge-neon-emerald');
                 
                 var groupsHtml = '';
                 if (item.groups && item.groups.length > 0) {
-                    groupsHtml += '<div class="d-flex flex-wrap gap-1 mt-2 pt-2 border-top border-light">';
+                    groupsHtml += '<div class="d-flex flex-wrap gap-1 mt-2 pt-2 room-divider">';
                     item.groups.forEach(function(g) {
                         var gKosong = g.kosong;
                         var gTerisi = g.terisi;
-                        var gBadge = gKosong > 0 ? 'bg-light text-dark border' : 'bg-secondary text-white';
+                        var chipClass = gKosong > 0 ? 'room-chip-available' : 'room-chip-full';
                         var gTitle = g.nama + ' (' + g.kelas + '): Terisi ' + gTerisi + ' dari ' + g.total + ' Bed, Kosong ' + gKosong;
                         groupsHtml += `
-                            <span class="badge ${gBadge} py-1 px-2 room-chip" 
+                            <span class="room-chip ${chipClass}" 
                                   title="${gTitle}"
                                   onclick="event.stopPropagation(); showBedDetail({type: 'ruangan', val: '${g.nama}', title: '${g.nama} (Lt. ${item.lantai})'})">
-                                ${g.nama} <span class="fw-bold ${gKosong > 0 ? 'text-success' : 'text-danger'}">(${gKosong} ksg)</span>
+                                <span class="room-chip-name">${g.nama}</span>
+                                <span class="room-chip-count">(${gKosong} ksg)</span>
                             </span>
                         `;
                     });
@@ -452,7 +644,7 @@ require_once('includes/header.php');
                          onclick="showBedDetail({type: 'lantai', val: ${item.lantai}, title: '${item.nama} (${item.sublabel})'})">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <div class="d-flex align-items-center gap-2">
-                                <span class="badge bg-primary fs-6 px-2 py-1"><i class="fas fa-layer-group me-1"></i>${item.nama}</span>
+                                <span class="badge badge-neon-blue fs-6 px-2 py-1"><i class="fas fa-layer-group me-1"></i>${item.nama}</span>
                                 <span class="small text-muted fw-bold">${item.sublabel}</span>
                             </div>
                             <div>
@@ -461,7 +653,7 @@ require_once('includes/header.php');
                         </div>
                         
                         <div class="d-flex justify-content-between small font-weight-bold mt-2">
-                            <span class="text-secondary">Terisi ${item.terisi} dari ${item.total} Bed</span>
+                            <span class="text-secondary bed-info-text">Terisi ${item.terisi} dari ${item.total} Bed</span>
                             <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Kosong: ${item.kosong} Bed</span>
                         </div>
                         
@@ -488,16 +680,16 @@ require_once('includes/header.php');
                 var color = bor > 85 ? 'bg-danger' : (bor > 60 ? 'bg-warning' : 'bg-success');
                 
                 html += `
-                    <div class="mb-3 p-2 rounded bed-row" onclick="showBedDetail('${item.kelas}')">
+                    <div class="mb-3 p-2 rounded bed-row shadow-sm" onclick="showBedDetail('${item.kelas}')">
                         <div class="d-flex justify-content-between small font-weight-bold">
-                            <span class="text-primary">${item.kelas}</span>
-                            <span>Terisi ${item.terisi} dari ${item.total} (${Math.round(bor)}%)</span>
+                            <span class="text-primary fw-bold">${item.kelas}</span>
+                            <span class="bed-info-text">Terisi ${item.terisi} dari ${item.total} (${Math.round(bor)}%)</span>
                         </div>
                         <div class="progress mt-1" style="height: 10px;">
                             <div class="progress-bar ${color}" role="progressbar" style="width: ${bor}%"></div>
                         </div>
                         <div class="text-end mt-1" style="font-size: 0.75rem;">
-                            <span class="text-success fw-bold">Kosong: ${kosong} Bed</span>
+                            <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Kosong: ${kosong} Bed</span>
                         </div>
                     </div>
                 `;
