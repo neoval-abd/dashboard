@@ -38,7 +38,7 @@ try {
             kpb_respond(200, ['success' => true, 'message' => $count . ' file berhasil diunggah.'], false);
         } else {
             $removed = kpb_delete($koneksi, $_POST['nik'] ?? null, $_POST['kode'] ?? null, $_POST['berkas'] ?? null);
-            kpb_respond(200, ['success' => true, 'message' => 'Berkas berhasil dihapus.' . ($removed ? '' : ' File fisik tidak ditemukan atau masih dipakai data lain.')], false);
+            kpb_respond(200, ['success' => true, 'message' => 'Berkas berhasil dihapus dari sistem.'], false);
         }
     } elseif ($action === 'summary') {
         session_write_close();

@@ -90,6 +90,8 @@ function kp_escape($value) { return htmlspecialchars((string) $value, ENT_QUOTES
     --kp-search-border: #cbd5e1;
     --kp-search-focus-border: #0d6efd;
     --kp-search-focus-glow: rgba(13, 110, 253, 0.2);
+    --kp-select-option-bg: #ffffff;
+    --kp-select-option-text: #1e293b;
     
     /* Employee List Cards */
     --kp-card-item-border: #f1f5f9;
@@ -172,6 +174,8 @@ html.theme-glass-animated {
     --kp-search-border: rgba(255, 255, 255, 0.15);
     --kp-search-focus-border: #38bdf8;
     --kp-search-focus-glow: rgba(56, 189, 248, 0.25);
+    --kp-select-option-bg: #0f172a;
+    --kp-select-option-text: #f8fafc;
     
     /* Employee List Cards */
     --kp-card-item-border: rgba(255, 255, 255, 0.07);
@@ -377,8 +381,20 @@ html.theme-glass-animated {
     border-radius: 8px;
 }
 .kp-filter-select option {
-    background-color: var(--kp-bg-surface);
-    color: var(--kp-text-body);
+    background-color: var(--kp-select-option-bg) !important;
+    color: var(--kp-select-option-text) !important;
+}
+html.theme-glass-solid .kp-filter-select option,
+html.theme-glass-animated .kp-filter-select option,
+html.theme-glass-solid .kp-category-select option,
+html.theme-glass-animated .kp-category-select option {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+}
+html.theme-light .kp-filter-select option,
+html.theme-light .kp-category-select option {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
 }
 
 /* Employee Cards (Left List) */
@@ -459,8 +475,8 @@ html.theme-glass-animated {
     border-radius: 6px;
 }
 .kp-category-select option {
-    background-color: var(--kp-bg-surface);
-    color: var(--kp-text-body);
+    background-color: var(--kp-select-option-bg) !important;
+    color: var(--kp-select-option-text) !important;
 }
 
 /* Accordion Groups */
@@ -519,6 +535,78 @@ html.theme-glass-animated {
     color: #ffffff !important;
 }
 .btn-xs { padding: 2px 7px; font-size: .75rem; border-radius: 4px; }
+
+/* SweetAlert2 Styling & Theme Integration */
+.swal2-container {
+    z-index: 10050 !important;
+}
+.kp-swal-popup {
+    border-radius: 16px !important;
+    padding: 1.5rem !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45) !important;
+}
+.kp-swal-popup .swal2-title {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    padding-top: 0.5rem !important;
+}
+.kp-swal-popup .swal2-html-container {
+    margin: 1rem 0.5rem !important;
+    font-size: 0.9rem !important;
+}
+.kp-swal-popup .swal2-actions {
+    margin-top: 1.25rem !important;
+    gap: 10px !important;
+}
+.kp-swal-popup .swal2-styled {
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    padding: 8px 18px !important;
+    box-shadow: none !important;
+}
+
+/* Dark / Glass Mode SweetAlert */
+html.theme-glass-solid .kp-swal-popup,
+html.theme-glass-animated .kp-swal-popup {
+    background: #1e293b !important;
+    color: #f8fafc !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75) !important;
+}
+html.theme-glass-solid .kp-swal-popup .swal2-title,
+html.theme-glass-animated .kp-swal-popup .swal2-title {
+    color: #f8fafc !important;
+}
+html.theme-glass-solid .kp-swal-popup .swal2-html-container,
+html.theme-glass-animated .kp-swal-popup .swal2-html-container {
+    color: #cbd5e1 !important;
+}
+html.theme-glass-solid .kp-swal-filebox,
+html.theme-glass-animated .kp-swal-filebox {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border: 1px dashed rgba(239, 68, 68, 0.4) !important;
+    color: #fca5a5 !important;
+}
+
+/* Light Mode SweetAlert */
+html.theme-light .kp-swal-popup {
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+html.theme-light .kp-swal-popup .swal2-title {
+    color: #0f172a !important;
+}
+html.theme-light .kp-swal-popup .swal2-html-container {
+    color: #475569 !important;
+}
+html.theme-light .kp-swal-filebox {
+    background: #fef2f2 !important;
+    border: 1px dashed #f87171 !important;
+    color: #b91c1c !important;
+}
 </style>
 <div class="d-flex justify-content-between align-items-center flex-wrap pt-3 pb-2 mb-3 border-bottom">
     <div><h4 class="mb-0"><i class="fas fa-id-card text-primary me-2"></i>Kepegawaian</h4>
@@ -722,6 +810,11 @@ html.theme-glass-animated {
                     <a href="#" class="btn btn-outline-success btn-sm" id="kpPreviewDownload" title="Unduh file">
                         <i class="fas fa-download me-1"></i>Unduh
                     </a>
+                    <?php if ($kp_write): ?>
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="kpPreviewDelete" title="Hapus berkas ini">
+                        <i class="fas fa-trash-alt me-1"></i>Hapus
+                    </button>
+                    <?php endif; ?>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
             </div>
@@ -737,6 +830,7 @@ html.theme-glass-animated {
 
 <?php ob_start(); ?>
 <script>window.kpConfig = <?php echo json_encode(['canWrite' => $kp_write && !$kp_error, 'csrf' => $_SESSION['kp_csrf'], 'ready' => !$kp_error], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="assets/js/kepegawaian.js?v=<?php echo filemtime(__DIR__ . '/assets/js/kepegawaian.js'); ?>"></script>
 <script src="assets/js/kepegawaian_berkas.js?v=<?php echo filemtime(__DIR__ . '/assets/js/kepegawaian_berkas.js'); ?>"></script>
 <?php $page_js = ob_get_clean(); require_once __DIR__ . '/includes/footer.php'; ?>

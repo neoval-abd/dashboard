@@ -407,7 +407,7 @@
                                                     <span class="kp-emp-subtext ms-1" style="font-size: .65rem;">(${esc(f.tgl)})</span>
                                                 </button>
                                                 ${cfg.canWrite ? `
-                                                    <button type="button" class="btn btn-outline-danger btn-xs py-0 px-1 kp-file-del-btn" 
+                                                    <button type="button" class="btn btn-outline-danger btn-xs py-0 px-1 kp-file-del-btn kp-delete-file" 
                                                         title="Hapus berkas ini"
                                                         data-nik="${esc(p.nik)}" 
                                                         data-kode="${esc(item.kode)}" 
@@ -574,34 +574,166 @@
         }
     }
 
+    function isDarkTheme() {
+        const theme = localStorage.getItem('app_theme') || 'theme-glass-animated';
+        return theme.includes('glass') || 
+               document.documentElement.classList.contains('theme-glass-solid') || 
+               document.documentElement.classList.contains('theme-glass-animated');
+    }
+
     // Delete File
     async function deleteFile(nik, kode, berkas, filename) {
-        if (!cfg.canWrite) return;
+        const isDark = isDarkTheme();
+        const displayFilename = filename || berkas || 'berkas';
 
-        const ok = confirm(`Hapus berkas "${filename}"?\n\nFile akan dihapus dari data berkas pegawai ini.`);
-        if (!ok) return;
+        if (!cfg.canWrite) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Akses Ditolak',
+                    text: 'Anda tidak memiliki hak akses untuk menghapus berkas pegawai.',
+                    confirmButtonText: 'Tutup',
+                    confirmButtonColor: '#64748b',
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    color: isDark ? '#f8fafc' : '#1e293b',
+                    customClass: { popup: 'kp-swal-popup' }
+                });
+            } else {
+                alert('Anda tidak memiliki hak akses untuk menghapus berkas pegawai.');
+            }
+            return;
+        }
 
-        const payload = new FormData();
-        payload.set('action', 'delete');
-        payload.set('csrf', cfg.csrf);
-        payload.set('nik', nik);
-        payload.set('kode', kode);
-        payload.set('berkas', berkas);
-
-        try {
-            const res = await request('api/berkas_pegawai.php', {
-                method: 'POST',
-                body: payload
+        if (typeof Swal !== 'undefined') {
+            const result = await Swal.fire({
+                title: 'Hapus Berkas?',
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <p class="mb-2">Apakah Anda yakin ingin menghapus berkas berikut?</p>
+                        <div class="kp-swal-filebox p-2 mb-3 rounded" style="word-break: break-all;">
+                            <i class="fas fa-file-alt text-danger me-2"></i><strong>${esc(displayFilename)}</strong>
+                        </div>
+                        <div class="p-2 rounded small" style="background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; color: ${isDark ? '#fcd34d' : '#b45309'};">
+                            <i class="fas fa-exclamation-triangle me-1"></i> File fisik dan data berkas pegawai ini akan dihapus dari sistem secara permanen.
+                        </div>
+                    </div>
+                `,
+                icon: 'warning',
+                iconColor: '#ef4444',
+                showCancelButton: true,
+                confirmButtonText: '<i class="fas fa-trash-alt me-1"></i> Ya, Hapus Berkas',
+                cancelButtonText: '<i class="fas fa-times me-1"></i> Batal',
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: isDark ? '#475569' : '#64748b',
+                reverseButtons: true,
+                focusCancel: true,
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f8fafc' : '#1e293b',
+                customClass: { popup: 'kp-swal-popup' }
             });
 
-            showToast(res.message, 'success');
-            await loadSummary(true);
-            if (selectedNik) {
-                const curCat = selectedDetail ? selectedDetail.kategori : '';
-                await loadDetail(selectedNik, curCat);
+            if (!result.isConfirmed) return;
+
+            // Tutup preview modal jika sedang terbuka
+            const modalEl = document.getElementById('kpPreviewModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl) || (bootstrap.Modal.getOrCreateInstance ? bootstrap.Modal.getOrCreateInstance(modalEl) : null);
+                if (modal) modal.hide();
             }
-        } catch (err) {
-            alert('Gagal menghapus berkas: ' + err.message);
+
+            // Tampilkan loading dialog
+            Swal.fire({
+                title: 'Menghapus Berkas...',
+                html: '<div class="small text-muted py-2">Sedang memproses penghapusan berkas...</div>',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                },
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f8fafc' : '#1e293b',
+                customClass: { popup: 'kp-swal-popup' }
+            });
+
+            const payload = new FormData();
+            payload.set('action', 'delete');
+            payload.set('csrf', cfg.csrf);
+            payload.set('nik', nik);
+            payload.set('kode', kode);
+            payload.set('berkas', berkas);
+
+            try {
+                const res = await request('api/berkas_pegawai.php', {
+                    method: 'POST',
+                    body: payload
+                });
+
+                Swal.fire({
+                    icon: 'success',
+                    iconColor: '#10b981',
+                    title: 'Berkas Berhasil Dihapus',
+                    text: res.message || 'Berkas telah berhasil dihapus.',
+                    timer: 2000,
+                    timerProgressBar: true,
+                    showConfirmButton: false,
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    color: isDark ? '#f8fafc' : '#1e293b',
+                    customClass: { popup: 'kp-swal-popup' }
+                });
+
+                showToast(res.message, 'success');
+                await loadSummary(true);
+                if (selectedNik) {
+                    const curCat = selectedDetail ? selectedDetail.kategori : '';
+                    await loadDetail(selectedNik, curCat);
+                }
+            } catch (err) {
+                Swal.fire({
+                    icon: 'error',
+                    iconColor: '#ef4444',
+                    title: 'Gagal Menghapus Berkas',
+                    text: err.message || 'Terjadi kesalahan saat menghapus berkas.',
+                    confirmButtonText: 'Tutup',
+                    confirmButtonColor: '#dc2626',
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    color: isDark ? '#f8fafc' : '#1e293b',
+                    customClass: { popup: 'kp-swal-popup' }
+                });
+            }
+        } else {
+            // Fallback bawaan browser jika Swal tidak tersedia
+            const ok = confirm(`Hapus berkas "${displayFilename}"?\n\nFile akan dihapus dari data berkas pegawai ini.`);
+            if (!ok) return;
+
+            const modalEl = document.getElementById('kpPreviewModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl) || (bootstrap.Modal.getOrCreateInstance ? bootstrap.Modal.getOrCreateInstance(modalEl) : null);
+                if (modal) modal.hide();
+            }
+
+            const payload = new FormData();
+            payload.set('action', 'delete');
+            payload.set('csrf', cfg.csrf);
+            payload.set('nik', nik);
+            payload.set('kode', kode);
+            payload.set('berkas', berkas);
+
+            try {
+                const res = await request('api/berkas_pegawai.php', {
+                    method: 'POST',
+                    body: payload
+                });
+
+                showToast(res.message, 'success');
+                await loadSummary(true);
+                if (selectedNik) {
+                    const curCat = selectedDetail ? selectedDetail.kategori : '';
+                    await loadDetail(selectedNik, curCat);
+                }
+            } catch (err) {
+                alert('Gagal menghapus berkas: ' + err.message);
+            }
         }
     }
 
@@ -624,6 +756,14 @@
 
         openNewTabBtn.href = fileUrl;
         downloadBtn.href = downloadUrl;
+
+        const deleteBtn = document.getElementById('kpPreviewDelete');
+        if (deleteBtn) {
+            deleteBtn.dataset.nik = data.nik || '';
+            deleteBtn.dataset.kode = data.kode || '';
+            deleteBtn.dataset.berkas = data.berkas || '';
+            deleteBtn.dataset.filename = data.filename || '';
+        }
 
         bodyEl.innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x mb-2"></i><br>Memuat preview...</div>';
 
@@ -758,8 +898,18 @@
         });
 
         // Tombol hapus file
-        $(document).on('click', '.kp-delete-file', function () {
+        $(document).on('click', '.kp-delete-file, .kp-file-del-btn', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
             const d = this.dataset;
+            deleteFile(d.nik, d.kode, d.berkas, d.filename);
+        });
+
+        // Tombol hapus file dari modal preview
+        $(document).on('click', '#kpPreviewDelete', function (e) {
+            e.preventDefault();
+            const d = this.dataset;
+            if (!d.nik) return;
             deleteFile(d.nik, d.kode, d.berkas, d.filename);
         });
     }

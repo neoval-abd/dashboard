@@ -382,13 +382,26 @@ function kpb_delete($db, $nik, $code, $berkas)
     $nik = kpb_text($nik, 'NIP pegawai', 20);
     $code = kpb_text($code, 'Jenis berkas', 10);
     $berkas = kpb_text($berkas, 'Berkas', 500);
-    // Khanza menghapus semua file dengan nik+kode yang sama; dashboard hanya menghapus satu file yang dipilih.
+    // 1. Hapus record dari database berkas_pegawai (exact match)
     $stmt = kp_query($db, 'DELETE FROM berkas_pegawai WHERE nik = ? AND kode_berkas = ? AND berkas = ? LIMIT 1', [$nik, $code, $berkas]);
     $affected = $stmt->affected_rows;
     $stmt->close();
+
+    // 2. Fallback jika ada perbedaan path separator (/ vs \)
+    if ($affected < 1) {
+        $berkasSlash = str_replace('\\', '/', $berkas);
+        $berkasBackslash = str_replace('/', '\\', $berkas);
+        $stmt2 = kp_query($db, 'DELETE FROM berkas_pegawai WHERE nik = ? AND kode_berkas = ? AND (berkas = ? OR berkas = ?) LIMIT 1', [$nik, $code, $berkasSlash, $berkasBackslash]);
+        $affected = $stmt2->affected_rows;
+        $stmt2->close();
+    }
+
     if ($affected < 1) throw new InvalidArgumentException('Berkas tidak ditemukan atau sudah dihapus.');
-    // File fisik hanya dihapus jika tidak lagi dirujuk baris lain.
-    if (kp_rows($db, 'SELECT 1 FROM berkas_pegawai WHERE berkas = ? LIMIT 1', [$berkas])) return false;
+
+    // 3. File fisik hanya dihapus jika tidak lagi dirujuk baris lain di tabel berkas_pegawai
+    $checkFiles = kp_rows($db, 'SELECT 1 FROM berkas_pegawai WHERE berkas = ? OR berkas = ? LIMIT 1', [$berkas, str_replace('\\', '/', $berkas)]);
+    if ($checkFiles) return false;
+
     $path = kpb_file_path($berkas);
     if ($path) {
         return @unlink($path);
