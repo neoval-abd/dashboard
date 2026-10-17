@@ -260,20 +260,59 @@ if ($res_poli) {
 $response['top_poli'] = $top_poli;
 
 // ==========================================================================
-// 6. TREN TAHUNAN
+// 6. TREN TAHUNAN (SINKRON DENGAN BED SK BPJS)
 // ==========================================================================
-$sql_tren = "SELECT MONTH(tgl_registrasi) as bulan, status_lanjut, COUNT(*) as jumlah FROM reg_periksa WHERE YEAR(tgl_registrasi) = '$year' AND stts != 'Batal' GROUP BY MONTH(tgl_registrasi), status_lanjut";
-$res_tren = $koneksi->query($sql_tren);
 $d_ralan = array_fill(1, 12, 0);
 $d_ranap = array_fill(1, 12, 0);
 $d_total = array_fill(1, 12, 0);
-if ($res_tren) {
-    while($row = $res_tren->fetch_assoc()) {
-        $b = (int)$row['bulan']; $j = (int)$row['jumlah'];
-        if ($row['status_lanjut'] == 'Ralan') $d_ralan[$b] = $j; else $d_ranap[$b] = $j;
+
+// 6a. Tren Ralan
+$sql_tren_ralan = "
+    SELECT MONTH(tgl_registrasi) as bulan, COUNT(*) as jumlah 
+    FROM reg_periksa 
+    WHERE YEAR(tgl_registrasi) = '$year' 
+      AND stts != 'Batal' 
+      AND status_lanjut = 'Ralan' 
+    GROUP BY MONTH(tgl_registrasi)
+";
+$res_tren_ralan = $koneksi->query($sql_tren_ralan);
+if ($res_tren_ralan) {
+    while ($row = $res_tren_ralan->fetch_assoc()) {
+        $b = (int)$row['bulan'];
+        $j = (int)$row['jumlah'];
+        $d_ralan[$b] = $j;
         $d_total[$b] += $j;
     }
 }
+
+// 6b. Tren Ranap (Difilter hanya Bed SK terdaftar, sinkron dengan laporan_kunjungan.php)
+$ranap_tren_kamar_filter = ($bed_in !== '') ? " AND kamar_fo.kd_kamar IN ($bed_in)" : " AND 1 = 0";
+$sql_tren_ranap = "
+    SELECT MONTH(rp.tgl_registrasi) as bulan, COUNT(DISTINCT rp.no_rawat) as jumlah
+    FROM reg_periksa rp
+    INNER JOIN kamar kamar_fo ON kamar_fo.kd_kamar = (
+        SELECT kamar_inap.kd_kamar
+        FROM kamar_inap
+        WHERE kamar_inap.no_rawat = rp.no_rawat
+        ORDER BY kamar_inap.tgl_masuk ASC, kamar_inap.jam_masuk ASC
+        LIMIT 1
+    )
+    WHERE YEAR(rp.tgl_registrasi) = '$year'
+      AND rp.stts != 'Batal'
+      AND rp.status_lanjut = 'Ranap'
+      $ranap_tren_kamar_filter
+    GROUP BY MONTH(rp.tgl_registrasi)
+";
+$res_tren_ranap = $koneksi->query($sql_tren_ranap);
+if ($res_tren_ranap) {
+    while ($row = $res_tren_ranap->fetch_assoc()) {
+        $b = (int)$row['bulan'];
+        $j = (int)$row['jumlah'];
+        $d_ranap[$b] = $j;
+        $d_total[$b] += $j;
+    }
+}
+
 $response['tren'] = ['ralan' => array_values($d_ralan), 'ranap' => array_values($d_ranap), 'total' => array_values($d_total)];
 
 echo json_encode($response);
