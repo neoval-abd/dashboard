@@ -3,7 +3,7 @@
  * Konfigurasi Fonnte.
  * Isi token dari dashboard Fonnte pada FONNTE_TOKEN di bawah ini.
  */
-define('FONNTE_TOKEN', '1oFryxP8vVwKkaMWhaHM');
+define('FONNTE_TOKEN', '');
 define('FONNTE_API_URL', 'https://api.fonnte.com/send');
 define('FONNTE_COUNTRY_CODE', '62');
 define('FONNTE_SSL_VERIFY', false);
