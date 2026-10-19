@@ -285,8 +285,6 @@ if ($is_search) {
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="9" class="text-center">Tidak ada data ditemukan untuk filter ini.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -385,6 +383,8 @@ if ($is_search) {
                     }
                 ],
                 "language": {
+                    "emptyTable": "Tidak ada data transaksi ditemukan untuk filter ini.",
+                    "zeroRecords": "Tidak ada data yang cocok dengan pencarian.",
                     "search": "Cari:",
                     "lengthMenu": "Tampilkan _MENU_ baris",
                     "info": "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",

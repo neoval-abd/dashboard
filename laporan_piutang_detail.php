@@ -103,10 +103,10 @@ $sql_sum_ranap = "
 $stmt_sum_ranap = $koneksi->prepare($sql_sum_ranap);
 
 // Untuk pemasukan dan pengeluaran tunai tetap sama
-$sql_sum_pemasukan = "SELECT SUM(besar) AS total_harian FROM pemasukan_lain WHERE tanggal = ?";
+$sql_sum_pemasukan = "SELECT SUM(besar) AS total_harian FROM pemasukan_lain WHERE DATE(tanggal) = ?";
 $stmt_sum_pemasukan = $koneksi->prepare($sql_sum_pemasukan);
 
-$sql_sum_pengeluaran = "SELECT SUM(biaya) AS total_harian FROM pengeluaran_harian WHERE tanggal = ?";
+$sql_sum_pengeluaran = "SELECT SUM(biaya) AS total_harian FROM pengeluaran_harian WHERE DATE(tanggal) = ?";
 $stmt_sum_pengeluaran = $koneksi->prepare($sql_sum_pengeluaran);
 
 // 5. Siapkan Loop Tanggal
@@ -152,32 +152,93 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                 $tanggal_str = $tanggal->format('Y-m-d');
                 $day_id = 'hari-' . $tanggal->format('Ymd');
                 
-                // Ambil summary harian
-                $stmt_sum_ralan->bind_param("s", $tanggal_str);
-                $stmt_sum_ralan->execute();
-                $harian_ralan = $stmt_sum_ralan->get_result()->fetch_assoc()['total_harian'] ?? 0;
+                // Ambil data setiap shift untuk tanggal ini agar Total Header sinkron 100% dengan isi shift
+                $shifts_data = [];
+                $grand_total_harian = 0;
+                $total_masuk_harian = 0;
+                $total_keluar_harian = 0;
+                $shift_index = 0;
+                foreach ($shift_times as $nama_shift => $times) {
+                    $range = getShiftDateTimeRange($tanggal_str, $nama_shift, $shift_times);
+                    
+                    // --- Ambil Data Ralan ---
+                    $stmt_ralan->bind_param("ss", $range['start'], $range['end']);
+                    $stmt_ralan->execute();
+                    $result_ralan = $stmt_ralan->get_result();
+                    $data_ralan = [];
+                    while ($row = $result_ralan->fetch_assoc()) $data_ralan[] = $row;
+                    
+                    // --- Ambil Data Ranap ---
+                    $stmt_ranap->bind_param("ss", $range['start'], $range['end']);
+                    $stmt_ranap->execute();
+                    $result_ranap = $stmt_ranap->get_result();
+                    $data_ranap = [];
+                    while ($row = $result_ranap->fetch_assoc()) $data_ranap[] = $row;
 
-                $stmt_sum_ranap->bind_param("s", $tanggal_str);
-                $stmt_sum_ranap->execute();
-                $harian_ranap = $stmt_sum_ranap->get_result()->fetch_assoc()['total_harian'] ?? 0;
+                    // --- Ambil Data Pemasukan ---
+                    $stmt_pemasukan->bind_param("ss", $range['start'], $range['end']);
+                    $stmt_pemasukan->execute();
+                    $result_pemasukan = $stmt_pemasukan->get_result();
+                    $data_pemasukan = [];
+                    while ($row = $result_pemasukan->fetch_assoc()) $data_pemasukan[] = $row;
 
-                $stmt_sum_pemasukan->bind_param("s", $tanggal_str);
-                $stmt_sum_pemasukan->execute();
-                $harian_pemasukan = $stmt_sum_pemasukan->get_result()->fetch_assoc()['total_harian'] ?? 0;
+                    // --- Ambil Data Pengeluaran ---
+                    $stmt_pengeluaran->bind_param("ss", $range['start'], $range['end']);
+                    $stmt_pengeluaran->execute();
+                    $result_pengeluaran = $stmt_pengeluaran->get_result();
+                    $data_pengeluaran = [];
+                    while ($row = $result_pengeluaran->fetch_assoc()) $data_pengeluaran[] = $row;
 
-                $stmt_sum_pengeluaran->bind_param("s", $tanggal_str);
-                $stmt_sum_pengeluaran->execute();
-                $harian_pengeluaran = $stmt_sum_pengeluaran->get_result()->fetch_assoc()['total_harian'] ?? 0;
+                    // --- Hitung Summary Total per Shift ---
+                    $total_ralan       = array_sum(array_column($data_ralan, 'total_rupiah'));
+                    $total_ranap       = array_sum(array_column($data_ranap, 'total_rupiah'));
+                    $total_pemasukan   = array_sum(array_column($data_pemasukan, 'besar'));
+                    $total_pengeluaran = array_sum(array_column($data_pengeluaran, 'biaya'));
+                    
+                    $shift_masuk       = $total_ralan + $total_ranap + $total_pemasukan;
+                    $shift_keluar      = $total_pengeluaran;
+                    $shift_bersih      = $shift_masuk - $shift_keluar;
+
+                    $total_masuk_harian  += $shift_masuk;
+                    $total_keluar_harian += $shift_keluar;
+                    $grand_total_harian  += $shift_bersih;
+
+                    $shifts_data[] = [
+                        'nama_shift' => $nama_shift,
+                        'shift_id' => $day_id . '-shift-' . $shift_index,
+                        'range' => $range,
+                        'data_ralan' => $data_ralan,
+                        'data_ranap' => $data_ranap,
+                        'data_pemasukan' => $data_pemasukan,
+                        'data_pengeluaran' => $data_pengeluaran,
+                        'total_ralan' => $total_ralan,
+                        'total_ranap' => $total_ranap,
+                        'total_pemasukan' => $total_pemasukan,
+                        'total_pengeluaran' => $total_pengeluaran,
+                        'shift_masuk' => $shift_masuk,
+                        'shift_keluar' => $shift_keluar,
+                        'shift_bersih' => $shift_bersih
+                    ];
+                    $shift_index++;
+                }
                 
-                $grand_total_harian = $harian_ralan + $harian_ranap + $harian_pemasukan - $harian_pengeluaran;
+                
         ?>
         <div class="accordion-item">
             <h2 class="accordion-header" id="heading-<?php echo $day_id; ?>">
-                <button class="accordion-button fs-5 fw-bold d-flex align-items-center gap-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-<?php echo $day_id; ?>" aria-expanded="true" aria-controls="collapse-<?php echo $day_id; ?>">
-                    <span class="me-auto">Laporan Tanggal: <?php echo $tanggal->format('d-m-Y'); ?></span>
-                    <span class="badge bg-primary rounded-pill d-flex align-items-center" style="font-size:1rem;" title="Grand Total Hari Ini" onclick="event.stopPropagation()">
-                        Total: <?php echo formatRupiah($grand_total_harian); ?>
-                    </span>
+                <button class="accordion-button fs-5 fw-bold d-flex align-items-center gap-2 flex-wrap" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-<?php echo $day_id; ?>" aria-expanded="true" aria-controls="collapse-<?php echo $day_id; ?>">
+                    <span class="me-auto text-truncate" style="min-width: 220px;">Laporan Tanggal: <?php echo $tanggal->format('d-m-Y'); ?></span>
+                    <div class="d-flex align-items-center gap-2 flex-wrap me-2" onclick="event.stopPropagation()">
+                        <span class="badge bg-success rounded-pill px-3 py-2 d-inline-flex align-items-center shadow-sm" style="font-size:0.85rem;" title="Total Pemasukan Tunai (Ralan + Ranap + Lain-lain)">
+                            <i class="fas fa-arrow-circle-down me-1"></i> Masuk: <?php echo formatRupiah($total_masuk_harian); ?>
+                        </span>
+                        <span class="badge bg-danger rounded-pill px-3 py-2 d-inline-flex align-items-center shadow-sm" style="font-size:0.85rem;" title="Total Pengeluaran Harian">
+                            <i class="fas fa-arrow-circle-up me-1"></i> Keluar: <?php echo formatRupiah($total_keluar_harian); ?>
+                        </span>
+                        <span class="badge bg-warning text-dark rounded-pill px-3 py-2 d-inline-flex align-items-center fw-bold shadow-sm" style="font-size:0.92rem;" title="Sisa Piutang Bersih">
+                            <i class="fas fa-wallet me-1"></i> Total Bersih: <?php echo formatRupiah($grand_total_harian); ?>
+                        </span>
+                    </div>
                 </button>
             </h2>
             <div id="collapse-<?php echo $day_id; ?>" class="accordion-collapse collapse <?php echo ($day_index == 0) ? 'show' : ''; ?>" aria-labelledby="heading-<?php echo $day_id; ?>" data-bs-parent="#accordionTanggal">
@@ -185,41 +246,18 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                     
                     <div class="accordion" id="accordionShift-<?php echo $day_id; ?>">
                         <?php
-                        $shift_index = 0; 
-                        foreach ($shift_times as $nama_shift => $times):
-                            $shift_id = $day_id . '-shift-' . $shift_index;
-                            $range = getShiftDateTimeRange($tanggal_str, $nama_shift, $shift_times);
-                            
-                            // Eksekusi Kueri
-                            $stmt_ralan->bind_param("ss", $range['start'], $range['end']);
-                            $stmt_ralan->execute();
-                            $result_ralan = $stmt_ralan->get_result();
-                            $data_ralan = [];
-                            while ($row = $result_ralan->fetch_assoc()) $data_ralan[] = $row;
-                            
-                            $stmt_ranap->bind_param("ss", $range['start'], $range['end']);
-                            $stmt_ranap->execute();
-                            $result_ranap = $stmt_ranap->get_result();
-                            $data_ranap = [];
-                            while ($row = $result_ranap->fetch_assoc()) $data_ranap[] = $row;
-
-                            $stmt_pemasukan->bind_param("ss", $range['start'], $range['end']);
-                            $stmt_pemasukan->execute();
-                            $result_pemasukan = $stmt_pemasukan->get_result();
-                            $data_pemasukan = [];
-                            while ($row = $result_pemasukan->fetch_assoc()) $data_pemasukan[] = $row;
-
-                            $stmt_pengeluaran->bind_param("ss", $range['start'], $range['end']);
-                            $stmt_pengeluaran->execute();
-                            $result_pengeluaran = $stmt_pengeluaran->get_result();
-                            $data_pengeluaran = [];
-                            while ($row = $result_pengeluaran->fetch_assoc()) $data_pengeluaran[] = $row;
-                            
-                            // --- Hitung Summary Total per Shift ---
-                            $total_ralan     = array_sum(array_column($data_ralan, 'total_rupiah'));
-                            $total_ranap     = array_sum(array_column($data_ranap, 'total_rupiah'));
-                            $total_pemasukan = array_sum(array_column($data_pemasukan, 'besar'));
-                            $total_pengeluaran = array_sum(array_column($data_pengeluaran, 'biaya'));
+                        foreach ($shifts_data as $s):
+                            $shift_id          = $s['shift_id'];
+                            $nama_shift        = $s['nama_shift'];
+                            $range             = $s['range'];
+                            $data_ralan        = $s['data_ralan'];
+                            $data_ranap        = $s['data_ranap'];
+                            $data_pemasukan    = $s['data_pemasukan'];
+                            $data_pengeluaran  = $s['data_pengeluaran'];
+                            $total_ralan       = $s['total_ralan'];
+                            $total_ranap       = $s['total_ranap'];
+                            $total_pemasukan   = $s['total_pemasukan'];
+                            $total_pengeluaran = $s['total_pengeluaran'];
                         ?>
                         <div class="accordion-item">
                             <h2 class="accordion-header" id="heading-<?php echo $shift_id; ?>">
@@ -240,6 +278,13 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                                 </span>
                                 <span style="display:inline-block; background:#dc3545; color:#fff; border-radius:50px; padding:3px 10px; font-weight:600;">
                                     &minus; Keluar: <?php echo formatRupiah($total_pengeluaran); ?>
+                                </span>
+                                <?php 
+                                    $sisa_shift = isset($s['shift_bersih']) ? $s['shift_bersih'] : (($total_ralan + $total_ranap + $total_pemasukan) - $total_pengeluaran);
+                                    $sisa_color = ($sisa_shift >= 0) ? '#20c997' : '#ff6b6b';
+                                ?>
+                                <span class="ms-auto" style="display:inline-block; background:#212529; color:#fff; border-radius:50px; padding:3px 12px; font-weight:700;">
+                                    &#61; Setoran Shift: <span style="color:<?php echo $sisa_color; ?>;"><?php echo formatRupiah($sisa_shift); ?></span>
                                 </span>
                             </div>
                             <div id="collapse-<?php echo $shift_id; ?>" class="accordion-collapse collapse" aria-labelledby="heading-<?php echo $shift_id; ?>" data-bs-parent="#accordionShift-<?php echo $day_id; ?>">
@@ -417,10 +462,6 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
     $stmt_ranap->close();
     $stmt_pemasukan->close();
     $stmt_pengeluaran->close();
-    $stmt_sum_ralan->close();
-    $stmt_sum_ranap->close();
-    $stmt_sum_pemasukan->close();
-    $stmt_sum_pengeluaran->close();
     ?>
 </div>
 

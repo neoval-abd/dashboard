@@ -281,7 +281,7 @@ require_once('includes/header.php');
         
         <!-- CARD 1: OMZET HARI INI -->
         <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-start border-4 border-primary shadow h-100 py-2 card-metric" onclick="window.location.href='laporan_billing_global.php'">
+            <div class="card border-start border-4 border-primary shadow h-100 py-2 card-metric" onclick="window.location.href='laporan_billing_global.php?action=cari&tgl_awal=<?php echo date('Y-m-d'); ?>&jam_awal=00:00:00&tgl_akhir=<?php echo date('Y-m-d'); ?>&jam_akhir=23:59:59'">
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="me-2" style="min-width: 0;">
@@ -379,7 +379,7 @@ require_once('includes/header.php');
                     <h6 class="m-0 font-weight-bold text-primary">Sumber Omzet Hari Ini</h6>
                 </div>
                 <div class="card-body">
-                    <div class="chart-pie pt-4 pb-2" style="height: 250px; cursor: pointer;" onclick="window.location.href='laporan_billing_global.php'">
+                    <div class="chart-pie pt-4 pb-2" style="height: 250px; cursor: pointer;" onclick="window.location.href='laporan_billing_global.php?action=cari&tgl_awal=<?php echo date('Y-m-d'); ?>&jam_awal=00:00:00&tgl_akhir=<?php echo date('Y-m-d'); ?>&jam_akhir=23:59:59'">
                         <canvas id="chartOmzet"></canvas>
                     </div>
                     <div class="mt-4 text-center small text-muted">
@@ -939,17 +939,47 @@ require_once('includes/header.php');
     function renderChartOmzet(dataObj) {
         var ctx = document.getElementById("chartOmzet").getContext('2d');
         if(chartOmzet) chartOmzet.destroy();
+        
+        var total = (dataObj && dataObj.total) ? Number(dataObj.total) : 0;
+        if (total <= 0) {
+            chartOmzet = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Belum Ada Transaksi Kasir'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: ['rgba(148, 163, 184, 0.2)'],
+                        borderColor: 'rgba(148, 163, 184, 0.3)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function() { return ' Belum ada pembayaran kasir hari ini'; }
+                            }
+                        }
+                    }, 
+                    cutout: '70%' 
+                }
+            });
+            return;
+        }
+
         chartOmzet = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: dataObj.labels,
                 datasets: [{
                     data: dataObj.data,
-                    backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'],
+                    backgroundColor: ['#1cc88a', '#f6c23e', '#4e73df', '#36b9cc', '#e74a3b'],
                     hoverBorderColor: "rgba(234, 236, 244, 1)",
                 }],
             },
-            options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '70%' }
+            options: { maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom' } }, cutout: '70%' }
         });
     }
 </script>
