@@ -150,3 +150,40 @@
 ### 🐛 Perbaikan / ⚡ Optimasi
 - **[AUTH]** Perbaikan bug tombol 'Cabut' yang tidak berfungsi pada user non-pegawai dengan menggunakan validasi AES_DECRYPT di sisi database.
 - **[UI]** Optimasi Select2: Mematikan interceptor AJAX loading global (global:false) saat pencarian nama pegawai agar tidak muncul overlay yang mengganggu pengetikan.
+
+
+## [v1.4.2] — 19 Oktober 2026, 16:45 WIB
+### ✨ Pembaruan & Sinkronisasi Modul Keuangan (Laporan Tunai & Laporan Kas)
+- **[KEUANGAN]** Sinkronisasi Pemasukan Lain-lain dengan SIMRS Khanza (`DlgPemasukanLain.java`):
+  - Penyelarasan kolom tabel tab Lain di `laporan_detail.php` dan `laporan_piutang_detail.php` menjadi 7 kolom persis SIMRS: Nomor, Tanggal, Kategori, Petugas, Pemasukan, Terima Dari, Keperluan, serta baris total `>> Total Pemasukan : Rp ...`.
+  - Kolom Petugas kini hanya menampilkan nama pegawai tanpa NIP untuk keterbacaan yang lebih bersih dan ringkas.
+- **[KEUANGAN]** Standardisasi Logika Shift ke-3 (Shift Malam Lintas Hari):
+  - Logika shift malam ditarik otomatis dari master `closing_kasir` (21:01 H s/d 06:59 H+1). Transaksi dini hari (00:00 - 06:59 subuh) otomatis terpetakan ke dalam Shift ke-3 tanggal sebelumnya, sesuai standar operasional serah terima uang fisik kasir manual di bagian keuangan.
+  - Sinkronisasi kueri shift di `laporan_detail.php`, `laporan_piutang_detail.php`, `laporan_kas.php`, dan `api/data_grafik.php`.
+
+## [v1.4.3] — 19 Oktober 2026, 17:30 WIB
+### ✨ Penambahan Tab Penjualan Obat Bebas & BHP Medis pada Laporan Tunai
+- **[LAPORAN TUNAI]** Penambahan Tab "Obat & BHP" di samping Tab "Lain" pada setiap Shift (`laporan_detail.php`):
+  - Mengintegrasikan transaksi penjualan obat bebas, alkes & BHP medis (`penjualan`, `detailjual`, `tagihan_sadewa`, `petugas`, `bangsal`) sesuai referensi SIMRS Khanza `inventory.DlgCariPenjualan.java`.
+  - Tabel menampilkan 12 kolom: No. Nota, Waktu Bayar, Petugas (nama saja), Pasien/Pembeli, Jns. Jual, Keterangan, Asal Stok, Akun Bayar, PPN, Ongkir, Total (Rp), dan Aksi (Nota).
+  - Dilengkapi baris footer `>> Total Penjualan Obat & BHP : Rp ...`.
+- **[RINGKASAN & AGREGASI SHIFT]** Sinkronisasi Kas Masuk & Sisa Kas:
+  - Indikator ringkasan shift badge kuning: `💊 <count> Obat/BHP — Rp <total>`.
+  - Total penjualan obat & BHP otomatis dimasukkan ke dalam perhitungan kas masuk shift (`$shift_masuk`), setoran shift (`$shift_bersih`), total kas masuk harian (`$total_masuk_harian`), dan sisa kas (`$grand_total_harian`).
+- **[MODAL DETAIL PENJUALAN]** Fitur Lihat Rincian Item Penjualan (`api/get_detail_penjualan.php`):
+  - Klik tombol "Nota" membuka modal interaktif yang menampilkan header transaksi, rincian item (kode, nama barang, jumlah, satuan, harga, subtotal, diskon, tuslah/embalase, total, no batch, aturan pakai), daftar racikan, serta kalkulasi PPN & Ongkir.
+
+
+## [v1.4.4] — 20 Oktober 2026, 08:30 WIB
+### ✨ Dashboard Monitoring & Input Masa Berlaku SIP (Surat Izin Praktik)
+- **[DASHBOARD MONITORING SIP]** Penambahan Widget Dashboard Pemantauan SIP Khusus Tenaga Kesehatan (Nakes):
+  - Ditempatkan tepat di bawah barisan tab utama (`.kp-tabs`) dan di atas filter kategori Nakes/Non-Klinis (`#kpBerkasCategoryTabs`), sesuai area alur kerja kepegawaian.
+  - Menampilkan 6 kartu KPI interaktif: **Total Nakes** (180 Nakes wajib SIP), **Masa Aman** (>90 hari tersisa), **Peringatan** (31-90 hari lagi), **Masa Kritis** (≤30 hari lagi), **Kadaluarsa** (perlu perpanjangan), dan **Belum Upload**.
+  - Kartu KPI terintegrasi dengan filter instan: klik kartu KPI untuk langsung menyaring daftar tenaga kesehatan pada kategori tersebut.
+  - Dilengkapi badge visual status masa berlaku SIP (Aktif, Peringatan, Kritis, Expired, No SIP) pada setiap kartu pegawai di panel kiri.
+- **[INPUT TANGGAL TERBIT & MASA BERLAKU SIP]** Form Input Khusus Berkas SIP:
+  - Pada modal upload berkas (`#kpUploadModal`), kolom Nomor SIP, Tanggal Terbit, dan Tanggal Kadaluarsa/Masa Berlaku otomatis muncul saat memilih berkas SIP (`DOK0005`, `DOK0011`, `DOK0017`, `DOK0023`).
+  - Modal khusus **Atur Masa Berlaku SIP** (`#kpEditSipModal`) disediakan untuk mengisi atau memperbarui masa berlaku SIP kapan saja tanpa harus mengunggah ulang dokumen fisik.
+  - Sinkronisasi otomatis: input Nomor SIP pada dokter otomatis tersinkron ke kolom `dokter.no_ijn_praktek` di tabel master SIMRS Khanza.
+  - Struktur tabel baru `pegawai_sip` mencatat `nik`, `kode_berkas`, `no_sip`, `tgl_terbit`, `tgl_kadaluarsa`, dan relasi file berkas secara terpusat.
+- **[DUAL THEME COMPATIBILITY]** Penyelarasan penuh antarmuka dengan tema terang (Light Mode) dan Dark Glass Mode (Solid & Animated Mesh Gradient).

@@ -102,14 +102,51 @@ $sql_ranap = "
 $stmt_ranap = $koneksi->prepare($sql_ranap);
 
 $sql_pemasukan = "
-    SELECT pemasukan_lain.tanggal, pemasukan_lain.keterangan, pemasukan_lain.besar, 
-           kategori_pemasukan_lain.nama_kategori 
+    SELECT 
+        pemasukan_lain.no_masuk,
+        pemasukan_lain.tanggal,
+        pemasukan_lain.keterangan,
+        pemasukan_lain.keperluan,
+        pemasukan_lain.besar,
+        pemasukan_lain.nip,
+        COALESCE(petugas.nama, '-') AS nama_petugas,
+        pemasukan_lain.kode_kategori,
+        COALESCE(kategori_pemasukan_lain.nama_kategori, '-') AS nama_kategori
     FROM pemasukan_lain 
-    INNER JOIN kategori_pemasukan_lain ON pemasukan_lain.kode_kategori = kategori_pemasukan_lain.kode_kategori 
+    LEFT JOIN petugas ON pemasukan_lain.nip = petugas.nip 
+    LEFT JOIN kategori_pemasukan_lain ON pemasukan_lain.kode_kategori = kategori_pemasukan_lain.kode_kategori 
     WHERE pemasukan_lain.tanggal BETWEEN ? AND ? 
     ORDER BY pemasukan_lain.tanggal
 ";
 $stmt_pemasukan = $koneksi->prepare($sql_pemasukan);
+
+$sql_obat = "
+    SELECT 
+        p.nota_jual,
+        p.tgl_jual,
+        p.nip,
+        COALESCE(pt.nama, '-') AS nama_petugas,
+        p.no_rkm_medis,
+        p.nm_pasien,
+        p.keterangan,
+        p.jns_jual,
+        COALESCE(p.ongkir, 0) AS ongkir,
+        COALESCE(p.ppn, 0) AS ppn,
+        COALESCE(p.nama_bayar, '-') AS nama_bayar,
+        COALESCE(b.nm_bangsal, '-') AS nm_bangsal,
+        (COALESCE(SUM(d.total), 0) + COALESCE(p.ppn, 0) + COALESCE(p.ongkir, 0)) AS total_jual,
+        COALESCE(ts.tgl_bayar, CONCAT(p.tgl_jual, ' 08:00:00')) AS waktu_bayar
+    FROM penjualan p
+    LEFT JOIN detailjual d ON p.nota_jual = d.nota_jual
+    LEFT JOIN petugas pt ON p.nip = pt.nip
+    LEFT JOIN bangsal b ON p.kd_bangsal = b.kd_bangsal
+    LEFT JOIN tagihan_sadewa ts ON p.nota_jual = ts.no_nota
+    WHERE p.status = 'Sudah Dibayar'
+        AND COALESCE(ts.tgl_bayar, CONCAT(p.tgl_jual, ' 08:00:00')) BETWEEN ? AND ?
+    GROUP BY p.nota_jual, p.tgl_jual, p.nip, pt.nama, p.no_rkm_medis, p.nm_pasien, p.keterangan, p.jns_jual, p.ongkir, p.ppn, p.nama_bayar, b.nm_bangsal, waktu_bayar
+    ORDER BY waktu_bayar ASC, p.nota_jual ASC
+";
+$stmt_obat = $koneksi->prepare($sql_obat);
 
 $sql_pengeluaran = "
     SELECT pengeluaran_harian.tanggal, pengeluaran_harian.keterangan, pengeluaran_harian.biaya, 
@@ -123,7 +160,7 @@ $sql_pengeluaran = "
 $stmt_pengeluaran = $koneksi->prepare($sql_pengeluaran);
 
 // Cek jika ada kueri yang gagal di-prepare
-if (!$stmt_ralan || !$stmt_ranap || !$stmt_pemasukan || !$stmt_pengeluaran) {
+if (!$stmt_ralan || !$stmt_ranap || !$stmt_obat || !$stmt_pemasukan || !$stmt_pengeluaran) {
     die("Gagal mempersiapkan kueri SQL: " . $koneksi->error);
 }
 
@@ -218,42 +255,54 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                 $shift_index = 0;
                 foreach ($shift_times as $nama_shift => $times) {
                     $range = getShiftDateTimeRange($tanggal_str, $nama_shift, $shift_times);
+                    $shift_ranges = getShiftRanges($tanggal_str, $nama_shift, $shift_times);
                     
-                    // --- Ambil Data Ralan ---
-                    $stmt_ralan->bind_param("ss", $range['start'], $range['end']);
-                    $stmt_ralan->execute();
-                    $result_ralan = $stmt_ralan->get_result();
                     $data_ralan = [];
-                    while ($row = $result_ralan->fetch_assoc()) $data_ralan[] = $row;
-                    
-                    // --- Ambil Data Ranap ---
-                    $stmt_ranap->bind_param("ss", $range['start'], $range['end']);
-                    $stmt_ranap->execute();
-                    $result_ranap = $stmt_ranap->get_result();
                     $data_ranap = [];
-                    while ($row = $result_ranap->fetch_assoc()) $data_ranap[] = $row;
-
-                    // --- Ambil Data Pemasukan ---
-                    $stmt_pemasukan->bind_param("ss", $range['start'], $range['end']);
-                    $stmt_pemasukan->execute();
-                    $result_pemasukan = $stmt_pemasukan->get_result();
+                    $data_obat = [];
                     $data_pemasukan = [];
-                    while ($row = $result_pemasukan->fetch_assoc()) $data_pemasukan[] = $row;
-
-                    // --- Ambil Data Pengeluaran ---
-                    $stmt_pengeluaran->bind_param("ss", $range['start'], $range['end']);
-                    $stmt_pengeluaran->execute();
-                    $result_pengeluaran = $stmt_pengeluaran->get_result();
                     $data_pengeluaran = [];
-                    while ($row = $result_pengeluaran->fetch_assoc()) $data_pengeluaran[] = $row;
+
+                    foreach ($shift_ranges as $sr) {
+                        // --- Ambil Data Ralan ---
+                        $stmt_ralan->bind_param("ss", $sr['start'], $sr['end']);
+                        $stmt_ralan->execute();
+                        $result_ralan = $stmt_ralan->get_result();
+                        while ($row = $result_ralan->fetch_assoc()) $data_ralan[] = $row;
+                        
+                        // --- Ambil Data Ranap ---
+                        $stmt_ranap->bind_param("ss", $sr['start'], $sr['end']);
+                        $stmt_ranap->execute();
+                        $result_ranap = $stmt_ranap->get_result();
+                        while ($row = $result_ranap->fetch_assoc()) $data_ranap[] = $row;
+
+                        // --- Ambil Data Penjualan Obat Bebas & BHP ---
+                        $stmt_obat->bind_param("ss", $sr['start'], $sr['end']);
+                        $stmt_obat->execute();
+                        $result_obat = $stmt_obat->get_result();
+                        while ($row = $result_obat->fetch_assoc()) $data_obat[] = $row;
+
+                        // --- Ambil Data Pemasukan ---
+                        $stmt_pemasukan->bind_param("ss", $sr['start'], $sr['end']);
+                        $stmt_pemasukan->execute();
+                        $result_pemasukan = $stmt_pemasukan->get_result();
+                        while ($row = $result_pemasukan->fetch_assoc()) $data_pemasukan[] = $row;
+
+                        // --- Ambil Data Pengeluaran ---
+                        $stmt_pengeluaran->bind_param("ss", $sr['start'], $sr['end']);
+                        $stmt_pengeluaran->execute();
+                        $result_pengeluaran = $stmt_pengeluaran->get_result();
+                        while ($row = $result_pengeluaran->fetch_assoc()) $data_pengeluaran[] = $row;
+                    }
 
                     // --- Hitung Summary Total per Shift ---
                     $total_ralan       = array_sum(array_column($data_ralan, 'total_rupiah'));
                     $total_ranap       = array_sum(array_column($data_ranap, 'total_rupiah'));
+                    $total_obat        = array_sum(array_column($data_obat, 'total_jual'));
                     $total_pemasukan   = array_sum(array_column($data_pemasukan, 'besar'));
                     $total_pengeluaran = array_sum(array_column($data_pengeluaran, 'biaya'));
                     
-                    $shift_masuk       = $total_ralan + $total_ranap + $total_pemasukan;
+                    $shift_masuk       = $total_ralan + $total_ranap + $total_obat + $total_pemasukan;
                     $shift_keluar      = $total_pengeluaran;
                     $shift_bersih      = $shift_masuk - $shift_keluar;
 
@@ -267,10 +316,12 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                         'range' => $range,
                         'data_ralan' => $data_ralan,
                         'data_ranap' => $data_ranap,
+                        'data_obat' => $data_obat,
                         'data_pemasukan' => $data_pemasukan,
                         'data_pengeluaran' => $data_pengeluaran,
                         'total_ralan' => $total_ralan,
                         'total_ranap' => $total_ranap,
+                        'total_obat' => $total_obat,
                         'total_pemasukan' => $total_pemasukan,
                         'total_pengeluaran' => $total_pengeluaran,
                         'shift_masuk' => $shift_masuk,
@@ -310,17 +361,19 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                             $range             = $s['range'];
                             $data_ralan        = $s['data_ralan'];
                             $data_ranap        = $s['data_ranap'];
+                            $data_obat         = $s['data_obat'];
                             $data_pemasukan    = $s['data_pemasukan'];
                             $data_pengeluaran  = $s['data_pengeluaran'];
                             $total_ralan       = $s['total_ralan'];
                             $total_ranap       = $s['total_ranap'];
+                            $total_obat        = $s['total_obat'];
                             $total_pemasukan   = $s['total_pemasukan'];
                             $total_pengeluaran = $s['total_pengeluaran'];
                         ?>
                         <div class="accordion-item">
                             <h2 class="accordion-header" id="heading-<?php echo $shift_id; ?>">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-<?php echo $shift_id; ?>" aria-expanded="false" aria-controls="collapse-<?php echo $shift_id; ?>">
-                                    Shift <?php echo htmlspecialchars($nama_shift); ?> (<?php echo $range['start'] . ' s/d ' . $range['end']; ?>)
+                                    Shift <?php echo htmlspecialchars($nama_shift); ?> (<?php echo isset($range['display']) ? htmlspecialchars($range['display']) : ($range['start'] . ' s/d ' . $range['end']); ?>)
                                 </button>
                             </h2>
                             <div class="d-flex flex-wrap gap-2 align-items-center px-3 py-2" style="background:#f0f4f8; border-bottom:1px solid #dee2e6; font-size:0.82rem;">
@@ -331,6 +384,9 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                                 <span style="display:inline-block; background:#0dcaf0; color:#000; border-radius:50px; padding:3px 10px; font-weight:600;">
                                     &#127916; <?php echo count($data_ranap); ?> Ranap &mdash; <?php echo formatRupiah($total_ranap); ?>
                                 </span>
+                                <span style="display:inline-block; background:#ffc107; color:#212529; border-radius:50px; padding:3px 10px; font-weight:600;">
+                                    &#128138; <?php echo count($data_obat); ?> Obat/BHP &mdash; <?php echo formatRupiah($total_obat); ?>
+                                </span>
                                 <span style="display:inline-block; background:#198754; color:#fff; border-radius:50px; padding:3px 10px; font-weight:600;">
                                     &#43; Lain-lain: <?php echo formatRupiah($total_pemasukan); ?>
                                 </span>
@@ -338,7 +394,7 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                                     &minus; Keluar: <?php echo formatRupiah($total_pengeluaran); ?>
                                 </span>
                                 <?php 
-                                    $sisa_shift = isset($s['shift_bersih']) ? $s['shift_bersih'] : (($total_ralan + $total_ranap + $total_pemasukan) - $total_pengeluaran);
+                                    $sisa_shift = isset($s['shift_bersih']) ? $s['shift_bersih'] : (($total_ralan + $total_ranap + $total_obat + $total_pemasukan) - $total_pengeluaran);
                                     $sisa_color = ($sisa_shift >= 0) ? '#20c997' : '#ff6b6b';
                                 ?>
                                 <span class="ms-auto" style="display:inline-block; background:#212529; color:#fff; border-radius:50px; padding:3px 12px; font-weight:700;">
@@ -357,6 +413,11 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                                         <li class="nav-item" role="presentation">
                                             <button class="nav-link" id="ranap-tab-<?php echo $shift_id; ?>" data-bs-toggle="tab" data-bs-target="#ranap-<?php echo $shift_id; ?>" type="button">
                                                 Ranap (<?php echo count($data_ranap); ?>)
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="obat-tab-<?php echo $shift_id; ?>" data-bs-toggle="tab" data-bs-target="#obat-<?php echo $shift_id; ?>" type="button">
+                                                Obat &amp; BHP (<?php echo count($data_obat); ?>)
                                             </button>
                                         </li>
                                         <li class="nav-item" role="presentation">
@@ -448,28 +509,102 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
 											</div>
                                             </div>
                                         </div>
+                                        <div class="tab-pane fade" id="obat-<?php echo $shift_id; ?>" role="tabpanel">
+                                            <div class="card-body border border-top-0 p-3">
+                                                <div class="table-responsive">
+                                                    <table id="tabel-obat-<?php echo $shift_id; ?>" class="table table-striped table-bordered table-sm align-middle" style="width:100%">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th style="min-width: 95px;">No. Nota</th>
+                                                                <th style="min-width: 120px;">Waktu Bayar</th>
+                                                                <th style="min-width: 150px;">Petugas</th>
+                                                                <th style="min-width: 170px;">Pasien / Pembeli</th>
+                                                                <th style="min-width: 80px;">Jns. Jual</th>
+                                                                <th style="min-width: 120px;">Keterangan</th>
+                                                                <th style="min-width: 100px;">Asal Stok</th>
+                                                                <th style="min-width: 100px;">Akun Bayar</th>
+                                                                <th class="text-end" style="min-width: 75px;">PPN</th>
+                                                                <th class="text-end" style="min-width: 75px;">Ongkir</th>
+                                                                <th class="text-end" style="min-width: 105px;">Total (Rp)</th>
+                                                                <th class="text-center" style="min-width: 70px;">Aksi</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <?php foreach ($data_obat as $data): ?>
+                                                            <tr>
+                                                                <td class="fw-semibold text-primary"><?php echo htmlspecialchars($data['nota_jual']); ?></td>
+                                                                <td><?php echo htmlspecialchars($data['waktu_bayar']); ?></td>
+                                                                <td><?php echo htmlspecialchars($data['nama_petugas']); ?></td>
+                                                                <td>
+                                                                    <?php 
+                                                                        $pasien_label = htmlspecialchars($data['nm_pasien']);
+                                                                        if (!empty($data['no_rkm_medis']) && $data['no_rkm_medis'] !== '-') {
+                                                                            $pasien_label = '<span class="text-muted small">' . htmlspecialchars($data['no_rkm_medis']) . '</span> ' . $pasien_label;
+                                                                        }
+                                                                        echo $pasien_label;
+                                                                    ?>
+                                                                </td>
+                                                                <td><span class="badge bg-secondary"><?php echo htmlspecialchars($data['jns_jual']); ?></span></td>
+                                                                <td><?php echo htmlspecialchars($data['keterangan']); ?></td>
+                                                                <td><?php echo htmlspecialchars($data['nm_bangsal']); ?></td>
+                                                                <td><span class="badge bg-success-subtle text-success border border-success"><?php echo htmlspecialchars($data['nama_bayar']); ?></span></td>
+                                                                <td class="text-end"><?php echo formatRupiah($data['ppn']); ?></td>
+                                                                <td class="text-end"><?php echo formatRupiah($data['ongkir']); ?></td>
+                                                                <td class="text-end fw-bold text-dark"><?php echo formatRupiah($data['total_jual']); ?></td>
+                                                                <td class="text-center">
+                                                                    <button type="button" class="btn btn-warning btn-sm btn-lihat-penjualan py-0 px-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalDetailPenjualan" data-notajual="<?php echo htmlspecialchars($data['nota_jual']); ?>" title="Lihat Rincian Item Obat/BHP">
+                                                                        <i class="fas fa-pills me-1"></i>Nota
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                            <?php endforeach; ?>
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr class="table-light fw-bold">
+                                                                <td colspan="10" class="text-end">&gt;&gt; Total Penjualan Obat &amp; BHP :</td>
+                                                                <td class="text-end text-primary fw-bold"><?php echo formatRupiah($total_obat); ?></td>
+                                                                <td></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div class="tab-pane fade" id="pemasukan-<?php echo $shift_id; ?>" role="tabpanel">
                                             <div class="card-body border border-top-0 p-3">
 											<div class="table-responsive">
-                                                <table id="tabel-pemasukan-<?php echo $shift_id; ?>" class="table table-striped table-bordered table-sm" style="width:100%">
-                                                    <thead>
+                                                <table id="tabel-pemasukan-<?php echo $shift_id; ?>" class="table table-striped table-bordered table-sm align-middle" style="width:100%">
+                                                    <thead class="table-light">
                                                         <tr>
-                                                            <th>Tanggal</th>
-                                                            <th>Kategori</th>
-                                                            <th>Keterangan</th>
-                                                            <th class="text-end">Besar</th>
+                                                            <th style="min-width: 90px;">Nomor</th>
+                                                            <th style="min-width: 125px;">Tanggal</th>
+                                                            <th style="min-width: 180px;">Kategori</th>
+                                                            <th style="min-width: 180px;">Petugas</th>
+                                                            <th class="text-end" style="min-width: 110px;">Pemasukan</th>
+                                                            <th style="min-width: 140px;">Terima Dari</th>
+                                                            <th style="min-width: 150px;">Keperluan</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         <?php foreach ($data_pemasukan as $data): ?>
                                                         <tr>
+                                                            <td><?php echo htmlspecialchars($data['no_masuk']); ?></td>
                                                             <td><?php echo htmlspecialchars($data['tanggal']); ?></td>
-                                                            <td><?php echo htmlspecialchars($data['nama_kategori']); ?></td>
+                                                            <td><?php echo htmlspecialchars($data['kode_kategori'] . ' ' . $data['nama_kategori']); ?></td>
+                                                            <td><?php echo htmlspecialchars($data['nama_petugas']); ?></td>
+                                                            <td class="text-end fw-semibold"><?php echo formatRupiah($data['besar']); ?></td>
                                                             <td><?php echo htmlspecialchars($data['keterangan']); ?></td>
-                                                            <td class="text-end"><?php echo formatRupiah($data['besar']); ?></td>
+                                                            <td><?php echo htmlspecialchars($data['keperluan']); ?></td>
                                                         </tr>
                                                         <?php endforeach; ?>
                                                     </tbody>
+                                                    <tfoot>
+                                                        <tr class="table-light fw-bold">
+                                                            <td colspan="4" class="text-end">&gt;&gt; Total Pemasukan :</td>
+                                                            <td class="text-end text-success fw-bold"><?php echo formatRupiah($total_pemasukan); ?></td>
+                                                            <td colspan="2"></td>
+                                                        </tr>
+                                                    </tfoot>
                                                 </table>
 											</div>
                                             </div>
@@ -519,6 +654,7 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
         // Tutup semua statement yang disiapkan
         $stmt_ralan->close();
         $stmt_ranap->close();
+        $stmt_obat->close();
         $stmt_pemasukan->close();
         $stmt_pengeluaran->close();
         ?>
@@ -543,6 +679,27 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
     </div>
 </div>
 
+<!-- Modal Detail Penjualan Obat Bebas & BHP -->
+<div class="modal fade" id="modalDetailPenjualan" tabindex="-1" aria-labelledby="modalPenjualanLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark py-2">
+                <h5 class="modal-title fs-6 fw-bold" id="modalPenjualanLabel">
+                    <i class="fas fa-pills me-2"></i>Rincian Penjualan Obat, Alkes &amp; BHP: <span id="nomor-penjualan-modal" class="badge bg-dark text-white ms-1">...</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div id="isi-penjualan-container">
+                    <p class="text-center py-4"><i class="fas fa-spinner fa-spin me-2"></i>Memuat data...</p>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php
 // Komentar: Kita 'inject' JavaScript ini ke footer.php
@@ -577,13 +734,17 @@ ob_start();
         // Ini mungkin berat jika datanya puluhan ribu, tapi kita coba dulu.
         $('table').DataTable({ 
             "responsive": true, 
-            "order": [[ 0, "desc" ]],
+            "order": [], // Pertahankan urutan awal (sesuai query SQL / kronologis)
             "pageLength": 10, // Batasi 10 baris per halaman
             "lengthChange": false // Sembunyikan opsi "Show X entries"
         });
+
+        // Sesuaikan lebar kolom saat pindah tab
+        $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+            $($.fn.dataTable.tables(true)).DataTable().columns.adjust().responsive.recalc();
+        });
         
-        
-        // Komentar: Event handler untuk tombol "Lihat Nota"
+        // Komentar: Event handler untuk tombol "Lihat Nota" (Billing Rawat Jalan & Inap)
         $(document).on('click', '.btn-lihat-nota', function() {
             var noRawat = $(this).data('norawat');
             var noNota = $(this).data('nonota');
@@ -597,7 +758,6 @@ ob_start();
                 data: { no_rawat: noRawat },
                 dataType: "json",
                 success: function(response) {
-                    // Komentar: Logika Tampilan Nota V2 (dari memori)
                     var html = '<table class="table table-sm">';
                     html += '<thead style="border-bottom: 2px solid #333;"><tr>';
                     html += '<th scope="col" style="width: 5%;">Ket.</th>';
@@ -616,7 +776,6 @@ ob_start();
                             var nm_perawatan = item.nm_perawatan || 'N/A';
                             var status = item.status || 'N/A';
                             
-                            // Clean up zero values untuk mereduksi visual clutter
                             var biayaText = parseFloat(item.biaya) > 0 ? formatRupiah(item.biaya) : '';
                             var jumlahText = parseFloat(item.jumlah) > 0 ? parseFloat(item.jumlah) : '';
                             var totalbiayaText = parseFloat(item.totalbiaya) !== 0 ? formatRupiah(item.totalbiaya) : '';
@@ -648,6 +807,122 @@ ob_start();
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
                     $("#isi-nota-container").html("<p class='text-danger'>Gagal memuat data. Status: " + textStatus + ", Error: " + errorThrown + "</p>");
+                }
+            });
+        });
+
+        // Event handler untuk tombol "Lihat Nota" Penjualan Obat Bebas, Alkes & BHP
+        $(document).on('click', '.btn-lihat-penjualan', function() {
+            var notaJual = $(this).data('notajual');
+            $("#nomor-penjualan-modal").text(notaJual);
+            $("#isi-penjualan-container").html("<p class='text-center py-4'><i class='fas fa-spinner fa-spin me-2'></i>Memuat rincian penjualan...</p>");
+
+            $.ajax({
+                url: "api/get_detail_penjualan.php",
+                type: "GET",
+                data: { nota_jual: notaJual },
+                dataType: "json",
+                success: function(res) {
+                    if (res.error) {
+                        $("#isi-penjualan-container").html("<p class='text-danger text-center'>" + res.error + "</p>");
+                        return;
+                    }
+                    var h = res.header || {};
+                    var html = '';
+
+                    // Header Info Card
+                    html += '<div class="card bg-light border-0 mb-3 shadow-none">';
+                    html += '<div class="card-body p-2" style="font-size:0.85rem;">';
+                    html += '<div class="row g-2">';
+                    html += '<div class="col-md-6">';
+                    html += '<strong>No. Nota:</strong> ' + (h.nota_jual || '-') + '<br>';
+                    html += '<strong>Waktu Bayar:</strong> ' + (h.waktu_bayar || h.tgl_jual || '-') + '<br>';
+                    html += '<strong>Petugas:</strong> ' + (h.nama_petugas || '-');
+                    html += '</div>';
+                    html += '<div class="col-md-6">';
+                    html += '<strong>Pasien / Pembeli:</strong> ' + (h.nm_pasien || '-') + (h.no_rkm_medis && h.no_rkm_medis !== '-' ? ' (' + h.no_rkm_medis + ')' : '') + '<br>';
+                    html += '<strong>Asal Stok:</strong> ' + (h.nm_bangsal || '-') + '<br>';
+                    html += '<strong>Akun Bayar:</strong> <span class="badge bg-success">' + (h.nama_bayar || '-') + '</span>';
+                    html += '</div>';
+                    html += '</div>';
+                    if (h.keterangan && h.keterangan !== '-') {
+                        html += '<div class="mt-1 pt-1 border-top text-muted"><strong>Keterangan:</strong> ' + h.keterangan + '</div>';
+                    }
+                    html += '</div></div>';
+
+                    // Tabel Rincian Obat/BHP
+                    html += '<div class="table-responsive"><table class="table table-bordered table-sm align-middle" style="font-size:0.83rem;">';
+                    html += '<thead class="table-light"><tr>';
+                    html += '<th class="text-center" style="width:35px;">No</th>';
+                    html += '<th>Barang (Kode & Nama)</th>';
+                    html += '<th class="text-center">Jml</th>';
+                    html += '<th class="text-center">Satuan</th>';
+                    html += '<th class="text-end">Harga</th>';
+                    html += '<th class="text-end">Subtotal</th>';
+                    html += '<th class="text-end">Diskon</th>';
+                    html += '<th class="text-end">Tamb+Emb+Tus</th>';
+                    html += '<th class="text-end">Total</th>';
+                    html += '<th>No. Batch</th>';
+                    html += '<th>Aturan Pakai</th>';
+                    html += '</tr></thead><tbody>';
+
+                    var subtotalItem = 0;
+                    if (Array.isArray(res.items) && res.items.length > 0) {
+                        res.items.forEach(function(item, idx) {
+                            var tot = parseFloat(item.total) || 0;
+                            subtotalItem += tot;
+                            var embTuslah = (parseFloat(item.embalase) || 0) + (parseFloat(item.tuslah) || 0) + (parseFloat(item.tambahan) || 0);
+                            html += '<tr>';
+                            html += '<td class="text-center">' + (idx + 1) + '</td>';
+                            html += '<td><span class="fw-semibold text-primary">' + (item.kode_brng || '') + '</span> - ' + (item.nama_brng || '') + '</td>';
+                            html += '<td class="text-center fw-bold">' + (item.jumlah || 0) + '</td>';
+                            html += '<td class="text-center">' + (item.satuan || '') + '</td>';
+                            html += '<td class="text-end">' + formatRupiah(item.h_jual) + '</td>';
+                            html += '<td class="text-end">' + formatRupiah(item.subtotal) + '</td>';
+                            html += '<td class="text-end text-danger">' + (parseFloat(item.bsr_dis) > 0 ? formatRupiah(item.bsr_dis) : '-') + '</td>';
+                            html += '<td class="text-end">' + (embTuslah > 0 ? formatRupiah(embTuslah) : '-') + '</td>';
+                            html += '<td class="text-end fw-bold text-dark">' + formatRupiah(item.total) + '</td>';
+                            html += '<td>' + (item.no_batch || '-') + '</td>';
+                            html += '<td>' + (item.aturan_pakai || '-') + '</td>';
+                            html += '</tr>';
+                        });
+                    } else {
+                        html += '<tr><td colspan="11" class="text-center text-muted">Tidak ada rincian item barang.</td></tr>';
+                    }
+                    html += '</tbody>';
+
+                    // Footer Calculations
+                    var ppn = parseFloat(h.ppn) || 0;
+                    var ongkir = parseFloat(h.ongkir) || 0;
+                    var grandTotal = subtotalItem + ppn + ongkir;
+
+                    html += '<tfoot class="table-light">';
+                    html += '<tr><th colspan="8" class="text-end">Subtotal Obat / BHP :</th><th class="text-end fw-bold">' + formatRupiah(subtotalItem) + '</th><th colspan="2"></th></tr>';
+                    if (ppn > 0) {
+                        html += '<tr><th colspan="8" class="text-end">PPN :</th><th class="text-end text-warning fw-bold">' + formatRupiah(ppn) + '</th><th colspan="2"></th></tr>';
+                    }
+                    if (ongkir > 0) {
+                        html += '<tr><th colspan="8" class="text-end">Ongkos Kirim :</th><th class="text-end text-info fw-bold">' + formatRupiah(ongkir) + '</th><th colspan="2"></th></tr>';
+                    }
+                    html += '<tr class="table-warning"><th colspan="8" class="text-end fs-6">TOTAL PENJUALAN :</th><th class="text-end fs-6 fw-bold text-dark">' + formatRupiah(grandTotal) + '</th><th colspan="2"></th></tr>';
+                    html += '</tfoot></table></div>';
+
+                    // Jika ada racikan
+                    if (Array.isArray(res.racikan) && res.racikan.length > 0) {
+                        html += '<div class="mt-3"><h6 class="fw-bold fs-7 mb-2 text-secondary"><i class="fas fa-mortar-pestle me-1"></i>Daftar Racikan:</h6>';
+                        html += '<ul class="list-group list-group-flush border rounded" style="font-size:0.83rem;">';
+                        res.racikan.forEach(function(rc) {
+                            html += '<li class="list-group-item d-flex justify-content-between align-items-center py-2">';
+                            html += '<div><strong>No. ' + rc.no_racik + ': ' + rc.nama_racik + '</strong> (' + rc.jml_dr + ' ' + rc.metode + ')<br><small class="text-muted">Aturan: ' + (rc.aturan_pakai || '-') + ' | Ket: ' + (rc.keterangan || '-') + '</small></div>';
+                            html += '</li>';
+                        });
+                        html += '</ul></div>';
+                    }
+
+                    $("#isi-penjualan-container").html(html);
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    $("#isi-penjualan-container").html("<p class='text-danger text-center'>Gagal memuat data penjualan: " + errorThrown + "</p>");
                 }
             });
         });

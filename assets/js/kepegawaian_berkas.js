@@ -6,12 +6,19 @@
     let categories = {};
     let activeCategory = ''; // '' = semua kategori
     let activeFilterStatus = 'all'; // all, complete, incomplete, empty
+    let activeSipFilter = 'all'; // all, nakes, active, warning, kritis, expired, empty
+    let sipStats = null;
     let activeKeyword = '';
     let selectedNik = null;
     let selectedDetail = null;
     let isLoadingSummary = false;
     let isLoadingDetail = false;
     let isUploading = false;
+
+    const SIP_CODES = ['DOK0005', 'DOK0011', 'DOK0017', 'DOK0023'];
+    function isSipCode(kode) {
+        return SIP_CODES.includes(String(kode || '').toUpperCase().trim());
+    }
 
     const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     const number = value => Number(value || 0).toLocaleString('id-ID');
@@ -36,6 +43,7 @@
     async function loadSummary(forceReload = false) {
         if (isLoadingSummary && !forceReload) return;
         if (summaryData.length > 0 && !forceReload) {
+            renderSipDashboard();
             renderSummaryView();
             return;
         }
@@ -49,8 +57,10 @@
         try {
             const res = await request('api/berkas_pegawai.php?action=summary');
             summaryData = res.rows || [];
+            sipStats = res.sip_stats || null;
             categories = res.kategori || {};
             renderCategoryTabs();
+            renderSipDashboard();
             renderSummaryView();
 
             // Jika ada selectedNik, refresh detailnya juga
@@ -64,6 +74,33 @@
             showToast(err.message, 'danger');
         } finally {
             isLoadingSummary = false;
+        }
+    }
+
+    function renderSipDashboard() {
+        const totalEl = document.getElementById('kpSipCountTotal');
+        const activeEl = document.getElementById('kpSipCountActive');
+        const warningEl = document.getElementById('kpSipCountWarning');
+        const kritisEl = document.getElementById('kpSipCountKritis');
+        const expiredEl = document.getElementById('kpSipCountExpired');
+        const emptyEl = document.getElementById('kpSipCountEmpty');
+        const resetBtn = document.getElementById('kpSipFilterReset');
+
+        if (totalEl) totalEl.textContent = number(sipStats ? sipStats.total_nakes : 0);
+        if (activeEl) activeEl.textContent = number(sipStats ? sipStats.active : 0);
+        if (warningEl) warningEl.textContent = number(sipStats ? sipStats.warning : 0);
+        if (kritisEl) kritisEl.textContent = number(sipStats ? sipStats.kritis : 0);
+        if (expiredEl) expiredEl.textContent = number(sipStats ? sipStats.expired : 0);
+        if (emptyEl) emptyEl.textContent = number(sipStats ? sipStats.empty : 0);
+
+        // Highlight active tile
+        document.querySelectorAll('.kp-sip-tile').forEach(tile => {
+            const filter = tile.dataset.sipFilter;
+            tile.classList.toggle('active', activeSipFilter === filter);
+        });
+
+        if (resetBtn) {
+            resetBtn.classList.toggle('d-none', activeSipFilter === 'all');
         }
     }
 
@@ -100,9 +137,28 @@
     function getFilteredEmployees() {
         const kw = activeKeyword.toLowerCase().trim();
         return summaryData.filter(emp => {
-            // Filter kategori
+            // Filter kategori nakes / non nakes
             if (activeCategory !== '' && emp.kategori !== activeCategory) {
                 return false;
+            }
+
+            // Filter SIP (khusus Tenaga Kesehatan)
+            if (activeSipFilter !== 'all') {
+                if (!emp.is_nakes) return false;
+                const sipStatus = emp.sip ? emp.sip.status : 'empty';
+                if (activeSipFilter === 'nakes') {
+                    // Tampilkan seluruh nakes wajib SIP
+                } else if (activeSipFilter === 'active' && sipStatus !== 'active') {
+                    return false;
+                } else if (activeSipFilter === 'warning' && sipStatus !== 'warning' && sipStatus !== 'need_date') {
+                    return false;
+                } else if (activeSipFilter === 'kritis' && sipStatus !== 'kritis') {
+                    return false;
+                } else if (activeSipFilter === 'expired' && sipStatus !== 'expired') {
+                    return false;
+                } else if (activeSipFilter === 'empty' && sipStatus !== 'empty') {
+                    return false;
+                }
             }
 
             // Filter kelengkapan
@@ -117,7 +173,8 @@
                 const matchNama = (emp.nama || '').toLowerCase().includes(kw);
                 const matchJbtn = (emp.jbtn || '').toLowerCase().includes(kw);
                 const matchDep = (emp.departemen || '').toLowerCase().includes(kw);
-                if (!matchNik && !matchNama && !matchJbtn && !matchDep) return false;
+                const matchSip = emp.sip && emp.sip.no_sip ? emp.sip.no_sip.toLowerCase().includes(kw) : false;
+                if (!matchNik && !matchNama && !matchJbtn && !matchDep && !matchSip) return false;
             }
 
             return true;
@@ -153,15 +210,36 @@
 
             const catLabel = categories[emp.kategori] || emp.kategori;
 
+            let sipBadge = '';
+            if (emp.is_nakes && emp.sip) {
+                const s = emp.sip.status;
+                if (s === 'expired') {
+                    sipBadge = `<span class="badge bg-danger ms-1" style="font-size: .65rem;" title="SIP Expired: ${esc(emp.sip.tgl_kadaluarsa || '')}"><i class="fas fa-times-circle me-1"></i>SIP Expired</span>`;
+                } else if (s === 'kritis') {
+                    sipBadge = `<span class="badge text-dark ms-1" style="background: #fed7aa; border: 1px solid #f97316; font-size: .65rem;" title="Masa Kritis: sisa ${emp.sip.sisa_hari} hari (${esc(emp.sip.tgl_kadaluarsa)})"><i class="fas fa-hourglass-end text-danger me-1"></i>SIP ${emp.sip.sisa_hari} hr</span>`;
+                } else if (s === 'warning') {
+                    sipBadge = `<span class="badge bg-warning text-dark ms-1" style="font-size: .65rem;" title="Peringatan: sisa ${emp.sip.sisa_hari} hari (${esc(emp.sip.tgl_kadaluarsa)})"><i class="fas fa-exclamation-circle me-1"></i>SIP ${emp.sip.sisa_hari} hr</span>`;
+                } else if (s === 'active') {
+                    sipBadge = `<span class="badge bg-success ms-1" style="font-size: .65rem;" title="SIP Aktif s/d ${esc(emp.sip.tgl_kadaluarsa)}"><i class="fas fa-check-circle me-1"></i>SIP Aktif</span>`;
+                } else if (s === 'need_date') {
+                    sipBadge = `<span class="badge bg-info text-dark ms-1" style="font-size: .65rem;" title="File SIP terunggah, belum ada tanggal berlaku"><i class="fas fa-calendar-plus me-1"></i>Isi Tgl SIP</span>`;
+                } else {
+                    sipBadge = `<span class="badge bg-secondary opacity-75 ms-1" style="font-size: .65rem;" title="Belum upload file SIP"><i class="fas fa-minus-circle me-1"></i>No SIP</span>`;
+                }
+            }
+
             html += `
                 <a href="javascript:void(0)" class="list-group-item list-group-item-action kp-emp-card py-2 px-3 ${isSelected ? 'active' : ''}" data-nik="${esc(emp.nik)}">
                     <div class="d-flex w-100 justify-content-between align-items-center mb-1">
                         <strong class="text-truncate me-2 kp-emp-name" style="font-size: .88rem;">${esc(emp.nama)}</strong>
                         <span class="badge ${isSelected ? 'kp-badge-active-nip' : 'kp-badge-nip'} font-monospace" style="font-size: .72rem;">${esc(emp.nik)}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center small mb-1 kp-emp-subtext">
-                        <span class="text-truncate me-2" style="font-size: .76rem;"><i class="fas fa-briefcase me-1 opacity-75"></i>${esc(emp.jbtn || '-')}</span>
-                        <span class="badge ${isSelected ? 'bg-light text-success border' : 'bg-success text-white'}" style="font-size: .68rem;">${esc(catLabel)}</span>
+                    <div class="d-flex justify-content-between align-items-center small mb-1 kp-emp-subtext flex-wrap gap-1">
+                        <span class="text-truncate" style="font-size: .76rem;"><i class="fas fa-briefcase me-1 opacity-75"></i>${esc(emp.jbtn || '-')}</span>
+                        <div class="d-flex align-items-center">
+                            <span class="badge ${isSelected ? 'bg-light text-success border' : 'bg-success text-white'}" style="font-size: .68rem;">${esc(catLabel)}</span>
+                            ${sipBadge}
+                        </div>
                     </div>
                     <div class="d-flex align-items-center gap-2 mt-1">
                         <div class="progress flex-grow-1" style="height: 5px;">
@@ -370,6 +448,46 @@
                 const hasFile = files.length > 0;
                 const isOther = item.lainnya;
 
+                let sipMetaHtml = '';
+                if (item.is_sip) {
+                    const meta = item.sip_meta || null;
+                    if (meta && meta.tgl_kadaluarsa) {
+                        const sisa = Number(meta.sisa_hari);
+                        let sisaBadge = '';
+                        if (sisa < 0) {
+                            sisaBadge = `<span class="badge bg-danger ms-1" style="font-size: .65rem;"><i class="fas fa-times-circle me-1"></i>Expired (${Math.abs(sisa)} hari lalu)</span>`;
+                        } else if (sisa <= 30) {
+                            sisaBadge = `<span class="badge text-dark ms-1" style="background: #fed7aa; border: 1px solid #f97316; font-size: .65rem;"><i class="fas fa-hourglass-end text-danger me-1"></i>Kritis: sisa ${sisa} hari</span>`;
+                        } else if (sisa <= 90) {
+                            sisaBadge = `<span class="badge bg-warning text-dark ms-1" style="font-size: .65rem;"><i class="fas fa-clock me-1"></i>Peringatan: sisa ${sisa} hari</span>`;
+                        } else {
+                            sisaBadge = `<span class="badge bg-success ms-1" style="font-size: .65rem;"><i class="fas fa-check-circle me-1"></i>Aktif: sisa ${sisa} hari</span>`;
+                        }
+
+                        sipMetaHtml = `
+                            <div class="mt-1 p-2 rounded kp-sip-input-card small" style="font-size: .72rem;">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-1">
+                                    <div>
+                                        <i class="fas fa-certificate text-warning me-1"></i>
+                                        <strong>No. SIP:</strong> <span class="font-monospace">${esc(meta.no_sip || '-')}</span>
+                                    </div>
+                                    <div>${sisaBadge}</div>
+                                </div>
+                                <div class="d-flex gap-3 text-muted mt-1" style="font-size: .7rem;">
+                                    <span><i class="fas fa-calendar-alt me-1"></i>Terbit: <strong>${esc(meta.tgl_terbit || '-')}</strong></span>
+                                    <span><i class="fas fa-calendar-times me-1"></i>Berlaku: <strong>${esc(meta.tgl_kadaluarsa)}</strong></span>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        sipMetaHtml = `
+                            <div class="mt-1 small kp-emp-subtext" style="font-size: .72rem;">
+                                <span class="badge bg-secondary opacity-75"><i class="fas fa-info-circle me-1"></i>Masa berlaku SIP belum diisi</span>
+                            </div>
+                        `;
+                    }
+                }
+
                 html += `
                     <tr>
                         <td class="text-center">
@@ -384,6 +502,7 @@
                         <td>
                             <strong class="${hasFile ? 'kp-doc-name-filled' : 'kp-doc-name-empty'}">${esc(item.nama)}</strong>
                             <div class="kp-emp-subtext font-monospace" style="font-size: .68rem;">Kode: ${esc(item.kode)}</div>
+                            ${sipMetaHtml}
                         </td>
                         <td>
                             ${files.length > 0 ? `
@@ -426,7 +545,7 @@
                         </td>
                         <td class="text-center">
                             ${cfg.canWrite ? `
-                                <button type="button" class="btn btn-outline-success btn-xs py-0 px-2 kp-item-upload" 
+                                <button type="button" class="btn btn-outline-success btn-xs py-0 px-2 kp-item-upload mb-1" 
                                     data-nik="${esc(p.nik)}" 
                                     data-kode="${esc(item.kode)}" 
                                     data-nama="${esc(item.nama)}"
@@ -434,6 +553,18 @@
                                     title="Upload ${esc(item.nama)}">
                                     <i class="fas fa-upload me-1"></i>Upload
                                 </button>
+                                ${item.is_sip ? `
+                                    <button type="button" class="btn btn-outline-info btn-xs py-0 px-2 kp-item-sip-date d-block mx-auto" 
+                                        data-nik="${esc(p.nik)}" 
+                                        data-nama-pegawai="${esc(p.nama)}"
+                                        data-kode="${esc(item.kode)}" 
+                                        data-nosip="${esc((item.sip_meta && item.sip_meta.no_sip) || '')}"
+                                        data-terbit="${esc((item.sip_meta && item.sip_meta.tgl_terbit) || '')}"
+                                        data-kadaluarsa="${esc((item.sip_meta && item.sip_meta.tgl_kadaluarsa) || '')}"
+                                        title="Atur Masa Berlaku SIP">
+                                        <i class="fas fa-calendar-check me-1"></i>Atur SIP
+                                    </button>
+                                ` : ''}
                             ` : `
                                 <span class="text-muted">-</span>
                             `}
@@ -493,6 +624,30 @@
             });
         }
 
+        const sipSection = document.getElementById('kpUploadSipSection');
+        const toggleSip = (k) => {
+            const isSip = isSipCode(k);
+            if (sipSection) {
+                sipSection.classList.toggle('d-none', !isSip);
+                if (isSip) {
+                    // Pre-fill jika SIP meta sudah ada di selectedDetail
+                    const existingMeta = selectedDetail && selectedDetail.sip_meta ? selectedDetail.sip_meta : null;
+                    document.getElementById('kpUploadNoSip').value = existingMeta && existingMeta.no_sip ? existingMeta.no_sip : '';
+                    document.getElementById('kpUploadTglTerbit').value = existingMeta && existingMeta.tgl_terbit ? existingMeta.tgl_terbit : '';
+                    document.getElementById('kpUploadTglKadaluarsa').value = existingMeta && existingMeta.tgl_kadaluarsa ? existingMeta.tgl_kadaluarsa : '';
+                } else {
+                    document.getElementById('kpUploadNoSip').value = '';
+                    document.getElementById('kpUploadTglTerbit').value = '';
+                    document.getElementById('kpUploadTglKadaluarsa').value = '';
+                }
+            }
+        };
+
+        selectKode.onchange = function () {
+            toggleSip(this.value);
+        };
+        toggleSip(kode || selectKode.value);
+
         // Reset file input
         const fileInput = document.getElementById('kpUploadFileInput');
         fileInput.value = '';
@@ -530,6 +685,16 @@
             errBox.textContent = 'Pilih jenis berkas terlebih dahulu.';
             errBox.classList.remove('d-none');
             return;
+        }
+
+        // Validasi khusus berkas SIP
+        if (isSipCode(kode)) {
+            const tglKadaluarsa = document.getElementById('kpUploadTglKadaluarsa').value;
+            if (!tglKadaluarsa) {
+                errBox.textContent = 'Tanggal kadaluarsa / masa berlaku SIP wajib diisi untuk monitoring dashboard.';
+                errBox.classList.remove('d-none');
+                return;
+            }
         }
 
         const formData = new FormData(form);
@@ -571,6 +736,78 @@
             submitBtn.disabled = false;
             progressBox.classList.add('d-none');
             progressBar.style.width = '0%';
+        }
+    }
+
+    // Modal Edit / Atur Masa Berlaku SIP
+    function openEditSipModal(nik, namaPegawai, kode, noSip, tglTerbit, tglKadaluarsa) {
+        if (!cfg.canWrite) {
+            showToast('Anda tidak memiliki hak akses atur masa berlaku SIP.', 'warning');
+            return;
+        }
+        const modalEl = document.getElementById('kpEditSipModal');
+        if (!modalEl) return;
+
+        document.getElementById('kpEditSipNik').value = nik;
+        document.getElementById('kpEditSipKode').value = kode;
+        document.getElementById('kpEditSipNamaPegawai').value = namaPegawai || nik;
+        document.getElementById('kpEditSipNo').value = noSip || '';
+        document.getElementById('kpEditSipTglTerbit').value = tglTerbit || '';
+        document.getElementById('kpEditSipTglKadaluarsa').value = tglKadaluarsa || '';
+        document.getElementById('kpEditSipError').classList.add('d-none');
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    }
+
+    async function submitEditSip(e) {
+        e.preventDefault();
+        const nik = document.getElementById('kpEditSipNik').value;
+        const kode = document.getElementById('kpEditSipKode').value;
+        const noSip = document.getElementById('kpEditSipNo').value;
+        const tglTerbit = document.getElementById('kpEditSipTglTerbit').value;
+        const tglKadaluarsa = document.getElementById('kpEditSipTglKadaluarsa').value;
+        const errBox = document.getElementById('kpEditSipError');
+        const submitBtn = document.getElementById('kpEditSipSubmitBtn');
+
+        errBox.classList.add('d-none');
+
+        if (!tglKadaluarsa) {
+            errBox.textContent = 'Tanggal kadaluarsa / masa berlaku SIP wajib diisi.';
+            errBox.classList.remove('d-none');
+            return;
+        }
+
+        const payload = new FormData();
+        payload.set('action', 'save_sip');
+        payload.set('csrf', cfg.csrf);
+        payload.set('nik', nik);
+        payload.set('kode', kode);
+        payload.set('no_sip', noSip);
+        payload.set('tgl_terbit', tglTerbit);
+        payload.set('tgl_kadaluarsa', tglKadaluarsa);
+
+        submitBtn.disabled = true;
+        try {
+            const res = await request('api/berkas_pegawai.php', {
+                method: 'POST',
+                body: payload
+            });
+            showToast(res.message, 'success');
+            const modalEl = document.getElementById('kpEditSipModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            await loadSummary(true);
+            if (selectedNik) {
+                const curCat = selectedDetail ? selectedDetail.kategori : '';
+                await loadDetail(selectedNik, curCat);
+            }
+        } catch (err) {
+            errBox.textContent = err.message;
+            errBox.classList.remove('d-none');
+        } finally {
+            submitBtn.disabled = false;
         }
     }
 
@@ -912,6 +1149,34 @@
             if (!d.nik) return;
             deleteFile(d.nik, d.kode, d.berkas, d.filename);
         });
+
+        // Filter kartu dashboard SIP
+        $(document).on('click', '.kp-sip-tile', function () {
+            const filter = this.dataset.sipFilter;
+            if (activeSipFilter === filter) {
+                activeSipFilter = 'all';
+            } else {
+                activeSipFilter = filter;
+            }
+            renderSipDashboard();
+            renderSummaryView();
+        });
+
+        // Tombol reset filter SIP
+        $(document).on('click', '#kpSipFilterReset', function () {
+            activeSipFilter = 'all';
+            renderSipDashboard();
+            renderSummaryView();
+        });
+
+        // Tombol atur tanggal masa berlaku SIP
+        $(document).on('click', '.kp-item-sip-date', function () {
+            const d = this.dataset;
+            openEditSipModal(d.nik, d.namaPegawai, d.kode, d.nosip, d.terbit, d.kadaluarsa);
+        });
+
+        // Form submit atur masa berlaku SIP
+        $('#kpEditSipForm').on('submit', submitEditSip);
     }
 
     // Expose public API

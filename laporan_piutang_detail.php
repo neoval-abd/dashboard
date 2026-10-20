@@ -70,8 +70,23 @@ $sql_ranap = "
 ";
 $stmt_ranap = $koneksi->prepare($sql_ranap);
 
-// Kueri Pemasukan Lain & Pengeluaran (Biasanya tunai, tapi kita biarkan ada untuk kelengkapan shift)
-$sql_pemasukan = "SELECT pemasukan_lain.tanggal, pemasukan_lain.keterangan, pemasukan_lain.besar, kategori_pemasukan_lain.nama_kategori FROM pemasukan_lain INNER JOIN kategori_pemasukan_lain ON pemasukan_lain.kode_kategori = kategori_pemasukan_lain.kode_kategori WHERE pemasukan_lain.tanggal BETWEEN ? AND ? ORDER BY pemasukan_lain.tanggal";
+$sql_pemasukan = "
+    SELECT 
+        pemasukan_lain.no_masuk,
+        pemasukan_lain.tanggal,
+        pemasukan_lain.keterangan,
+        pemasukan_lain.keperluan,
+        pemasukan_lain.besar,
+        pemasukan_lain.nip,
+        COALESCE(petugas.nama, '-') AS nama_petugas,
+        pemasukan_lain.kode_kategori,
+        COALESCE(kategori_pemasukan_lain.nama_kategori, '-') AS nama_kategori
+    FROM pemasukan_lain 
+    LEFT JOIN petugas ON pemasukan_lain.nip = petugas.nip 
+    LEFT JOIN kategori_pemasukan_lain ON pemasukan_lain.kode_kategori = kategori_pemasukan_lain.kode_kategori 
+    WHERE pemasukan_lain.tanggal BETWEEN ? AND ? 
+    ORDER BY pemasukan_lain.tanggal
+";
 $stmt_pemasukan = $koneksi->prepare($sql_pemasukan);
 
 $sql_pengeluaran = "SELECT pengeluaran_harian.tanggal, pengeluaran_harian.keterangan, pengeluaran_harian.biaya, kategori_pengeluaran_harian.nama_kategori FROM pengeluaran_harian INNER JOIN kategori_pengeluaran_harian ON pengeluaran_harian.kode_kategori = kategori_pengeluaran_harian.kode_kategori WHERE pengeluaran_harian.tanggal BETWEEN ? AND ? ORDER BY pengeluaran_harian.tanggal";
@@ -160,34 +175,38 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                 $shift_index = 0;
                 foreach ($shift_times as $nama_shift => $times) {
                     $range = getShiftDateTimeRange($tanggal_str, $nama_shift, $shift_times);
+                    $shift_ranges = getShiftRanges($tanggal_str, $nama_shift, $shift_times);
                     
-                    // --- Ambil Data Ralan ---
-                    $stmt_ralan->bind_param("ss", $range['start'], $range['end']);
-                    $stmt_ralan->execute();
-                    $result_ralan = $stmt_ralan->get_result();
                     $data_ralan = [];
-                    while ($row = $result_ralan->fetch_assoc()) $data_ralan[] = $row;
-                    
-                    // --- Ambil Data Ranap ---
-                    $stmt_ranap->bind_param("ss", $range['start'], $range['end']);
-                    $stmt_ranap->execute();
-                    $result_ranap = $stmt_ranap->get_result();
                     $data_ranap = [];
-                    while ($row = $result_ranap->fetch_assoc()) $data_ranap[] = $row;
-
-                    // --- Ambil Data Pemasukan ---
-                    $stmt_pemasukan->bind_param("ss", $range['start'], $range['end']);
-                    $stmt_pemasukan->execute();
-                    $result_pemasukan = $stmt_pemasukan->get_result();
                     $data_pemasukan = [];
-                    while ($row = $result_pemasukan->fetch_assoc()) $data_pemasukan[] = $row;
-
-                    // --- Ambil Data Pengeluaran ---
-                    $stmt_pengeluaran->bind_param("ss", $range['start'], $range['end']);
-                    $stmt_pengeluaran->execute();
-                    $result_pengeluaran = $stmt_pengeluaran->get_result();
                     $data_pengeluaran = [];
-                    while ($row = $result_pengeluaran->fetch_assoc()) $data_pengeluaran[] = $row;
+
+                    foreach ($shift_ranges as $sr) {
+                        // --- Ambil Data Ralan ---
+                        $stmt_ralan->bind_param("ss", $sr['start'], $sr['end']);
+                        $stmt_ralan->execute();
+                        $result_ralan = $stmt_ralan->get_result();
+                        while ($row = $result_ralan->fetch_assoc()) $data_ralan[] = $row;
+                        
+                        // --- Ambil Data Ranap ---
+                        $stmt_ranap->bind_param("ss", $sr['start'], $sr['end']);
+                        $stmt_ranap->execute();
+                        $result_ranap = $stmt_ranap->get_result();
+                        while ($row = $result_ranap->fetch_assoc()) $data_ranap[] = $row;
+
+                        // --- Ambil Data Pemasukan ---
+                        $stmt_pemasukan->bind_param("ss", $sr['start'], $sr['end']);
+                        $stmt_pemasukan->execute();
+                        $result_pemasukan = $stmt_pemasukan->get_result();
+                        while ($row = $result_pemasukan->fetch_assoc()) $data_pemasukan[] = $row;
+
+                        // --- Ambil Data Pengeluaran ---
+                        $stmt_pengeluaran->bind_param("ss", $sr['start'], $sr['end']);
+                        $stmt_pengeluaran->execute();
+                        $result_pengeluaran = $stmt_pengeluaran->get_result();
+                        while ($row = $result_pengeluaran->fetch_assoc()) $data_pengeluaran[] = $row;
+                    }
 
                     // --- Hitung Summary Total per Shift ---
                     $total_ralan       = array_sum(array_column($data_ralan, 'total_rupiah'));
@@ -407,18 +426,38 @@ $date_range = new DatePeriod($start_date, $interval, $end_date);
                                         <div class="tab-pane fade" id="pemasukan-<?php echo $shift_id; ?>" role="tabpanel">
                                             <div class="card-body border border-top-0 p-3">
                                                 <div class="table-responsive">
-                                                    <table class="table table-striped table-bordered table-sm" style="width:100%">
-                                                        <thead><tr><th>Tanggal</th><th>Kategori</th><th>Keterangan</th><th class="text-end">Besar</th></tr></thead>
+                                                    <table class="table table-striped table-bordered table-sm align-middle" style="width:100%">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th style="min-width: 90px;">Nomor</th>
+                                                                <th style="min-width: 125px;">Tanggal</th>
+                                                                <th style="min-width: 180px;">Kategori</th>
+                                                                <th style="min-width: 180px;">Petugas</th>
+                                                                <th class="text-end" style="min-width: 110px;">Pemasukan</th>
+                                                                <th style="min-width: 140px;">Terima Dari</th>
+                                                                <th style="min-width: 150px;">Keperluan</th>
+                                                            </tr>
+                                                        </thead>
                                                         <tbody>
                                                             <?php foreach ($data_pemasukan as $data): ?>
                                                             <tr>
+                                                                <td><?php echo htmlspecialchars($data['no_masuk']); ?></td>
                                                                 <td><?php echo htmlspecialchars($data['tanggal']); ?></td>
-                                                                <td><?php echo htmlspecialchars($data['nama_kategori']); ?></td>
+                                                                <td><?php echo htmlspecialchars($data['kode_kategori'] . ' ' . $data['nama_kategori']); ?></td>
+                                                                <td><?php echo htmlspecialchars($data['nama_petugas']); ?></td>
+                                                                <td class="text-end fw-semibold"><?php echo formatRupiah($data['besar']); ?></td>
                                                                 <td><?php echo htmlspecialchars($data['keterangan']); ?></td>
-                                                                <td class="text-end"><?php echo formatRupiah($data['besar']); ?></td>
+                                                                <td><?php echo htmlspecialchars($data['keperluan']); ?></td>
                                                             </tr>
                                                             <?php endforeach; ?>
                                                         </tbody>
+                                                        <tfoot>
+                                                            <tr class="table-light fw-bold">
+                                                                <td colspan="4" class="text-end">&gt;&gt; Total Pemasukan :</td>
+                                                                <td class="text-end text-success fw-bold"><?php echo formatRupiah($total_pemasukan); ?></td>
+                                                                <td colspan="2"></td>
+                                                            </tr>
+                                                        </tfoot>
                                                     </table>
                                                 </div>
                                             </div>

@@ -37,7 +37,7 @@ function getShiftDateTimeRange($tanggal_str, $shift, $shift_times) {
     $dt_awal_str = $tanggal_str . ' ' . $jam_masuk;
     $dt_akhir_str = $tanggal_str . ' ' . $jam_pulang;
 
-    // Logika lintas hari (Shift Malam)
+    // Logika lintas hari (Shift Malam: dimulai jam 21:01 pada tanggal T, berakhir jam 06:59 pada tanggal T+1)
     if (strtotime($jam_masuk) > strtotime($jam_pulang)) {
         $tanggal_obj = new DateTime($tanggal_str);
         $tanggal_obj->modify('+1 day');
@@ -47,9 +47,21 @@ function getShiftDateTimeRange($tanggal_str, $shift, $shift_times) {
 
     return [
         'start' => $dt_awal_str,
-        'end' => $dt_akhir_str
+        'end' => $dt_akhir_str,
+        'display' => $dt_awal_str . ' s/d ' . $dt_akhir_str
     ];
 }
+
+// 3b. Fungsi Mengambil Daftar Rentang Waktu Shift
+function getShiftRanges($tanggal_str, $shift, $shift_times) {
+    $range = getShiftDateTimeRange($tanggal_str, $shift, $shift_times);
+    if (!$range) return [];
+    
+    return [
+        ['start' => $range['start'], 'end' => $range['end']]
+    ];
+}
+
 
 // --- FUNGSI TAMBAHAN DARI KUNJUNGAN AKTIF ---
 

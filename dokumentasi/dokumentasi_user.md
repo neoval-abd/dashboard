@@ -49,7 +49,33 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 ![Laporan Harian Piutang](9. Laporan harian Piutang.jpg)
 ![Detail Piutang](11. Detail nota Laporan Harian Piutang.jpg)
 
-*   **Laporan Tunai**: Rekapitulasi pemasukan kasir harian per shift. Sangat berguna untuk sinkronisasi setoran harian.
+*   **Laporan Tunai (Detail Transaksi per Shift)**: Modul vital rekonsiliasi kasir harian. Menampilkan seluruh aliran kas masuk dan keluar yang dikelompokkan secara cerdas per tanggal dan per shift kasir.
+    *   **Struktur Header Harian**: Menampilkan ringkasan total tanggal berjalan:
+        *   `Masuk`: Akumulasi kas masuk riil dari seluruh shift (Ralan, Ranap, Obat & BHP, dan Pemasukan Lain-lain).
+        *   `Keluar`: Akumulasi pengeluaran operasional kasir harian.
+        *   `Sisa Kas`: Kas bersih yang disetor ke brankas/bendahara (`Masuk - Keluar`).
+    *   **Pembagian Shift Otomatis (Dinamis dari SIMRS Khanza)**:
+        Jam shift ditarik otomatis dari tabel master `closing_kasir`:
+        *   **Shift Pagi**: `07:00:00` s/d `14:00:00`
+        *   **Shift Siang**: `14:01:00` s/d `21:00:00`
+        *   **Shift Malam (Shift ke-3 / Lintas Hari)**: `21:01:00` (Hari H) s/d `06:59:00` (Hari H+1).
+    *   **Logika Otomatis Shift ke-3 (Malam Lintas Hari)**:
+        *   Petugas kasir shift 3 bekerja semalaman mulai pukul 21:00 s/d 07:00 pagi keesokan harinya.
+        *   Sesuai alur pembukuan dan setoran fisik keuangan manual, transaksi yang diinput pada **dini hari (00:00 s/d 06:59 pagi)**—seperti pelunasan piutang obat pukul 01:59 subuh—secara otomatis dihitung ke dalam **Shift Malam tanggal sebelumnya**.
+        *   Uang fisik setoran kasir pagi hari saat serah terima kasir selalu sinkron 100% dengan rekapan shift di dashboard.
+    *   **5 Tab Rincian Transaksi per Shift**:
+        1.  **Tab Ralan**: Waktu Bayar, No. Rawat, No. Nota, Nama Pasien, Cara Bayar, Dokter, Total (Rp), dan Tombol `Nota` (pop-up rincian billing kasir).
+        2.  **Tab Ranap**: Waktu Bayar, No. Rawat, No. Nota, Nama Pasien, Cara Bayar, Dokter DPJP, Total (Rp), dan Tombol `Nota`.
+        3.  **Tab Obat & BHP (Penjualan Obat Bebas, Alkes & BHP Medis)**: Selaras 100% dengan SIMRS Khanza (`inventory.DlgCariPenjualan.java`):
+            *   Menampilkan transaksi penjualan apotek tunai / lunas (`penjualan.status = 'Sudah Dibayar'`).
+            *   Kolom: `No. Nota`, `Waktu Bayar`, `Petugas` (nama petugas tanpa NIP), `Pasien / Pembeli`, `Jns. Jual`, `Keterangan`, `Asal Stok`, `Akun Bayar`, `PPN`, `Ongkir`, `Total (Rp)`, dan `Aksi`.
+            *   Dilengkapi tombol **Nota** yang memunculkan modal interaktif rincian item barang, batch, aturan pakai, diskon, embalase, tuslah, racikan, serta footer kalkulasi otomatis.
+            *   Baris total di bawah tabel: `>> Total Penjualan Obat & BHP : Rp ...`.
+        4.  **Tab Lain (Pemasukan Lain-lain)**: Selaras 100% dengan SIMRS Khanza (`keuangan.DlgPemasukanLain.java`):
+            *   Kolom: `Nomor` (`no_masuk`), `Tanggal`, `Kategori`, `Petugas` (nama petugas langsung tanpa NIP agar bersih), `Pemasukan` (Rp), `Terima Dari` (nama penyetor), dan `Keperluan`.
+            *   Dilengkapi baris total otomatis di bawah tabel: `>> Total Pemasukan : Rp ...`.
+        5.  **Tab Keluar (Pengeluaran Harian)**: Rincian biaya operasional kasir: Tanggal, Kategori, Keterangan, dan Biaya (Rp).
+    *   **Badge Ringkasan Shift**: Setiap panel shift dilengkapi indikator instan: `[Ralan]` + `[Ranap]` + `[💊 Obat/BHP]` + `[+ Lain-lain]` - `[- Keluar]` = `[= Setoran Shift]`.
 ![Laporan Tunai](12. Laporan Tunai (sama seperti piutang).jpg)
 
 *   **Analisa Tindakan**: Ketahui unit atau dokter mana yang paling produktif dalam memberikan tindakan medis.
@@ -61,7 +87,25 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 
 ---
 
-## 📅 5. Administrasi & HRD (Monitoring Pegawai)
+## 📅 5. Administrasi & HRD (Monitoring Pegawai & Legalitas Nakes)
+
+*   **Kepegawaian & Audit Berkas Pegawai**:
+    *   **List & Index Pegawai**: Manajemen biodata, data penempatan, pendidikan, dan kalkulasi index penggajian terintegrasi dengan SIMRS Khanza.
+    *   **Audit Kelengkapan Berkas**: Pemantauan pemenuhan checklist dokumen per kategori profesi (Dokter Umum, Dokter Spesialis, Perawat & Bidan, Profesi Lain, dan Tenaga Non-Klinis).
+    *   **Dashboard Monitoring Surat Izin Praktik (SIP) Nakes**:
+        *   Ditempatkan tepat di atas filter kategori untuk visibilitas maksimal manajemen HRD/Direksi.
+        *   Menyajikan 6 Kartu KPI pemantauan izin legalitas:
+            1.  **Total Nakes**: Rekap seluruh tenaga kesehatan aktif di RS yang wajib mengantongi SIP.
+            2.  **Masa Aman**: Jumlah SIP yang masa berlakunya masih lebih dari 90 hari.
+            3.  **Peringatan (31 - 90 Hari)**: Memberikan waktu yang cukup bagi manajemen untuk mengingatkan nakes mengajukan perpanjangan izin.
+            4.  **Masa Kritis (≤ 30 Hari)**: Peringatan intensif perpanjangan segera agar tidak melewati batas izin praktik.
+            5.  **Kadaluarsa**: Daftar nakes yang izin praktiknya telah berakhir dan harus segera ditindaklanjuti.
+            6.  **Belum Upload**: Nakes yang berkas fisik SIP-nya belum diunggah ke sistem.
+        *   **Filter Interaktif**: Cukup klik salah satu kartu KPI di dashboard, daftar pegawai di sebelah kiri otomatis tersaring sesuai kategori masa berlaku SIP yang dipilih.
+    *   **Input & Pengaturan Masa Berlaku SIP**:
+        *   Pada saat mengunggah berkas SIP (`DOK0005`, `DOK0011`, `DOK0017`, `DOK0023`), form upload otomatis menyediakan kolom input **Nomor SIP**, **Tanggal Terbit**, dan **Tanggal Kadaluarsa / Masa Berlaku**.
+        *   Tersedia tombol **"Atur SIP"** di samping berkas tersimpan agar admin kepegawaian dapat mengisi atau memperbarui masa berlaku izin kapan saja tanpa harus mengunggah ulang file.
+        *   **Sinkronisasi Otomatis Khanza**: Input Nomor SIP untuk dokter otomatis memperbarui kolom `no_ijn_praktek` pada tabel master `dokter` di SIMRS Khanza.
 
 *   **Laporan Absensi**: Pantau kedisiplinan pegawai, dari jam masuk, keterlambatan, hingga rekapitulasi ketidakhadiran secara visual.
 ![Dashboard Analytics Absensi](19. Dashboard analitics Absensi.jpg)

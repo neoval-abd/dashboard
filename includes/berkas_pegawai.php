@@ -93,6 +93,22 @@ function kpb_pick_category($row, $perCategory)
     return [kpb_guess_category($row), 'perkiraan'];
 }
 
+function kpb_sip_codes($db)
+{
+    static $sipCodes = null;
+    if ($sipCodes === null) {
+        $sipCodes = [];
+        $rows = kp_rows($db, "SELECT kode FROM master_berkas_pegawai WHERE nama_berkas LIKE '%praktik%' OR nama_berkas LIKE '%praktek%'");
+        foreach ($rows as $r) {
+            $sipCodes[] = strtoupper(trim($r['kode']));
+        }
+        if (!$sipCodes) {
+            $sipCodes = ['DOK0005', 'DOK0011', 'DOK0017', 'DOK0023'];
+        }
+    }
+    return $sipCodes;
+}
+
 function kpb_master_totals($db)
 {
     $totals = [];
@@ -105,26 +121,113 @@ function kpb_master_totals($db)
 function kpb_summary($db)
 {
     $totals = kpb_master_totals($db);
+    $sipCodes = kpb_sip_codes($db);
+
+    $sipRows = [];
+    foreach (kp_rows($db, "SELECT nik, kode_berkas, no_sip, tgl_terbit, tgl_kadaluarsa, DATEDIFF(tgl_kadaluarsa, CURDATE()) AS sisa_hari FROM pegawai_sip") as $sr) {
+        $sipRows[$sr['nik']] = $sr;
+    }
+
     $stats = [];
-    foreach (kp_rows($db, "SELECT b.nik, m.kategori, COUNT(*) AS files,
+    $sipUploaded = [];
+    foreach (kp_rows($db, "SELECT b.nik, m.kategori, b.kode_berkas, COUNT(*) AS files,
             COUNT(DISTINCT CASE WHEN m.nama_berkas <> 'Dll' THEN b.kode_berkas END) AS filled,
             MAX(b.tgl_uploud) AS last_upload
         FROM berkas_pegawai b JOIN master_berkas_pegawai m ON m.kode = b.kode_berkas
-        GROUP BY b.nik, m.kategori") as $row) {
-        $stats[$row['nik']][$row['kategori']] = ['files' => (int) $row['files'], 'filled' => (int) $row['filled'], 'last' => $row['last_upload']];
+        GROUP BY b.nik, m.kategori, b.kode_berkas") as $row) {
+        if (!isset($stats[$row['nik']][$row['kategori']])) {
+            $stats[$row['nik']][$row['kategori']] = ['files' => 0, 'filled' => 0, 'last' => ''];
+        }
+        $stats[$row['nik']][$row['kategori']]['files'] += (int) $row['files'];
+        $stats[$row['nik']][$row['kategori']]['filled'] += (int) $row['filled'];
+        if ($row['last_upload'] > $stats[$row['nik']][$row['kategori']]['last']) {
+            $stats[$row['nik']][$row['kategori']]['last'] = $row['last_upload'];
+        }
+
+        if (in_array(strtoupper($row['kode_berkas']), $sipCodes, true)) {
+            $sipUploaded[$row['nik']] = true;
+        }
     }
+
     // Sama dengan Khanza: pegawai berstatus KELUAR tidak ditampilkan.
     $employees = kp_rows($db, "SELECT p.nik, p.nama, p.jbtn, p.bidang, p.pendidikan, p.stts_aktif, d.nama AS departemen_nama, dk.nm_dokter
         FROM pegawai p
         LEFT JOIN departemen d ON d.dep_id = p.departemen
         LEFT JOIN dokter dk ON dk.kd_dokter = p.nik
         WHERE p.stts_aktif <> 'KELUAR' ORDER BY p.nama");
+    
     $rows = [];
+    $sipStats = [
+        'total_nakes' => 0,
+        'active'      => 0,
+        'warning'     => 0,
+        'kritis'      => 0,
+        'expired'     => 0,
+        'empty'       => 0,
+    ];
+
     foreach ($employees as $employee) {
         $per = $stats[$employee['nik']] ?? [];
         list($category, $source) = kpb_pick_category($employee, $per);
         $last = '';
         foreach ($per as $item) if ($item['last'] > $last) $last = $item['last'];
+
+        $isNakes = ($category !== 'Tenaga Non Klinis');
+        $sipInfo = null;
+
+        if ($isNakes) {
+            $sipStats['total_nakes']++;
+            $sip = $sipRows[$employee['nik']] ?? null;
+
+            if ($sip && !empty($sip['tgl_kadaluarsa'])) {
+                $sisa = (int) $sip['sisa_hari'];
+                if ($sisa < 0) {
+                    $sipStatus = 'expired';
+                    $sipStats['expired']++;
+                } elseif ($sisa <= 30) {
+                    $sipStatus = 'kritis';
+                    $sipStats['kritis']++;
+                } elseif ($sisa <= 90) {
+                    $sipStatus = 'warning';
+                    $sipStats['warning']++;
+                } else {
+                    $sipStatus = 'active';
+                    $sipStats['active']++;
+                }
+
+                $sipInfo = [
+                    'status'         => $sipStatus,
+                    'sisa_hari'      => $sisa,
+                    'tgl_kadaluarsa' => $sip['tgl_kadaluarsa'],
+                    'tgl_terbit'     => $sip['tgl_terbit'],
+                    'no_sip'         => $sip['no_sip'],
+                    'has_file'       => true,
+                ];
+            } elseif (!empty($sipUploaded[$employee['nik']])) {
+                $sipStatus = 'need_date';
+                $sipStats['warning']++;
+                $sipInfo = [
+                    'status'         => $sipStatus,
+                    'sisa_hari'      => null,
+                    'tgl_kadaluarsa' => null,
+                    'tgl_terbit'     => null,
+                    'no_sip'         => null,
+                    'has_file'       => true,
+                ];
+            } else {
+                $sipStatus = 'empty';
+                $sipStats['empty']++;
+                $sipInfo = [
+                    'status'         => $sipStatus,
+                    'sisa_hari'      => null,
+                    'tgl_kadaluarsa' => null,
+                    'tgl_terbit'     => null,
+                    'no_sip'         => null,
+                    'has_file'       => false,
+                ];
+            }
+        }
+
         $rows[] = [
             'nik' => $employee['nik'], 'nama' => $employee['nama'], 'jbtn' => $employee['jbtn'],
             'departemen' => $employee['departemen_nama'], 'stts_aktif' => $employee['stts_aktif'],
@@ -134,9 +237,11 @@ function kpb_summary($db)
             'filled' => $per[$category]['filled'] ?? 0,
             'wajib' => $totals[$category] ?? 0,
             'last_upload' => $last,
+            'is_nakes' => $isNakes,
+            'sip' => $sipInfo,
         ];
     }
-    return $rows;
+    return ['rows' => $rows, 'sip_stats' => $sipStats];
 }
 
 function kpb_storage_dir($create = false)
@@ -190,13 +295,35 @@ function kpb_detail($db, $nik, $category = '')
     else { kpb_valid_category($category); $source = 'pilihan'; }
     $byCode = [];
     foreach ($files as $file) if ($file['kategori'] === $category) $byCode[$file['kode_berkas']][] = kpb_file_info($file);
+
+    $sipCodes = kpb_sip_codes($db);
+    $sipMetaRows = kp_rows($db, "SELECT kode_berkas, no_sip, tgl_terbit, tgl_kadaluarsa, DATEDIFF(tgl_kadaluarsa, CURDATE()) AS sisa_hari, berkas FROM pegawai_sip WHERE nik = ?", [$employee['nik']]);
+    $sipByCode = [];
+    foreach ($sipMetaRows as $sm) {
+        $sipByCode[$sm['kode_berkas']] = $sm;
+    }
+
     $groups = [];
     $known = kpb_groups();
     foreach (kp_rows($db, 'SELECT kode, nama_berkas FROM master_berkas_pegawai WHERE kategori = ? ORDER BY no_urut, kode', [$category]) as $master) {
         $prefix = strtoupper(substr($master['kode'], 0, 3));
         if (!isset($known[$prefix])) $prefix = 'LAIN';
         if (!isset($groups[$prefix])) $groups[$prefix] = ['kode' => $prefix, 'label' => $known[$prefix][0] ?? 'Lainnya', 'icon' => $known[$prefix][1] ?? 'fa-folder', 'items' => []];
-        $groups[$prefix]['items'][] = ['kode' => $master['kode'], 'nama' => $master['nama_berkas'], 'lainnya' => kpb_is_other($master['nama_berkas']), 'files' => $byCode[$master['kode']] ?? []];
+
+        $isSip = in_array(strtoupper($master['kode']), $sipCodes, true);
+        $itemData = [
+            'kode' => $master['kode'], 
+            'nama' => $master['nama_berkas'], 
+            'lainnya' => kpb_is_other($master['nama_berkas']), 
+            'files' => $byCode[$master['kode']] ?? [],
+            'is_sip' => $isSip,
+        ];
+        if ($isSip) {
+            $meta = $sipByCode[$master['kode']] ?? ($sipMetaRows[0] ?? null);
+            $itemData['sip_meta'] = $meta;
+        }
+
+        $groups[$prefix]['items'][] = $itemData;
     }
     $others = [];
     foreach ($per as $name => $item) if ($name !== $category) $others[$name] = $item['files'];
@@ -204,12 +331,11 @@ function kpb_detail($db, $nik, $category = '')
     try { 
         kpb_storage_dir(true); 
     } catch (KpbStorageException $error) { 
-        // Jika folder fisik lokal tidak ada di server ini, cek apakah remote host URL aktif
         $storage = (defined('KP_BERKAS_URL') && !empty(KP_BERKAS_URL));
     }
     $employee['dokter'] = !empty($employee['nm_dokter']);
     unset($employee['nm_dokter']);
-    return ['pegawai' => $employee, 'kategori' => $category, 'sumber' => $source, 'groups' => array_values($groups), 'kategori_lain' => $others, 'storage' => $storage];
+    return ['pegawai' => $employee, 'kategori' => $category, 'sumber' => $source, 'groups' => array_values($groups), 'kategori_lain' => $others, 'storage' => $storage, 'sip_meta' => $sipMetaRows[0] ?? null];
 }
 
 function kpb_normalize_files($input)
@@ -241,12 +367,55 @@ function kpb_safe_name($value)
     return trim(preg_replace('/[^A-Za-z0-9.-]+/', '_', $value), '._') ?: 'x';
 }
 
-function kpb_upload($db, $nik, $code, $date, $input)
+function kpb_save_sip_meta($db, $nik, $code, $noSip, $tglTerbit, $tglKadaluarsa, $berkas = null)
+{
+    $nik = kpb_text($nik, 'NIP pegawai', 20);
+    $code = kpb_text($code, 'Jenis berkas', 10);
+    $noSip = is_string($noSip) ? trim($noSip) : null;
+    if ($noSip === '') $noSip = null;
+    
+    $tglTerbit = is_string($tglTerbit) && kp_valid_date($tglTerbit) ? trim($tglTerbit) : null;
+    if (!is_string($tglKadaluarsa) || !kp_valid_date($tglKadaluarsa)) {
+        throw new InvalidArgumentException('Tanggal kadaluarsa / masa berlaku SIP wajib diisi dengan format tanggal valid.');
+    }
+    $tglKadaluarsa = trim($tglKadaluarsa);
+
+    $berkas = is_string($berkas) && $berkas !== '' ? trim($berkas) : null;
+
+    $stmt = kp_query($db, "INSERT INTO pegawai_sip (nik, kode_berkas, no_sip, tgl_terbit, tgl_kadaluarsa, berkas)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE 
+            no_sip = VALUES(no_sip),
+            tgl_terbit = VALUES(tgl_terbit),
+            tgl_kadaluarsa = VALUES(tgl_kadaluarsa),
+            berkas = COALESCE(VALUES(berkas), berkas)",
+        [$nik, $code, $noSip, $tglTerbit, $tglKadaluarsa, $berkas]);
+    $stmt->close();
+
+    // Jika pegawai adalah dokter dan no_sip diisi, sinkronkan juga ke tabel dokter SIMRS Khanza
+    if (!empty($noSip)) {
+        $checkDokter = kp_rows($db, "SELECT 1 FROM dokter WHERE kd_dokter = ? LIMIT 1", [$nik]);
+        if ($checkDokter) {
+            kp_query($db, "UPDATE dokter SET no_ijn_praktek = ? WHERE kd_dokter = ?", [$noSip, $nik])->close();
+        }
+    }
+
+    return true;
+}
+
+function kpb_upload($db, $nik, $code, $date, $input, $sipMeta = [])
 {
     $employee = kpb_find_employee($db, $nik);
     $code = kpb_text($code, 'Jenis berkas', 10);
     if (!kp_rows($db, 'SELECT kode FROM master_berkas_pegawai WHERE kode = ?', [$code])) throw new InvalidArgumentException('Jenis berkas tidak ditemukan.');
     if (!is_string($date) || !kp_valid_date($date)) throw new InvalidArgumentException('Tanggal upload tidak valid.');
+    
+    $sipCodes = kpb_sip_codes($db);
+    $isSip = in_array(strtoupper($code), $sipCodes, true);
+    if ($isSip && !empty($sipMeta['tgl_kadaluarsa']) && !kp_valid_date($sipMeta['tgl_kadaluarsa'])) {
+        throw new InvalidArgumentException('Tanggal kadaluarsa SIP tidak valid.');
+    }
+
     $files = kpb_normalize_files($input);
     if (!$files) throw new InvalidArgumentException('Pilih file yang akan diunggah.');
     if (count($files) > KPB_MAX_FILES) throw new InvalidArgumentException('Maksimal ' . KPB_MAX_FILES . ' file sekali unggah.');
@@ -283,6 +452,7 @@ function kpb_upload($db, $nik, $code, $date, $input)
 
     $saved = [];
     $savedRemote = [];
+    $lastSavedRelPath = null;
     if (!$db->begin_transaction()) throw new RuntimeException('Transaksi tidak dapat dimulai.');
     try {
         foreach ($prepared as $item) {
@@ -301,8 +471,25 @@ function kpb_upload($db, $nik, $code, $date, $input)
                 $saved[] = $target;
             }
 
-            kp_query($db, 'INSERT INTO berkas_pegawai (nik, tgl_uploud, kode_berkas, berkas) VALUES (?, ?, ?, ?)', [$employee['nik'], $date, $code, KPB_DIR . $name])->close();
+            $relPath = KPB_DIR . $name;
+            $lastSavedRelPath = $relPath;
+            kp_query($db, 'INSERT INTO berkas_pegawai (nik, tgl_uploud, kode_berkas, berkas) VALUES (?, ?, ?, ?)', [$employee['nik'], $date, $code, $relPath])->close();
         }
+
+        // Jika berkas adalah SIP, simpan/perbarui metadata SIP
+        if ($isSip) {
+            $noSip = isset($sipMeta['no_sip']) ? trim((string)$sipMeta['no_sip']) : null;
+            $tglTerbit = !empty($sipMeta['tgl_terbit']) ? trim((string)$sipMeta['tgl_terbit']) : null;
+            $tglKadaluarsa = !empty($sipMeta['tgl_kadaluarsa']) ? trim((string)$sipMeta['tgl_kadaluarsa']) : null;
+
+            if (!empty($tglKadaluarsa)) {
+                kpb_save_sip_meta($db, $employee['nik'], $code, $noSip, $tglTerbit, $tglKadaluarsa, $lastSavedRelPath);
+            } elseif ($lastSavedRelPath) {
+                // Update file relpath pada tabel pegawai_sip jika baris sudah ada
+                kp_query($db, "UPDATE pegawai_sip SET berkas = ? WHERE nik = ? AND kode_berkas = ?", [$lastSavedRelPath, $employee['nik'], $code])->close();
+            }
+        }
+
         if (!$db->commit()) throw new RuntimeException('Commit gagal.');
     } catch (Throwable $error) {
         $db->rollback();
@@ -397,6 +584,14 @@ function kpb_delete($db, $nik, $code, $berkas)
     }
 
     if ($affected < 1) throw new InvalidArgumentException('Berkas tidak ditemukan atau sudah dihapus.');
+
+    // Jika berkas yang dihapus adalah SIP, perbarui referensi berkas di tabel pegawai_sip
+    $sipCodes = kpb_sip_codes($db);
+    if (in_array(strtoupper($code), $sipCodes, true)) {
+        $remainingSip = kp_rows($db, "SELECT berkas FROM berkas_pegawai WHERE nik = ? AND kode_berkas = ? ORDER BY tgl_uploud DESC LIMIT 1", [$nik, $code]);
+        $newBerkas = $remainingSip ? $remainingSip[0]['berkas'] : null;
+        kp_query($db, "UPDATE pegawai_sip SET berkas = ? WHERE nik = ? AND kode_berkas = ?", [$newBerkas, $nik, $code])->close();
+    }
 
     // 3. File fisik hanya dihapus jika tidak lagi dirujuk baris lain di tabel berkas_pegawai
     $checkFiles = kp_rows($db, 'SELECT 1 FROM berkas_pegawai WHERE berkas = ? OR berkas = ? LIMIT 1', [$berkas, str_replace('\\', '/', $berkas)]);

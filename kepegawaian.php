@@ -536,6 +536,63 @@ html.theme-light .kp-category-select option {
 }
 .btn-xs { padding: 2px 7px; font-size: .75rem; border-radius: 4px; }
 
+/* Dashboard SIP Monitoring */
+.kp-sip-dashboard-card {
+    border-radius: 12px !important;
+    border: 1px solid var(--kp-border-color) !important;
+    background: var(--kp-bg-surface) !important;
+}
+.kp-sip-title {
+    color: var(--kp-text-title) !important;
+    font-size: 0.95rem;
+}
+.kp-sip-tile {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--kp-border-color);
+    background: var(--kp-bg-subtle);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    position: relative;
+}
+.kp-sip-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: var(--kp-border-strong);
+}
+.kp-sip-tile.active {
+    box-shadow: 0 0 0 2px #0d6efd, 0 4px 12px rgba(13, 110, 253, 0.15);
+    background: var(--kp-bg-surface);
+}
+.kp-sip-tile-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--kp-text-muted);
+}
+.kp-sip-tile-val {
+    font-size: 1.4rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin: 3px 0 2px 0;
+    font-family: monospace;
+}
+.kp-sip-tile-sub {
+    font-size: 0.68rem;
+    color: var(--kp-text-subtle);
+}
+.kp-sip-tile-icon {
+    font-size: 1.1rem;
+    opacity: 0.85;
+}
+.kp-sip-input-card {
+    background: var(--kp-bg-subtle);
+    border: 1px dashed var(--kp-border-strong) !important;
+}
+.kp-sip-form-title {
+    color: var(--kp-text-title) !important;
+}
+
 /* SweetAlert2 Styling & Theme Integration */
 .swal2-container {
     z-index: 10050 !important;
@@ -676,6 +733,92 @@ html.theme-light .kp-swal-filebox {
 
 <!-- Panel Berkas Pegawai -->
 <div id="kpBerkasPanel" class="d-none" role="tabpanel" aria-labelledby="kpBerkasTab">
+    <!-- Dashboard Monitoring SIP Nakes -->
+    <div class="card shadow-sm mb-3 kp-sip-dashboard-card" id="kpSipDashboard">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-stethoscope text-success fs-5"></i>
+                    <div>
+                        <h6 class="mb-0 fw-bold kp-sip-title">Dashboard Monitoring Surat Izin Praktik (SIP) Nakes</h6>
+                        <small class="kp-emp-subtext" style="font-size: .74rem;">Pemantauan masa berlaku izin praktik Dokter, Perawat, Bidan, & Nakes lainnya</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark border d-none d-md-inline" style="font-size: .72rem;">
+                        <i class="fas fa-filter text-primary me-1"></i>Klik kartu untuk filter data
+                    </span>
+                    <button type="button" class="btn btn-xs btn-outline-secondary kp-sip-reset-btn d-none" id="kpSipFilterReset" title="Tampilkan Semua Nakes">
+                        <i class="fas fa-undo me-1"></i>Reset Filter SIP
+                    </button>
+                </div>
+            </div>
+            <!-- 6 KPI Interactive Cards -->
+            <div class="row g-2" id="kpSipCardsRow">
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="kp-sip-tile" data-sip-filter="nakes" role="button" tabindex="0" title="Klik untuk menampilkan seluruh Nakes wajib SIP">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="kp-sip-tile-label">Total Nakes</span>
+                            <i class="fas fa-user-md kp-sip-tile-icon text-primary"></i>
+                        </div>
+                        <div class="kp-sip-tile-val text-primary" id="kpSipCountTotal">0</div>
+                        <div class="kp-sip-tile-sub">Wajib SIP</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="kp-sip-tile" data-sip-filter="active" role="button" tabindex="0" title="Klik untuk memfilter SIP aktif (>90 hari)">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="kp-sip-tile-label">Masa Aman</span>
+                            <i class="fas fa-shield-alt kp-sip-tile-icon text-success"></i>
+                        </div>
+                        <div class="kp-sip-tile-val text-success" id="kpSipCountActive">0</div>
+                        <div class="kp-sip-tile-sub">&gt; 90 hari tersisa</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="kp-sip-tile" data-sip-filter="warning" role="button" tabindex="0" title="Klik untuk memfilter SIP dalam masa peringatan (31-90 hari)">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="kp-sip-tile-label">Peringatan</span>
+                            <i class="fas fa-exclamation-circle kp-sip-tile-icon text-warning"></i>
+                        </div>
+                        <div class="kp-sip-tile-val text-warning" id="kpSipCountWarning">0</div>
+                        <div class="kp-sip-tile-sub">31 - 90 hari lagi</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="kp-sip-tile" data-sip-filter="kritis" role="button" tabindex="0" title="Klik untuk memfilter SIP masa kritis (≤30 hari)">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="kp-sip-tile-label">Masa Kritis</span>
+                            <i class="fas fa-hourglass-end kp-sip-tile-icon text-orange" style="color: #f97316;"></i>
+                        </div>
+                        <div class="kp-sip-tile-val" style="color: #f97316;" id="kpSipCountKritis">0</div>
+                        <div class="kp-sip-tile-sub">≤ 30 hari lagi</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="kp-sip-tile" data-sip-filter="expired" role="button" tabindex="0" title="Klik untuk memfilter SIP yang sudah kadaluarsa">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="kp-sip-tile-label">Kadaluarsa</span>
+                            <i class="fas fa-times-circle kp-sip-tile-icon text-danger"></i>
+                        </div>
+                        <div class="kp-sip-tile-val text-danger" id="kpSipCountExpired">0</div>
+                        <div class="kp-sip-tile-sub">Perlu perpanjangan</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="kp-sip-tile" data-sip-filter="empty" role="button" tabindex="0" title="Klik untuk memfilter Nakes yang belum mengunggah SIP">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="kp-sip-tile-label">Belum Upload</span>
+                            <i class="fas fa-file-excel kp-sip-tile-icon text-secondary"></i>
+                        </div>
+                        <div class="kp-sip-tile-val text-secondary" id="kpSipCountEmpty">0</div>
+                        <div class="kp-sip-tile-sub">Belum ada berkas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Filter Kategori (Tab Hijau Khas SIMRS Khanza) & Pencarian -->
     <div class="card shadow-sm mb-3">
         <div class="card-body py-2">
@@ -767,6 +910,30 @@ html.theme-light .kp-swal-filebox {
                         </select>
                     </div>
 
+                    <!-- Kolom Khusus Upload SIP (Surat Izin Praktik) -->
+                    <div id="kpUploadSipSection" class="p-3 mb-2 rounded border d-none kp-sip-input-card">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="fas fa-certificate text-warning"></i>
+                            <strong class="small kp-sip-form-title">Masa Berlaku Surat Izin Praktik (SIP)</strong>
+                            <span class="badge bg-warning text-dark ms-auto" style="font-size: .68rem;">Khusus SIP</span>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1" for="kpUploadNoSip">Nomor SIP</label>
+                            <input type="text" class="form-control form-control-sm" name="no_sip" id="kpUploadNoSip" placeholder="Contoh: 503/012/SIP/DPMPTSP/2024" maxlength="100">
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small mb-1" for="kpUploadTglTerbit">Tanggal Terbit</label>
+                                <input type="date" class="form-control form-control-sm" name="tgl_terbit" id="kpUploadTglTerbit">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-1" for="kpUploadTglKadaluarsa">Tgl Kadaluarsa / Berlaku <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control form-control-sm" name="tgl_kadaluarsa" id="kpUploadTglKadaluarsa">
+                            </div>
+                        </div>
+                        <div class="form-text small mt-1" style="font-size: .72rem;">Tanggal masa berlaku akan dipantau otomatis pada dashboard untuk peringatan perpanjangan izin.</div>
+                    </div>
+
                     <div class="mb-2">
                         <label class="form-label small fw-bold mb-1" for="kpUploadDate">Tanggal Upload <span class="text-danger">*</span></label>
                         <input type="date" class="form-control form-control-sm" name="tgl" id="kpUploadDate" required value="<?php echo date('Y-m-d'); ?>">
@@ -788,6 +955,51 @@ html.theme-light .kp-swal-filebox {
                 <div class="modal-footer py-2 bg-light">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" class="btn btn-primary btn-sm" id="kpUploadSubmitBtn"><i class="fas fa-upload me-1"></i>Simpan & Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit / Atur Masa Berlaku SIP -->
+<div class="modal fade" id="kpEditSipModal" tabindex="-1" aria-labelledby="kpEditSipModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="kpEditSipForm">
+                <div class="modal-header bg-light py-2">
+                    <h6 class="modal-title mb-0" id="kpEditSipModalLabel"><i class="fas fa-calendar-check text-primary me-2"></i>Atur Masa Berlaku SIP</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <input type="hidden" name="nik" id="kpEditSipNik">
+                    <input type="hidden" name="kode" id="kpEditSipKode">
+                    
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold mb-1">Pegawai Nakes</label>
+                        <input type="text" class="form-control form-control-sm bg-light" id="kpEditSipNamaPegawai" readonly>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold mb-1">Nomor SIP</label>
+                        <input type="text" class="form-control form-control-sm" name="no_sip" id="kpEditSipNo" placeholder="Contoh: 503/012/SIP/DPMPTSP/2024" maxlength="100">
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1" for="kpEditSipTglTerbit">Tanggal Terbit</label>
+                            <input type="date" class="form-control form-control-sm" name="tgl_terbit" id="kpEditSipTglTerbit">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1" for="kpEditSipTglKadaluarsa">Tgl Kadaluarsa / Berlaku <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control form-control-sm" name="tgl_kadaluarsa" id="kpEditSipTglKadaluarsa" required>
+                        </div>
+                    </div>
+
+                    <div id="kpEditSipError" class="alert alert-danger py-2 small d-none"></div>
+                </div>
+                <div class="modal-footer py-2 bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="kpEditSipSubmitBtn"><i class="fas fa-save me-1"></i>Simpan Masa Berlaku</button>
                 </div>
             </form>
         </div>

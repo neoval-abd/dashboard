@@ -25,7 +25,7 @@ try {
         http_response_code(403);
         throw new InvalidArgumentException('Anda tidak memiliki hak akses admin pegawai.');
     }
-    if ($action === 'upload' || $action === 'delete') {
+    if ($action === 'upload' || $action === 'delete' || $action === 'save_sip') {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); throw new InvalidArgumentException('Gunakan metode POST.'); }
         // Upload yang melebihi post_max_size membuat $_POST kosong.
         if (empty($_POST) && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) throw new InvalidArgumentException('Ukuran unggahan terlalu besar.');
@@ -34,15 +34,29 @@ try {
         if (!kp_can_write($koneksi)) { http_response_code(403); throw new InvalidArgumentException('Anda tidak memiliki hak kelola berkas pegawai.'); }
         session_write_close();
         if ($action === 'upload') {
-            $count = kpb_upload($koneksi, $_POST['nik'] ?? null, $_POST['kode'] ?? null, $_POST['tgl'] ?? null, $_FILES['files'] ?? null);
+            $sipMeta = [
+                'no_sip'         => $_POST['no_sip'] ?? null,
+                'tgl_terbit'     => $_POST['tgl_terbit'] ?? null,
+                'tgl_kadaluarsa' => $_POST['tgl_kadaluarsa'] ?? null,
+            ];
+            $count = kpb_upload($koneksi, $_POST['nik'] ?? null, $_POST['kode'] ?? null, $_POST['tgl'] ?? null, $_FILES['files'] ?? null, $sipMeta);
             kpb_respond(200, ['success' => true, 'message' => $count . ' file berhasil diunggah.'], false);
+        } elseif ($action === 'save_sip') {
+            kpb_save_sip_meta($koneksi, $_POST['nik'] ?? null, $_POST['kode'] ?? null, $_POST['no_sip'] ?? null, $_POST['tgl_terbit'] ?? null, $_POST['tgl_kadaluarsa'] ?? null);
+            kpb_respond(200, ['success' => true, 'message' => 'Data masa berlaku SIP berhasil disimpan.'], false);
         } else {
             $removed = kpb_delete($koneksi, $_POST['nik'] ?? null, $_POST['kode'] ?? null, $_POST['berkas'] ?? null);
             kpb_respond(200, ['success' => true, 'message' => 'Berkas berhasil dihapus dari sistem.'], false);
         }
     } elseif ($action === 'summary') {
         session_write_close();
-        kpb_respond(200, ['success' => true, 'rows' => kpb_summary($koneksi), 'kategori' => kpb_categories()], false);
+        $sumResult = kpb_summary($koneksi);
+        kpb_respond(200, [
+            'success'   => true,
+            'rows'      => $sumResult['rows'],
+            'sip_stats' => $sumResult['sip_stats'],
+            'kategori'  => kpb_categories()
+        ], false);
     } elseif ($action === 'detail') {
         session_write_close();
         $category = $_GET['kategori'] ?? '';
