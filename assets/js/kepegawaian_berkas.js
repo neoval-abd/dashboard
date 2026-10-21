@@ -214,13 +214,13 @@
             if (emp.is_nakes && emp.sip) {
                 const s = emp.sip.status;
                 if (s === 'expired') {
-                    sipBadge = `<span class="badge bg-danger ms-1" style="font-size: .65rem;" title="SIP Expired: ${esc(emp.sip.tgl_kadaluarsa || '')}"><i class="fas fa-times-circle me-1"></i>SIP Expired</span>`;
+                    sipBadge = `<span class="badge kp-badge-sip-expired ms-1" style="font-size: .65rem;" title="SIP Expired: ${esc(emp.sip.tgl_kadaluarsa || '')}"><i class="fas fa-times-circle me-1"></i>SIP Expired</span>`;
                 } else if (s === 'kritis') {
-                    sipBadge = `<span class="badge text-dark ms-1" style="background: #fed7aa; border: 1px solid #f97316; font-size: .65rem;" title="Masa Kritis: sisa ${emp.sip.sisa_hari} hari (${esc(emp.sip.tgl_kadaluarsa)})"><i class="fas fa-hourglass-end text-danger me-1"></i>SIP ${emp.sip.sisa_hari} hr</span>`;
+                    sipBadge = `<span class="badge kp-badge-sip-kritis ms-1" style="font-size: .65rem;" title="Masa Kritis: sisa ${emp.sip.sisa_hari} hari (${esc(emp.sip.tgl_kadaluarsa)})"><i class="fas fa-hourglass-end me-1"></i>SIP ${emp.sip.sisa_hari} hr</span>`;
                 } else if (s === 'warning') {
-                    sipBadge = `<span class="badge bg-warning text-dark ms-1" style="font-size: .65rem;" title="Peringatan: sisa ${emp.sip.sisa_hari} hari (${esc(emp.sip.tgl_kadaluarsa)})"><i class="fas fa-exclamation-circle me-1"></i>SIP ${emp.sip.sisa_hari} hr</span>`;
+                    sipBadge = `<span class="badge kp-badge-sip-warning ms-1" style="font-size: .65rem;" title="Peringatan: sisa ${emp.sip.sisa_hari} hari (${esc(emp.sip.tgl_kadaluarsa)})"><i class="fas fa-clock me-1"></i>SIP ${emp.sip.sisa_hari} hr</span>`;
                 } else if (s === 'active') {
-                    sipBadge = `<span class="badge bg-success ms-1" style="font-size: .65rem;" title="SIP Aktif s/d ${esc(emp.sip.tgl_kadaluarsa)}"><i class="fas fa-check-circle me-1"></i>SIP Aktif</span>`;
+                    sipBadge = `<span class="badge kp-badge-sip-active ms-1" style="font-size: .65rem;" title="SIP Aktif s/d ${esc(emp.sip.tgl_kadaluarsa)}"><i class="fas fa-check-circle me-1"></i>SIP Aktif</span>`;
                 } else if (s === 'need_date') {
                     sipBadge = `<span class="badge bg-info text-dark ms-1" style="font-size: .65rem;" title="File SIP terunggah, belum ada tanggal berlaku"><i class="fas fa-calendar-plus me-1"></i>Isi Tgl SIP</span>`;
                 } else {
@@ -455,34 +455,59 @@
                         const sisa = Number(meta.sisa_hari);
                         let sisaBadge = '';
                         if (sisa < 0) {
-                            sisaBadge = `<span class="badge bg-danger ms-1" style="font-size: .65rem;"><i class="fas fa-times-circle me-1"></i>Expired (${Math.abs(sisa)} hari lalu)</span>`;
+                            sisaBadge = `<span class="badge kp-badge-sip-expired" style="font-size: .65rem;"><i class="fas fa-times-circle me-1"></i>Expired (${Math.abs(sisa)} hari lalu)</span>`;
                         } else if (sisa <= 30) {
-                            sisaBadge = `<span class="badge text-dark ms-1" style="background: #fed7aa; border: 1px solid #f97316; font-size: .65rem;"><i class="fas fa-hourglass-end text-danger me-1"></i>Kritis: sisa ${sisa} hari</span>`;
+                            sisaBadge = `<span class="badge kp-badge-sip-kritis" style="font-size: .65rem;"><i class="fas fa-hourglass-end me-1"></i>Kritis: sisa ${sisa} hari</span>`;
                         } else if (sisa <= 90) {
-                            sisaBadge = `<span class="badge bg-warning text-dark ms-1" style="font-size: .65rem;"><i class="fas fa-clock me-1"></i>Peringatan: sisa ${sisa} hari</span>`;
+                            sisaBadge = `<span class="badge kp-badge-sip-warning" style="font-size: .65rem;"><i class="fas fa-clock me-1"></i>Peringatan: sisa ${sisa} hari</span>`;
                         } else {
-                            sisaBadge = `<span class="badge bg-success ms-1" style="font-size: .65rem;"><i class="fas fa-check-circle me-1"></i>Aktif: sisa ${sisa} hari</span>`;
+                            sisaBadge = `<span class="badge kp-badge-sip-active" style="font-size: .65rem;"><i class="fas fa-check-circle me-1"></i>Aktif: sisa ${sisa} hari</span>`;
                         }
 
+                        const dateRangeText = meta.tgl_terbit 
+                            ? `${esc(meta.tgl_terbit)} s/d <strong>${esc(meta.tgl_kadaluarsa)}</strong>`
+                            : `s/d <strong>${esc(meta.tgl_kadaluarsa)}</strong>`;
+
                         sipMetaHtml = `
-                            <div class="mt-1 p-2 rounded kp-sip-input-card small" style="font-size: .72rem;">
-                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-1">
-                                    <div>
-                                        <i class="fas fa-certificate text-warning me-1"></i>
-                                        <strong>No. SIP:</strong> <span class="font-monospace">${esc(meta.no_sip || '-')}</span>
-                                    </div>
-                                    <div>${sisaBadge}</div>
-                                </div>
-                                <div class="d-flex gap-3 text-muted mt-1" style="font-size: .7rem;">
-                                    <span><i class="fas fa-calendar-alt me-1"></i>Terbit: <strong>${esc(meta.tgl_terbit || '-')}</strong></span>
-                                    <span><i class="fas fa-calendar-times me-1"></i>Berlaku: <strong>${esc(meta.tgl_kadaluarsa)}</strong></span>
-                                </div>
+                            <div class="mt-1 d-inline-flex align-items-center flex-wrap gap-2 py-1 px-2 rounded kp-sip-inline-box" style="font-size: .72rem;">
+                                <span class="d-inline-flex align-items-center">
+                                    <i class="fas fa-certificate text-warning me-1"></i>
+                                    <strong>No. SIP:</strong>&nbsp;<span class="font-monospace">${esc(meta.no_sip || '-')}</span>
+                                </span>
+                                ${sisaBadge}
+                                <span class="kp-emp-subtext" style="font-size: .68rem;">
+                                    <i class="fas fa-calendar-alt me-1"></i>${dateRangeText}
+                                </span>
+                                ${cfg.canWrite ? `
+                                    <button type="button" class="btn btn-outline-info btn-xs py-0 px-2 kp-item-sip-date ms-1" 
+                                        data-nik="${esc(p.nik)}" 
+                                        data-nama-pegawai="${esc(p.nama)}"
+                                        data-kode="${esc(item.kode)}" 
+                                        data-nosip="${esc(meta.no_sip || '')}"
+                                        data-terbit="${esc(meta.tgl_terbit || '')}"
+                                        data-kadaluarsa="${esc(meta.tgl_kadaluarsa || '')}"
+                                        title="Atur Masa Berlaku SIP">
+                                        <i class="fas fa-calendar-check me-1"></i>Atur SIP
+                                    </button>
+                                ` : ''}
                             </div>
                         `;
                     } else {
                         sipMetaHtml = `
-                            <div class="mt-1 small kp-emp-subtext" style="font-size: .72rem;">
+                            <div class="mt-1 d-inline-flex align-items-center flex-wrap gap-2 py-1 px-2 rounded kp-sip-inline-box" style="font-size: .72rem;">
                                 <span class="badge bg-secondary opacity-75"><i class="fas fa-info-circle me-1"></i>Masa berlaku SIP belum diisi</span>
+                                ${cfg.canWrite ? `
+                                    <button type="button" class="btn btn-outline-info btn-xs py-0 px-2 kp-item-sip-date ms-1" 
+                                        data-nik="${esc(p.nik)}" 
+                                        data-nama-pegawai="${esc(p.nama)}"
+                                        data-kode="${esc(item.kode)}" 
+                                        data-nosip="${esc((item.sip_meta && item.sip_meta.no_sip) || '')}"
+                                        data-terbit="${esc((item.sip_meta && item.sip_meta.tgl_terbit) || '')}"
+                                        data-kadaluarsa="${esc((item.sip_meta && item.sip_meta.tgl_kadaluarsa) || '')}"
+                                        title="Atur Masa Berlaku SIP">
+                                        <i class="fas fa-calendar-plus me-1"></i>Atur SIP
+                                    </button>
+                                ` : ''}
                             </div>
                         `;
                     }
@@ -543,9 +568,9 @@
                                 <span class="kp-emp-subtext fst-italic" style="font-size: .72rem;">Belum ada file</span>
                             `}
                         </td>
-                        <td class="text-center">
+                        <td class="text-center align-middle">
                             ${cfg.canWrite ? `
-                                <button type="button" class="btn btn-outline-success btn-xs py-0 px-2 kp-item-upload mb-1" 
+                                <button type="button" class="btn btn-outline-success btn-xs py-0 px-2 kp-item-upload" 
                                     data-nik="${esc(p.nik)}" 
                                     data-kode="${esc(item.kode)}" 
                                     data-nama="${esc(item.nama)}"
@@ -553,18 +578,6 @@
                                     title="Upload ${esc(item.nama)}">
                                     <i class="fas fa-upload me-1"></i>Upload
                                 </button>
-                                ${item.is_sip ? `
-                                    <button type="button" class="btn btn-outline-info btn-xs py-0 px-2 kp-item-sip-date d-block mx-auto" 
-                                        data-nik="${esc(p.nik)}" 
-                                        data-nama-pegawai="${esc(p.nama)}"
-                                        data-kode="${esc(item.kode)}" 
-                                        data-nosip="${esc((item.sip_meta && item.sip_meta.no_sip) || '')}"
-                                        data-terbit="${esc((item.sip_meta && item.sip_meta.tgl_terbit) || '')}"
-                                        data-kadaluarsa="${esc((item.sip_meta && item.sip_meta.tgl_kadaluarsa) || '')}"
-                                        title="Atur Masa Berlaku SIP">
-                                        <i class="fas fa-calendar-check me-1"></i>Atur SIP
-                                    </button>
-                                ` : ''}
                             ` : `
                                 <span class="text-muted">-</span>
                             `}

@@ -130,6 +130,26 @@ function kp_escape($value) { return htmlspecialchars((string) $value, ENT_QUOTES
     /* Minimalist Scrollbar */
     --kp-scroll-thumb: rgba(100, 116, 139, 0.35);
     --kp-scroll-thumb-hover: #0d6efd;
+    
+    /* SIP Status Badges - Light Mode */
+    --kp-sip-kritis-bg: #ffedd5;
+    --kp-sip-kritis-border: #f97316;
+    --kp-sip-kritis-text: #9a3412;
+    --kp-sip-kritis-icon: #ea580c;
+    --kp-sip-expired-bg: #fee2e2;
+    --kp-sip-expired-border: #ef4444;
+    --kp-sip-expired-text: #991b1b;
+    --kp-sip-expired-icon: #dc2626;
+    --kp-sip-warning-bg: #fef9c3;
+    --kp-sip-warning-border: #f59e0b;
+    --kp-sip-warning-text: #854d0e;
+    --kp-sip-warning-icon: #d97706;
+    --kp-sip-active-bg: #dcfce7;
+    --kp-sip-active-border: #22c55e;
+    --kp-sip-active-text: #166534;
+    --kp-sip-active-icon: #16a34a;
+    --kp-sip-inline-bg: #f8fafc;
+    --kp-sip-inline-border: #e2e8f0;
 }
 
 /* OVERRIDES UNTUK DARK MODE (SOLID DARK NAVY & ANIMATED MESH GRADIENT) */
@@ -214,6 +234,26 @@ html.theme-glass-animated {
     /* Minimalist Scrollbar */
     --kp-scroll-thumb: rgba(148, 163, 184, 0.28);
     --kp-scroll-thumb-hover: rgba(56, 189, 248, 0.6);
+    
+    /* SIP Status Badges - Dark Mode (Translucent, High-Contrast Glow) */
+    --kp-sip-kritis-bg: rgba(249, 115, 22, 0.18);
+    --kp-sip-kritis-border: rgba(249, 115, 22, 0.55);
+    --kp-sip-kritis-text: #fdba74;
+    --kp-sip-kritis-icon: #fb923c;
+    --kp-sip-expired-bg: rgba(239, 68, 68, 0.2);
+    --kp-sip-expired-border: rgba(239, 68, 68, 0.6);
+    --kp-sip-expired-text: #fca5a5;
+    --kp-sip-expired-icon: #f87171;
+    --kp-sip-warning-bg: rgba(245, 158, 11, 0.18);
+    --kp-sip-warning-border: rgba(245, 158, 11, 0.55);
+    --kp-sip-warning-text: #fde047;
+    --kp-sip-warning-icon: #fbbf24;
+    --kp-sip-active-bg: rgba(34, 197, 94, 0.18);
+    --kp-sip-active-border: rgba(34, 197, 94, 0.5);
+    --kp-sip-active-text: #86efac;
+    --kp-sip-active-icon: #4ade80;
+    --kp-sip-inline-bg: rgba(255, 255, 255, 0.04);
+    --kp-sip-inline-border: rgba(255, 255, 255, 0.1);
 }
 
 /* Minimalist Custom Scrollbar */
@@ -565,6 +605,18 @@ html.theme-light .kp-category-select option {
     box-shadow: 0 0 0 2px #0d6efd, 0 4px 12px rgba(13, 110, 253, 0.15);
     background: var(--kp-bg-surface);
 }
+.kp-sip-tile[data-sip-filter="kritis"].active {
+    box-shadow: 0 0 0 2px #f97316, 0 4px 14px rgba(249, 115, 22, 0.28) !important;
+}
+.kp-sip-tile[data-sip-filter="expired"].active {
+    box-shadow: 0 0 0 2px #ef4444, 0 4px 14px rgba(239, 68, 68, 0.28) !important;
+}
+.kp-sip-tile[data-sip-filter="warning"].active {
+    box-shadow: 0 0 0 2px #f59e0b, 0 4px 14px rgba(245, 158, 11, 0.28) !important;
+}
+.kp-sip-tile[data-sip-filter="active"].active {
+    box-shadow: 0 0 0 2px #22c55e, 0 4px 14px rgba(34, 197, 94, 0.28) !important;
+}
 .kp-sip-tile-label {
     font-size: 0.74rem;
     font-weight: 600;
@@ -588,6 +640,50 @@ html.theme-light .kp-category-select option {
 .kp-sip-input-card {
     background: var(--kp-bg-subtle);
     border: 1px dashed var(--kp-border-strong) !important;
+}
+.kp-sip-inline-box {
+    background: var(--kp-sip-inline-bg);
+    border: 1px solid var(--kp-sip-inline-border);
+    transition: all 0.2s ease;
+}
+.kp-sip-inline-box:hover {
+    border-color: var(--kp-border-strong);
+}
+.kp-badge-sip-kritis {
+    background-color: var(--kp-sip-kritis-bg) !important;
+    border: 1px solid var(--kp-sip-kritis-border) !important;
+    color: var(--kp-sip-kritis-text) !important;
+    font-weight: 600;
+}
+.kp-badge-sip-kritis i {
+    color: var(--kp-sip-kritis-icon) !important;
+}
+.kp-badge-sip-expired {
+    background-color: var(--kp-sip-expired-bg) !important;
+    border: 1px solid var(--kp-sip-expired-border) !important;
+    color: var(--kp-sip-expired-text) !important;
+    font-weight: 600;
+}
+.kp-badge-sip-expired i {
+    color: var(--kp-sip-expired-icon) !important;
+}
+.kp-badge-sip-warning {
+    background-color: var(--kp-sip-warning-bg) !important;
+    border: 1px solid var(--kp-sip-warning-border) !important;
+    color: var(--kp-sip-warning-text) !important;
+    font-weight: 600;
+}
+.kp-badge-sip-warning i {
+    color: var(--kp-sip-warning-icon) !important;
+}
+.kp-badge-sip-active {
+    background-color: var(--kp-sip-active-bg) !important;
+    border: 1px solid var(--kp-sip-active-border) !important;
+    color: var(--kp-sip-active-text) !important;
+    font-weight: 600;
+}
+.kp-badge-sip-active i {
+    color: var(--kp-sip-active-icon) !important;
 }
 .kp-sip-form-title {
     color: var(--kp-text-title) !important;
