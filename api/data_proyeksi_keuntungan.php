@@ -145,40 +145,53 @@ if (empty($kd_pj) && $status_bayar != 'Piutang') {
 
 
 // =================================================================================
-// 3. HITUNG RETUR (PENGURANG PROFIT) - FIX JOIN
+// 3. HITUNG RETUR PENJUALAN BEBAS (Hanya jika Penjualan Bebas aktif)
 // =================================================================================
-// Kita join ke databarang karena detreturjual tidak punya h_beli
-$sql_retur_bebas = "
-    SELECT 
-        SUM(drj.subtotal) as total_retur_jual, 
-        SUM(b.h_beli * drj.jml_retur) as modal_retur
-    FROM detreturjual drj
-    INNER JOIN returjual rj ON drj.no_retur_jual = rj.no_retur_jual
-    INNER JOIN databarang b ON drj.kode_brng = b.kode_brng
-    WHERE rj.tgl_retur BETWEEN ? AND ?
-";
+// Retur jual adalah retur dari penjualan bebas apotek/toko umum,
+// sehingga HANYA dihitung jika user tidak sedang memfilter penjamin pasien dan bukan piutang.
+if (empty($kd_pj) && $status_bayar != 'Piutang') {
+    $sql_retur_bebas = "
+        SELECT 
+            rj.tgl_retur,
+            SUM(drj.subtotal) as total_retur_jual, 
+            SUM(b.h_beli * drj.jml_retur) as modal_retur
+        FROM detreturjual drj
+        INNER JOIN returjual rj ON drj.no_retur_jual = rj.no_retur_jual
+        INNER JOIN databarang b ON drj.kode_brng = b.kode_brng
+        WHERE rj.tgl_retur BETWEEN ? AND ?
+        GROUP BY rj.tgl_retur
+    ";
 
-$stmt3 = $koneksi->prepare($sql_retur_bebas);
-if ($stmt3) {
-    $stmt3->bind_param("ss", $tgl_awal, $tgl_akhir);
-    $stmt3->execute();
-    $res3 = $stmt3->get_result();
-    
-    if ($res3) {
-        $row_retur = $res3->fetch_assoc();
-        $retur_omzet = (float)$row_retur['total_retur_jual'];
-        $retur_modal = (float)$row_retur['modal_retur'];
-        $retur_profit = $retur_omzet - $retur_modal;
+    $stmt3 = $koneksi->prepare($sql_retur_bebas);
+    if ($stmt3) {
+        $stmt3->bind_param("ss", $tgl_awal, $tgl_akhir);
+        $stmt3->execute();
+        $res3 = $stmt3->get_result();
+        
+        while ($row_retur = $res3->fetch_assoc()) {
+            $retur_omzet = (float)($row_retur['total_retur_jual'] ?? 0);
+            $retur_modal = (float)($row_retur['modal_retur'] ?? 0);
+            $retur_profit = $retur_omzet - $retur_modal;
 
-        // Kurangi Summary dengan Retur
-        $summary['omzet'] -= $retur_omzet;
-        $summary['modal'] -= $retur_modal;
-        $summary['profit'] -= $retur_profit;
-        $summary['retur'] = $retur_omzet; 
+            // Kurangi Summary dengan Retur
+            $summary['omzet'] -= $retur_omzet;
+            $summary['modal'] -= $retur_modal;
+            $summary['profit'] -= $retur_profit;
+            $summary['retur'] += $retur_omzet;
+
+            // Kurangi Data Harian (Grafik) agar sinkron dengan summary
+            $tgl = date('Y-m-d', strtotime($row_retur['tgl_retur']));
+            if (!isset($daily_data[$tgl])) {
+                $daily_data[$tgl] = ['omzet' => 0, 'modal' => 0, 'profit' => 0];
+            }
+            $daily_data[$tgl]['omzet'] -= $retur_omzet;
+            $daily_data[$tgl]['modal'] -= $retur_modal;
+            $daily_data[$tgl]['profit'] -= $retur_profit;
+        }
+        $stmt3->close();
+    } else {
+        error_log("Query Retur Error: " . $koneksi->error);
     }
-    $stmt3->close();
-} else {
-    error_log("Query Retur Error: " . $koneksi->error);
 }
 
 // =================================================================================
