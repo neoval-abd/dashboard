@@ -154,6 +154,8 @@ Kita udah pecah menu-menu ini jadi kategori biar gak pusing carinya. Gunakan tom
 *   **Monitoring Stok**: Pantau stok berjalan di gudang farmasi dan apotek secara real-time.
 ![Dashboard Stok Farmasi](40. Dashboard Stok Berjalan Farmasi.jpg)
 
+*   **Penjualan Obat (Sirkulasi Farmasi)**: Sirkulasi lengkap 33 indikator keluar masuk obat, alkes, dan BHP medis (Stok, Aset, Pengadaan, Penerimaan, Penjualan, Ke Pasien, Piutang Jual, Retur Beli/Jual/Piutang, UTD, Keluar Medis, Resep Pulang, Mutasi Masuk/Keluar, Hibah).
+
 *   **Profit Farmasi**: Analisa keuntungan dari penjualan obat dan pemberian resep.
 ![Dashboard Profit Farmasi](44. Dashboard Proyeksi Keuntungan Farmasi.jpg)
 ![Detail Margin Obat](45. Detail Proyeksi Keuntungan jual dan beri obat.jpg)

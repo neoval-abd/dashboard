@@ -172,6 +172,12 @@
                 "is_active": true
             },
             {
+                "url": "laporan_penjualan_obat.php",
+                "title": "Penjualan Obat",
+                "icon": "fas fa-cash-register",
+                "is_active": true
+            },
+            {
                 "url": "laporan_stok_opname.php",
                 "title": "Stok Opname",
                 "icon": "fas fa-clipboard-check",
@@ -320,5 +326,3 @@
         ]
     }
 ]
-
-

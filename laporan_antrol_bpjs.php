@@ -14,8 +14,8 @@ $tgl1 = isset($_GET['tgl1']) ? $_GET['tgl1'] : date('Y-m-d', strtotime('-7 days'
 $tgl2 = isset($_GET['tgl2']) ? $_GET['tgl2'] : date('Y-m-d');
 
 // ============================================================
-// Query DB Lokal — data pasien + Task ID dari tabel bpjs_taskid_live
-// (hasil sync SIMRS Khanza → BPJS). Tidak perlu fetch live lagi.
+// Query DB Lokal — data pasien + Task ID dari tabel referensi_mobilejkn_bpjs_taskid
+// (tabel standar SIMRS Khanza).
 // ============================================================
 $sql = "SELECT 
     rp.no_rawat,
@@ -34,12 +34,12 @@ $sql = "SELECT
     (SELECT no_sep FROM bridging_sep WHERE no_rawat = rp.no_rawat LIMIT 1) AS `no_sep`,
     CONCAT(rp.tgl_registrasi, ' ', rp.jam_reg) AS `Jam Registrasi`,
     rmj.validasi AS `Jam Checkin`,
-    -- Task ID dari bpjs_taskid_live (sync SIMRS → BPJS)
-    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '3' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_3`,
-    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '4' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_4`,
-    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '5' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_5`,
-    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '6' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_6`,
-    DATE_FORMAT(MAX(CASE WHEN btl.taskid = '7' THEN btl.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_7`,
+    -- Task ID dari referensi_mobilejkn_bpjs_taskid
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '3' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_3`,
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '4' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_4`,
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '5' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_5`,
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '6' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_6`,
+    DATE_FORMAT(MAX(CASE WHEN rmjt.taskid = '7' THEN rmjt.waktu END), '%Y-%m-%d %H:%i:%s') AS `bpjs_TID_7`,
     -- Referensi ERM (untuk tab Raw/IT)
     (SELECT CONCAT(pr.tgl_perawatan, ' ', pr.jam_rawat)
      FROM pemeriksaan_ralan pr INNER JOIN dokter d2 ON pr.nip = d2.kd_dokter
@@ -54,7 +54,7 @@ LEFT JOIN penjab pj ON rp.kd_pj = pj.kd_pj
 LEFT JOIN pasien ps ON rp.no_rkm_medis = ps.no_rkm_medis
 LEFT JOIN dokter d ON rp.kd_dokter = d.kd_dokter
 LEFT JOIN maping_poli_bpjs mpb ON rp.kd_poli = mpb.kd_poli_rs
-LEFT JOIN bpjs_taskid_live btl ON rp.no_rawat = btl.no_rawat
+LEFT JOIN referensi_mobilejkn_bpjs_taskid rmjt ON rp.no_rawat = rmjt.no_rawat
 LEFT JOIN referensi_mobilejkn_bpjs rmj ON rp.no_rawat = rmj.no_rawat
 LEFT JOIN mutasi_berkas mb ON rp.no_rawat = mb.no_rawat
 LEFT JOIN resep_obat ro ON rp.no_rawat = ro.no_rawat
@@ -98,7 +98,7 @@ if ($stmt = $koneksi->prepare($sql)) {
                 'ket_batal'        => $row['ket_batal'] ?? '',
                 'Jam_Registrasi'   => $row['Jam Registrasi'],
                 'Jam_Checkin'      => $row['Jam Checkin'] ?? '',
-                // Data BPJS dari bpjs_taskid_live (sumber utama)
+                // Data BPJS dari referensi_mobilejkn_bpjs_taskid (sumber utama)
                 'bpjs' => [
                     'TID3' => $row['bpjs_TID_3'] ?? '',
                     'TID4' => $row['bpjs_TID_4'] ?? '',
@@ -252,7 +252,7 @@ if ($stmt = $koneksi->prepare($sql)) {
     <div class="tab-pane fade show active" id="matrix-pane" role="tabpanel" tabindex="0">
         <div class="table-container pt-4 border border-top-0">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0"><i class="fas fa-shield-alt text-success me-2"></i>Laporan Validasi Antrol Standard <span class="badge bg-success text-white ms-2" style="font-size:0.7rem;"><i class="fas fa-database"></i> Sumber: bpjs_taskid_live (SIMRS Sync)</span></h5>
+                <h5 class="fw-bold mb-0"><i class="fas fa-shield-alt text-success me-2"></i>Laporan Validasi Antrol Standard <span class="badge bg-success text-white ms-2" style="font-size:0.7rem;"><i class="fas fa-database"></i> Sumber: referensi_mobilejkn_bpjs_taskid</span></h5>
             </div>
             <div class="table-responsive">
                 <table id="antrolTable" class="table table-striped table-hover align-middle w-100" style="font-size: 0.82rem;">
@@ -284,7 +284,7 @@ if ($stmt = $koneksi->prepare($sql)) {
             <h5 class="fw-bold mb-3"><i class="fas fa-laptop-code text-primary me-2"></i>Analisis Timestamp (Bot IT)</h5>
             <div class="alert alert-info py-2 small mb-3">
                 <i class="fas fa-info-circle me-1"></i>
-                Kolom <b>ERM RS</b> = jejak dari SIMRS lokal. Kolom <b>BPJS Live</b> = data aktual dari server BPJS.
+                Kolom <b>ERM RS</b> = jejak dari SIMRS lokal. Kolom <b>BPJS Task ID</b> = data aktual task ID (referensi_mobilejkn_bpjs_taskid).
                 <b>Orange Flag</b> = Bot menambal, <b>Red Flag</b> = SIMRS gagal bridging, <b>Blue Flag</b> = data hanya ada di BPJS (dikirim dari luar SIMRS).
             </div>
             <div class="table-responsive">
@@ -312,7 +312,7 @@ if ($stmt = $koneksi->prepare($sql)) {
 <?php ob_start(); ?>
 <script>
 // ============================================================
-// Data pasien dari PHP (termasuk Task ID dari bpjs_taskid_live)
+// Data pasien dari PHP (termasuk Task ID dari referensi_mobilejkn_bpjs_taskid)
 // ============================================================
 const PATIENTS = <?php echo json_encode($patients, JSON_UNESCAPED_UNICODE); ?>;
 const TOTAL    = PATIENTS.length;
@@ -354,7 +354,7 @@ function prc(sent, total) {
 function buildBadgeExec(bpjsTime, taskid) {
     if (bpjsTime) {
         const t = extractTime(bpjsTime) || bpjsTime;
-        return `<span class='badge bg-success badge-bpjs' title='BPJS Live [T${taskid}]: ${t}'><i class='fas fa-check'></i> ${t}</span>`;
+        return `<span class='badge bg-success badge-bpjs' title='BPJS [T${taskid}]: ${t}'><i class='fas fa-check'></i> ${t}</span>`;
     }
     return `<span class='badge bg-danger badge-bpjs'><i class='fas fa-times'></i> Gagal</span>`;
 }
@@ -398,10 +398,10 @@ function buildRawCell(erm, bpjs) {
 }
 
 // ============================================================
-// Render satu baris dari data PHP (bpjs_taskid_live)
+// Render satu baris dari data PHP (referensi_mobilejkn_bpjs_taskid)
 // ============================================================
 function renderRow(p) {
-    // Data BPJS langsung dari PHP (bpjs_taskid_live)
+    // Data BPJS langsung dari PHP (referensi_mobilejkn_bpjs_taskid)
     const t3 = p.bpjs.TID3 || null;
     const t4 = p.bpjs.TID4 || null;
     const t5 = p.bpjs.TID5 || null;
