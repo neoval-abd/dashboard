@@ -147,8 +147,14 @@
         "items": [
             {
                 "url": "laporan_kinerja_dokter.php",
-                "title": "Kunjungan Dokter",
+                "title": "Kunjungan Per Dokter",
                 "icon": "fas fa-user-md",
+                "is_active": true
+            },
+            {
+                "url": "laporan_ketepatan_dokter.php",
+                "title": "Absensi  Dokter",
+                "icon": "fas fa-user-clock",
                 "is_active": true
             },
             {
