@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = trim((string) ($_POST['action'] ?? 'enqueue'));
 
-    // 0a. Simpan Konfigurasi Kredensial SaungWA ke config/saungwa.php
+    // 0a. Simpan Konfigurasi Kredensial SaungWA ke Database (`konfigurasi_wa_gateway`)
     if ($action === 'save_saungwa_config') {
         $saveRes = save_saungwa_config_file([
             'provider'     => $_POST['provider'] ?? 'saungwa',
@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'app_key'      => $_POST['app_key'] ?? '',
             'auth_key'     => $_POST['auth_key'] ?? '',
             'test_target'  => $_POST['test_target'] ?? '',
-        ]);
+        ], $koneksi);
 
         if (empty($saveRes['success'])) {
             echo json_encode([
@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode([
             'success' => true,
             'config'  => $saveRes,
-            'message' => 'Konfigurasi SaungWA berhasil disimpan ke config/saungwa.php.',
+            'message' => 'Konfigurasi SaungWA berhasil disimpan ke Database (siap dipakai di Linux/Windows tanpa sudo).',
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -134,13 +134,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
         if (!empty($sendRes['success'])) {
-            // Simpan permanen hanya setelah tes kirim sukses (atau kredensial valid)
+            // Simpan permanen ke Database (tidak memerlukan izin tulis folder / sudo di Linux)
             $savedCfg = save_saungwa_config_file([
                 'provider'     => $_POST['provider'] ?? 'saungwa',
                 'sender_phone' => $senderPhone,
                 'app_key'      => $appKey,
                 'auth_key'     => $authKey,
-            ]);
+            ], $koneksi);
 
             echo json_encode([
                 'success'       => true,

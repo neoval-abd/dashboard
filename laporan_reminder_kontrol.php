@@ -1574,7 +1574,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                 </div>
             </div>
             <div class="modal-footer modal-footer-themed d-flex justify-content-between">
-                <small class="text-muted">Tersimpan di <code>config/saungwa.php</code> &amp; dipakai oleh worker service 5 menit.</small>
+                <small class="text-muted"><i class="fas fa-database me-1"></i>Tersimpan otomatis di Database (tanpa perlu izin folder / <code>sudo</code> di Linux).</small>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
                     <button type="button" class="btn btn-success fw-bold px-4" id="btnSaveSaungwaConfig">

@@ -8,4 +8,3 @@ while true; do
     printf 'Menunggu %d detik sebelum siklus berikutnya...\n' "$WAIT_SEC"
     sleep "$WAIT_SEC"
 done
- 

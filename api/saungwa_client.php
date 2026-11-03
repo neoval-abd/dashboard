@@ -2,7 +2,8 @@
 /*
  * File: api/saungwa_client.php
  * Fungsi: Client resmi integrasi WhatsApp Gateway SaungWA (https://app.saungwa.com/api/create-message)
- *         beserta router gateway terpadu (SaungWA / Fonnte) dan manajemen file konfigurasi.
+ *         dengan penyimpanan konfigurasi berbasis Database (`konfigurasi_wa_gateway`) agar 100% berjalan
+ *         di server Linux Mint / Ubuntu maupun Windows tanpa memerlukan sudo / chmod pada folder config/.
  */
 
 $saungwaConfigPath = dirname(__DIR__) . '/config/saungwa.php';
@@ -32,6 +33,9 @@ if (!function_exists('normalize_wa_number')) {
     }
 }
 
+/**
+ * Validasi & ekstrak AppKey SaungWA (menolak link /user/device/... dan mengekstrak UUID bila ditempel dari snippet)
+ */
 function parse_saungwa_appkey_input($rawInput)
 {
     $raw = trim((string) $rawInput);
@@ -39,21 +43,18 @@ function parse_saungwa_appkey_input($rawInput)
         return ['valid' => true, 'app_key' => '', 'error' => ''];
     }
 
-    // Deteksi salah tempel URL dari menu Device Broadcast (/user/device/...)
     if (stripos($raw, '/user/device/') !== false || stripos($raw, '/device/') !== false) {
         return [
             'valid'   => false,
             'app_key' => '',
-            'error'   => 'Yang ditempel adalah link menu "Device Broadcast" (/user/device/...), bukan AppKey! Silakan klik menu "Webhook App" (ikon kuning di atas History Pesan pada sidebar kiri SaungWA) -> Buat App untuk RS ASSALAM -> klik Integration -> salin kode appkey.',
+            'error'   => 'Yang ditempel adalah link menu "Device Broadcast" (/user/device/...), bukan AppKey! Buka menu "Webhook App" di sidebar kiri SaungWA -> Buat App -> klik Integration -> salin kode appkey.',
         ];
     }
 
-    // Jika user menempel potongan kode PHP/cURL dari halaman Integration SaungWA, ekstrak nilai appkey-nya
     if (preg_match('/appkey[\'"]?\s*(?:=>|=|:)\s*[\'"]([a-zA-Z0-9\-]{16,80})[\'"]/i', $raw, $m)) {
         return ['valid' => true, 'app_key' => $m[1], 'error' => ''];
     }
 
-    // Jika user menempel URL dari halaman Webhook App yang mengandung UUID
     if (preg_match('/^https?:\/\//i', $raw)) {
         if (preg_match('/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i', $raw, $mUuid)) {
             return ['valid' => true, 'app_key' => $mUuid[1], 'error' => ''];
@@ -65,68 +66,153 @@ function parse_saungwa_appkey_input($rawInput)
         ];
     }
 
-    // Bersihkan tanda kutip jika ikut tersalin
     $clean = trim($raw, " \t\n\r\0\x0B\"'");
     return ['valid' => true, 'app_key' => $clean, 'error' => ''];
 }
 
-function get_active_wa_provider()
+/**
+ * Pastikan tabel konfigurasi gateway WA tersedia di database (bebas masalah permission folder Linux).
+ */
+function ensure_wa_gateway_config_table($db = null)
 {
-    $prov = defined('WA_ACTIVE_PROVIDER') ? strtolower(trim((string) WA_ACTIVE_PROVIDER)) : 'saungwa';
-    return in_array($prov, ['saungwa', 'fonnte'], true) ? $prov : 'saungwa';
+    if (!$db && isset($GLOBALS['koneksi']) && ($GLOBALS['koneksi'] instanceof mysqli)) {
+        $db = $GLOBALS['koneksi'];
+    }
+    if (!($db instanceof mysqli)) {
+        return false;
+    }
+
+    $sql = "CREATE TABLE IF NOT EXISTS konfigurasi_wa_gateway (
+        id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+        provider VARCHAR(20) NOT NULL DEFAULT 'saungwa',
+        sender_phone VARCHAR(30) NOT NULL DEFAULT '',
+        app_key VARCHAR(120) NOT NULL DEFAULT '',
+        auth_key VARCHAR(160) NOT NULL DEFAULT '',
+        api_url VARCHAR(255) NOT NULL DEFAULT 'https://app.saungwa.com/api/create-message',
+        test_target VARCHAR(30) NOT NULL DEFAULT '',
+        updated_by VARCHAR(100) DEFAULT NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+    return (bool) @$db->query($sql);
 }
 
-function get_saungwa_config_summary()
+/**
+ * Ambil konfigurasi aktif dengan prioritas:
+ * 1. Tabel database `konfigurasi_wa_gateway` (id = 1)
+ * 2. Fallback konstanta `config/saungwa.php` (bila ada)
+ */
+function get_saungwa_runtime_settings($db = null, $forceReload = false)
 {
-    $provider    = get_active_wa_provider();
-    $senderRaw   = defined('SAUNGWA_SENDER_PHONE') ? trim((string) SAUNGWA_SENDER_PHONE) : '';
-    $senderNorm  = normalize_wa_number($senderRaw);
-    $senderDisp  = ($senderNorm !== '' && substr($senderNorm, 0, 2) === '62')
+    static $cached = null;
+    if ($cached !== null && !$forceReload) {
+        return $cached;
+    }
+
+    if (!$db && isset($GLOBALS['koneksi']) && ($GLOBALS['koneksi'] instanceof mysqli)) {
+        $db = $GLOBALS['koneksi'];
+    }
+
+    // Nilai default dari file config/saungwa.php (jika ada di lokal) atau default standar RS Assalam
+    $provider   = defined('WA_ACTIVE_PROVIDER') ? strtolower(trim((string) WA_ACTIVE_PROVIDER)) : 'saungwa';
+    $senderRaw  = defined('SAUNGWA_SENDER_PHONE') ? trim((string) SAUNGWA_SENDER_PHONE) : '6289675463447';
+    $appKey     = defined('SAUNGWA_APP_KEY') ? trim((string) SAUNGWA_APP_KEY) : '';
+    $authKey    = defined('SAUNGWA_AUTH_KEY') ? trim((string) SAUNGWA_AUTH_KEY) : '';
+    $apiUrl     = defined('SAUNGWA_API_URL') && trim((string) SAUNGWA_API_URL) !== ''
+        ? trim((string) SAUNGWA_API_URL)
+        : 'https://app.saungwa.com/api/create-message';
+    $testTarget = defined('SAUNGWA_TEST_TARGET') ? trim((string) SAUNGWA_TEST_TARGET) : '';
+    $source     = is_file(dirname(__DIR__) . '/config/saungwa.php') ? 'file' : 'default';
+
+    if ($db instanceof mysqli && ensure_wa_gateway_config_table($db)) {
+        $res = @$db->query("SELECT provider, sender_phone, app_key, auth_key, api_url, test_target FROM konfigurasi_wa_gateway WHERE id = 1 LIMIT 1");
+        if ($res && ($row = $res->fetch_assoc())) {
+            $provider   = strtolower(trim((string) ($row['provider'] ?: 'saungwa')));
+            $senderRaw  = trim((string) ($row['sender_phone'] !== '' ? $row['sender_phone'] : $senderRaw));
+            $appKey     = trim((string) $row['app_key']);
+            $authKey    = trim((string) ($row['auth_key'] !== '' ? $row['auth_key'] : $authKey));
+            $apiUrl     = trim((string) ($row['api_url'] !== '' ? $row['api_url'] : $apiUrl));
+            $testTarget = trim((string) $row['test_target']);
+            $source     = 'database';
+        } elseif ($appKey !== '' || $authKey !== '') {
+            // Seed otomatis baris pertama ke DB bila file lokal memiliki konfigurasi awal
+            $stmtSeed = @$db->prepare("INSERT IGNORE INTO konfigurasi_wa_gateway (id, provider, sender_phone, app_key, auth_key, api_url, test_target, updated_by) VALUES (1, ?, ?, ?, ?, ?, ?, 'auto-seed')");
+            if ($stmtSeed) {
+                $normSender = normalize_wa_number($senderRaw);
+                $stmtSeed->bind_param("ssssss", $provider, $normSender, $appKey, $authKey, $apiUrl, $testTarget);
+                @$stmtSeed->execute();
+                $stmtSeed->close();
+                $source = 'database';
+            }
+        }
+    }
+
+    if (!in_array($provider, ['saungwa', 'fonnte'], true)) {
+        $provider = 'saungwa';
+    }
+
+    $senderNorm = normalize_wa_number($senderRaw);
+    $senderDisp = ($senderNorm !== '' && substr($senderNorm, 0, 2) === '62')
         ? ('0' . substr($senderNorm, 2))
         : $senderRaw;
 
-    $appKey      = defined('SAUNGWA_APP_KEY') ? trim((string) SAUNGWA_APP_KEY) : '';
-    $authKey     = defined('SAUNGWA_AUTH_KEY') ? trim((string) SAUNGWA_AUTH_KEY) : '';
-    $apiUrl      = defined('SAUNGWA_API_URL') ? trim((string) SAUNGWA_API_URL) : 'https://app.saungwa.com/api/create-message';
-    $testTarget  = defined('SAUNGWA_TEST_TARGET') ? trim((string) SAUNGWA_TEST_TARGET) : '';
-    $queueDelay  = defined('SAUNGWA_QUEUE_DELAY_SECONDS') ? (int) SAUNGWA_QUEUE_DELAY_SECONDS : 300;
-    $cooldown    = defined('SAUNGWA_SEND_COOLDOWN_SECONDS') ? (int) SAUNGWA_SEND_COOLDOWN_SECONDS : 120;
-
-    $parsedApp   = parse_saungwa_appkey_input($appKey);
-    $hasAppKey   = ($parsedApp['valid'] && $parsedApp['app_key'] !== '');
-    $hasAuthKey  = ($authKey !== '');
-    $isReady     = ($provider === 'fonnte')
+    $parsedApp  = parse_saungwa_appkey_input($appKey);
+    $cleanApp   = $parsedApp['valid'] ? $parsedApp['app_key'] : '';
+    $hasAppKey  = ($cleanApp !== '');
+    $hasAuthKey = ($authKey !== '');
+    $isReady    = ($provider === 'fonnte')
         ? (defined('FONNTE_TOKEN') && trim((string) FONNTE_TOKEN) !== '')
         : ($hasAppKey && $hasAuthKey);
 
-    return [
+    $cached = [
         'provider'       => $provider,
         'sender_phone'   => $senderNorm,
         'sender_display' => $senderDisp,
-        'app_key'        => $appKey,
+        'app_key'        => $cleanApp,
         'auth_key'       => $authKey,
         'has_app_key'    => $hasAppKey,
         'has_auth_key'   => $hasAuthKey,
         'api_url'        => $apiUrl,
         'test_target'    => $testTarget,
-        'queue_delay'    => $queueDelay,
-        'cooldown'       => $cooldown,
+        'queue_delay'    => defined('SAUNGWA_QUEUE_DELAY_SECONDS') ? (int) SAUNGWA_QUEUE_DELAY_SECONDS : 300,
+        'cooldown'       => defined('SAUNGWA_SEND_COOLDOWN_SECONDS') ? (int) SAUNGWA_SEND_COOLDOWN_SECONDS : 120,
+        'storage_source' => $source,
         'is_ready'       => $isReady,
     ];
+
+    return $cached;
+}
+
+function get_active_wa_provider()
+{
+    $cfg = get_saungwa_runtime_settings();
+    return $cfg['provider'];
+}
+
+function get_saungwa_config_summary()
+{
+    return get_saungwa_runtime_settings();
 }
 
 /**
- * Simpan pembaruan konfigurasi SaungWA secara aman ke config/saungwa.php
+ * Simpan pembaruan konfigurasi SaungWA ke Database (`konfigurasi_wa_gateway`)
+ * sehingga tidak pernah gagal akibat izin tulis folder / sudo di Linux Mint.
+ * Jika file config/saungwa.php kebetulan writable (mis. di Windows lokal), ikut disinkronkan secara opsional.
  */
-function save_saungwa_config_file(array $input)
+function save_saungwa_config_file(array $input, $db = null)
 {
-    $provider = strtolower(trim((string) ($input['provider'] ?? get_active_wa_provider())));
+    if (!$db && isset($GLOBALS['koneksi']) && ($GLOBALS['koneksi'] instanceof mysqli)) {
+        $db = $GLOBALS['koneksi'];
+    }
+
+    $current  = get_saungwa_runtime_settings($db);
+    $provider = strtolower(trim((string) ($input['provider'] ?? $current['provider'])));
     if (!in_array($provider, ['saungwa', 'fonnte'], true)) {
         $provider = 'saungwa';
     }
 
-    $senderPhone = normalize_wa_number($input['sender_phone'] ?? (defined('SAUNGWA_SENDER_PHONE') ? SAUNGWA_SENDER_PHONE : ''));
-    $rawAppKey   = trim((string) ($input['app_key'] ?? (defined('SAUNGWA_APP_KEY') ? SAUNGWA_APP_KEY : '')));
+    $senderPhone = normalize_wa_number($input['sender_phone'] ?? $current['sender_phone']);
+    $rawAppKey   = trim((string) ($input['app_key'] ?? $current['app_key']));
     $parsedApp   = parse_saungwa_appkey_input($rawAppKey);
     if (!$parsedApp['valid']) {
         return [
@@ -134,74 +220,97 @@ function save_saungwa_config_file(array $input)
             'error'   => $parsedApp['error'],
         ];
     }
-    $appKey      = $parsedApp['app_key'];
-    $authKey     = trim((string) ($input['auth_key'] ?? (defined('SAUNGWA_AUTH_KEY') ? SAUNGWA_AUTH_KEY : '')));
-    $testTarget  = trim((string) ($input['test_target'] ?? (defined('SAUNGWA_TEST_TARGET') ? SAUNGWA_TEST_TARGET : '')));
+    $appKey     = $parsedApp['app_key'];
+    $authKey    = trim((string) ($input['auth_key'] ?? $current['auth_key']));
+    $testTarget = trim((string) ($input['test_target'] ?? $current['test_target']));
     if ($testTarget !== '') {
         $testTarget = normalize_wa_number($testTarget);
     }
+    $apiUrl     = $current['api_url'] ?: 'https://app.saungwa.com/api/create-message';
+    $updatedBy  = substr(trim((string) ($_SESSION['nama_pegawai'] ?? ($_SESSION['user_id'] ?? 'admin'))), 0, 100);
 
-    $apiUrl      = defined('SAUNGWA_API_URL') && trim((string) SAUNGWA_API_URL) !== ''
-        ? trim((string) SAUNGWA_API_URL)
-        : 'https://app.saungwa.com/api/create-message';
-    $sandbox     = defined('SAUNGWA_SANDBOX') ? (bool) SAUNGWA_SANDBOX : false;
-    $sslVerify   = defined('SAUNGWA_SSL_VERIFY') ? (bool) SAUNGWA_SSL_VERIFY : false;
-    $cooldown    = defined('SAUNGWA_SEND_COOLDOWN_SECONDS') ? max(0, (int) SAUNGWA_SEND_COOLDOWN_SECONDS) : 120;
-    $queueDelay  = defined('SAUNGWA_QUEUE_DELAY_SECONDS') ? max(60, (int) SAUNGWA_QUEUE_DELAY_SECONDS) : 300;
-    $maxAttempts = defined('SAUNGWA_QUEUE_MAX_ATTEMPTS') ? max(1, (int) SAUNGWA_QUEUE_MAX_ATTEMPTS) : 2;
-    $safeStart   = defined('WA_SAFE_HOUR_START') ? (int) WA_SAFE_HOUR_START : 7;
-    $safeEnd     = defined('WA_SAFE_HOUR_END') ? (int) WA_SAFE_HOUR_END : 20;
+    $savedToDb = false;
+    $dbErr     = '';
 
-    $phpContent = "<?php\n"
-        . "/*\n"
-        . " * Konfigurasi Integrasi WhatsApp Gateway SaungWA (https://app.saungwa.com)\n"
-        . " * Diperbarui pada: " . date('Y-m-d H:i:s') . "\n"
-        . " */\n\n"
-        . "define('WA_ACTIVE_PROVIDER', " . var_export($provider, true) . ");\n\n"
-        . "// Nomor WA perangkat pengirim di SaungWA\n"
-        . "define('SAUNGWA_SENDER_PHONE', " . var_export($senderPhone, true) . ");\n\n"
-        . "// Kredensial API SaungWA (POST https://app.saungwa.com/api/create-message)\n"
-        . "define('SAUNGWA_APP_KEY', " . var_export($appKey, true) . ");\n"
-        . "define('SAUNGWA_AUTH_KEY', " . var_export($authKey, true) . ");\n"
-        . "define('SAUNGWA_API_URL', " . var_export($apiUrl, true) . ");\n\n"
-        . "// Pengaturan Koneksi & Keamanan Pengiriman\n"
-        . "define('SAUNGWA_SANDBOX', " . var_export($sandbox, true) . ");\n"
-        . "define('SAUNGWA_SSL_VERIFY', " . var_export($sslVerify, true) . ");\n"
-        . "define('SAUNGWA_TEST_TARGET', " . var_export($testTarget, true) . ");\n\n"
-        . "// Pengaturan Jeda Antrean Service (~5 menit per pesan agar aman dari blokir WhatsApp)\n"
-        . "define('SAUNGWA_SEND_COOLDOWN_SECONDS', " . $cooldown . ");\n"
-        . "define('SAUNGWA_QUEUE_DELAY_SECONDS', " . $queueDelay . ");\n"
-        . "define('SAUNGWA_QUEUE_MAX_ATTEMPTS', " . $maxAttempts . ");\n\n"
-        . "// Jam sopan pengiriman otomatis ke pasien (07:00 s/d 20:00 WIB)\n"
-        . "define('WA_SAFE_HOUR_START', " . $safeStart . ");\n"
-        . "define('WA_SAFE_HOUR_END', " . $safeEnd . ");\n"
-        . "?>\n";
+    if ($db instanceof mysqli && ensure_wa_gateway_config_table($db)) {
+        $sql = "INSERT INTO konfigurasi_wa_gateway
+                    (id, provider, sender_phone, app_key, auth_key, api_url, test_target, updated_by)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    provider     = VALUES(provider),
+                    sender_phone = VALUES(sender_phone),
+                    app_key      = VALUES(app_key),
+                    auth_key     = VALUES(auth_key),
+                    api_url      = VALUES(api_url),
+                    test_target  = VALUES(test_target),
+                    updated_by   = VALUES(updated_by)";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("sssssss", $provider, $senderPhone, $appKey, $authKey, $apiUrl, $testTarget, $updatedBy);
+            if ($stmt->execute()) {
+                $savedToDb = true;
+            } else {
+                $dbErr = $stmt->error;
+            }
+            $stmt->close();
+        } else {
+            $dbErr = $db->error;
+        }
+    }
 
+    // Opsional (best-effort): sinkronkan ke config/saungwa.php HANYA bila folder/file mengizinkan tulis (tidak wajib di Linux)
     $targetFile = dirname(__DIR__) . '/config/saungwa.php';
-    $written = @file_put_contents($targetFile, $phpContent, LOCK_EX);
-    if ($written === false) {
+    $configDir  = dirname($targetFile);
+    $savedToFile = false;
+    if ((is_file($targetFile) && is_writable($targetFile)) || (!is_file($targetFile) && is_writable($configDir))) {
+        $sandbox     = defined('SAUNGWA_SANDBOX') ? (bool) SAUNGWA_SANDBOX : false;
+        $sslVerify   = defined('SAUNGWA_SSL_VERIFY') ? (bool) SAUNGWA_SSL_VERIFY : false;
+        $cooldown    = defined('SAUNGWA_SEND_COOLDOWN_SECONDS') ? max(0, (int) SAUNGWA_SEND_COOLDOWN_SECONDS) : 120;
+        $queueDelay  = defined('SAUNGWA_QUEUE_DELAY_SECONDS') ? max(60, (int) SAUNGWA_QUEUE_DELAY_SECONDS) : 300;
+        $maxAttempts = defined('SAUNGWA_QUEUE_MAX_ATTEMPTS') ? max(1, (int) SAUNGWA_QUEUE_MAX_ATTEMPTS) : 2;
+        $safeStart   = defined('WA_SAFE_HOUR_START') ? (int) WA_SAFE_HOUR_START : 7;
+        $safeEnd     = defined('WA_SAFE_HOUR_END') ? (int) WA_SAFE_HOUR_END : 20;
+
+        $phpContent = "<?php\n"
+            . "/*\n"
+            . " * Konfigurasi Integrasi WhatsApp Gateway SaungWA\n"
+            . " * Diperbarui pada: " . date('Y-m-d H:i:s') . "\n"
+            . " */\n\n"
+            . "define('WA_ACTIVE_PROVIDER', " . var_export($provider, true) . ");\n"
+            . "define('SAUNGWA_SENDER_PHONE', " . var_export($senderPhone, true) . ");\n"
+            . "define('SAUNGWA_APP_KEY', " . var_export($appKey, true) . ");\n"
+            . "define('SAUNGWA_AUTH_KEY', " . var_export($authKey, true) . ");\n"
+            . "define('SAUNGWA_API_URL', " . var_export($apiUrl, true) . ");\n"
+            . "define('SAUNGWA_SANDBOX', " . var_export($sandbox, true) . ");\n"
+            . "define('SAUNGWA_SSL_VERIFY', " . var_export($sslVerify, true) . ");\n"
+            . "define('SAUNGWA_TEST_TARGET', " . var_export($testTarget, true) . ");\n"
+            . "define('SAUNGWA_SEND_COOLDOWN_SECONDS', " . $cooldown . ");\n"
+            . "define('SAUNGWA_QUEUE_DELAY_SECONDS', " . $queueDelay . ");\n"
+            . "define('SAUNGWA_QUEUE_MAX_ATTEMPTS', " . $maxAttempts . ");\n"
+            . "define('WA_SAFE_HOUR_START', " . $safeStart . ");\n"
+            . "define('WA_SAFE_HOUR_END', " . $safeEnd . ");\n"
+            . "?>\n";
+
+        if (@file_put_contents($targetFile, $phpContent, LOCK_EX) !== false) {
+            $savedToFile = true;
+            if (function_exists('opcache_invalidate')) {
+                @opcache_invalidate($targetFile, true);
+            }
+        }
+    }
+
+    if (!$savedToDb && !$savedToFile) {
         return [
             'success' => false,
-            'error'   => 'Gagal menulis ke file config/saungwa.php. Pastikan folder config memiliki izin tulis.',
+            'error'   => 'Gagal menyimpan konfigurasi ke database' . ($dbErr !== '' ? ': ' . $dbErr : '.'),
         ];
     }
 
-    if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate($targetFile, true);
-    }
-
-    return [
-        'success'        => true,
-        'provider'       => $provider,
-        'app_key'        => $appKey,
-        'sender_phone'   => $senderPhone,
-        'sender_display' => ($senderPhone !== '' && substr($senderPhone, 0, 2) === '62') ? ('0' . substr($senderPhone, 2)) : $senderPhone,
-        'has_app_key'    => ($appKey !== ''),
-        'has_auth_key'   => ($authKey !== ''),
-        'is_ready'       => ($provider === 'fonnte')
-            ? (defined('FONNTE_TOKEN') && trim((string) FONNTE_TOKEN) !== '')
-            : ($appKey !== '' && $authKey !== ''),
-    ];
+    // Muat ulang cache runtime setelah tersimpan
+    $fresh = get_saungwa_runtime_settings($db, true);
+    $fresh['success']    = true;
+    $fresh['saved_mode'] = $savedToDb ? 'database' : 'file';
+    return $fresh;
 }
 
 function get_saungwa_send_cooldown()
@@ -287,13 +396,14 @@ function release_saungwa_send_slot($lockHandle, $markSent)
  */
 function send_saungwa_message($phone, $message, array $options = [])
 {
+    $runtimeCfg     = get_saungwa_runtime_settings();
     $target         = normalize_wa_number($phone);
     $originalTarget = $target;
     $cleanMsg       = trim((string) $message);
 
-    $rawAppKey      = isset($options['appkey'])
+    $rawAppKey      = (isset($options['appkey']) && trim((string) $options['appkey']) !== '')
         ? trim((string) $options['appkey'])
-        : (defined('SAUNGWA_APP_KEY') ? trim((string) SAUNGWA_APP_KEY) : '');
+        : $runtimeCfg['app_key'];
     $parsedApp      = parse_saungwa_appkey_input($rawAppKey);
     if (!$parsedApp['valid']) {
         return [
@@ -301,14 +411,12 @@ function send_saungwa_message($phone, $message, array $options = [])
             'error'   => $parsedApp['error'],
         ];
     }
-    $appKey         = $parsedApp['app_key'];
-    $authKey        = isset($options['authkey'])
+    $appKey          = $parsedApp['app_key'];
+    $authKey         = (isset($options['authkey']) && trim((string) $options['authkey']) !== '')
         ? trim((string) $options['authkey'])
-        : (defined('SAUNGWA_AUTH_KEY') ? trim((string) SAUNGWA_AUTH_KEY) : '');
-    $apiUrl         = defined('SAUNGWA_API_URL') && trim((string) SAUNGWA_API_URL) !== ''
-        ? trim((string) SAUNGWA_API_URL)
-        : 'https://app.saungwa.com/api/create-message';
-    $bypassCooldown = !empty($options['bypass_cooldown']);
+        : $runtimeCfg['auth_key'];
+    $apiUrl          = $runtimeCfg['api_url'] ?: 'https://app.saungwa.com/api/create-message';
+    $bypassCooldown  = !empty($options['bypass_cooldown']);
     $ignoreTestRedir = !empty($options['ignore_test_redirect']);
 
     if ($authKey === '') {
@@ -333,8 +441,8 @@ function send_saungwa_message($phone, $message, array $options = [])
         return ['success' => false, 'error' => 'Isi pesan WhatsApp kosong.'];
     }
 
-    if (!$ignoreTestRedir && defined('SAUNGWA_TEST_TARGET') && trim((string) SAUNGWA_TEST_TARGET) !== '') {
-        $testTarget = normalize_wa_number(SAUNGWA_TEST_TARGET);
+    if (!$ignoreTestRedir && $runtimeCfg['test_target'] !== '') {
+        $testTarget = normalize_wa_number($runtimeCfg['test_target']);
         if ($testTarget !== '') {
             $target   = $testTarget;
             $cleanMsg = "[MODE UJI COBA SAUNGWA]\nTarget asli: {$originalTarget}\n\n" . $cleanMsg;
@@ -342,7 +450,7 @@ function send_saungwa_message($phone, $message, array $options = [])
     }
 
     if (!function_exists('curl_init')) {
-        return ['success' => false, 'error' => 'Ekstensi PHP cURL belum aktif di server Apache/PHP.'];
+        return ['success' => false, 'error' => 'Ekstensi PHP cURL belum aktif di server Apache/PHP (di Linux Mint jalankan: sudo apt install php-curl).'];
     }
 
     $rateLimitLock = null;
@@ -356,7 +464,6 @@ function send_saungwa_message($phone, $message, array $options = [])
     $sandboxFlag = (defined('SAUNGWA_SANDBOX') && SAUNGWA_SANDBOX) ? 'true' : 'false';
     $sslVerify   = defined('SAUNGWA_SSL_VERIFY') ? (bool) SAUNGWA_SSL_VERIFY : false;
 
-    // SaungWA menggunakan multipart/form-data (array pada CURLOPT_POSTFIELDS)
     $postFields = [
         'appkey'  => $appKey,
         'authkey' => $authKey,
@@ -413,7 +520,6 @@ function send_saungwa_message($phone, $message, array $options = [])
         ];
     }
 
-    // Evaluasi status sukses SaungWA: {"message_status":"Success","data":{"to":"...","status_code":200}}
     $msgStatus  = strtolower(trim((string) ($json['message_status'] ?? '')));
     $dataCode   = isset($json['data']['status_code']) ? (int) $json['data']['status_code'] : 0;
     $boolStatus = $json['status'] ?? null;
@@ -439,7 +545,6 @@ function send_saungwa_message($phone, $message, array $options = [])
     }
 
     if (!$bypassCooldown) {
-        // Jangan kunci cooldown bila gagal karena kredensial 401/400 agar admin bisa langsung perbaiki
         $markCooldown = ($http >= 500 || $http === 429);
         release_saungwa_send_slot($rateLimitLock, $markCooldown);
     }
@@ -457,7 +562,6 @@ function send_saungwa_message($phone, $message, array $options = [])
         $errDetail = 'Ditolak oleh SaungWA (HTTP ' . $http . ')';
     }
 
-    // Uraikan rincian field apabila SaungWA mengembalikan "Validation errors" (array data / errors)
     $validationFields = [];
     foreach (['data', 'errors'] as $errContainerKey) {
         if (!empty($json[$errContainerKey]) && is_array($json[$errContainerKey])) {
@@ -517,4 +621,3 @@ function send_wa_gateway_message($phone, $message, array $options = [])
     return send_saungwa_message($phone, $message, $options);
 }
 ?>
-
