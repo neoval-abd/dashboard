@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode([
             'success' => true,
             'config'  => $saveRes,
-            'message' => 'Konfigurasi SaungWA berhasil disimpan ke Database (siap dipakai di Linux/Windows tanpa sudo).',
+            'message' => 'Konfigurasi SaungWA berhasil disimpan ke Database.',
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

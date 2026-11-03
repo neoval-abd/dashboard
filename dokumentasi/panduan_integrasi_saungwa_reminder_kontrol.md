@@ -31,17 +31,17 @@ Dokumen ini menjelaskan cara menyiapkan kredensial **SaungWA (`https://app.saung
 
 Pilih **salah satu** dari dua cara paling praktis di Linux Mint berikut (cukup disetup **1 kali saja**, selanjutnya berjalan otomatis di belakang layar tanpa perlu ketik password `sudo` lagi setiap hari):
 
-### Cara A (Paling Mudah): Menggunakan `crontab` Linux Mint (Setiap 5 Menit)
+### Cara A (Paling Mudah): Menggunakan `crontab` Linux Mint (XAMPP `/opt/lampp`)
 Buka Terminal di server Linux Mint, lalu jalankan:
 
 ```bash
 crontab -e
 ```
 *(Jika diminta memilih editor, ketik angka untuk `nano` lalu Enter).*
-Tambahkan **1 baris** berikut di bagian paling bawah (sesuaikan `/var/www/html/dashboardassalam` jika letak folder berbeda):
+Tambahkan **1 baris** berikut di bagian paling bawah:
 
 ```cron
-*/5 7-19 * * * /usr/bin/php /var/www/html/dashboardassalam/api/process_reminder_queue.php >> /tmp/wa_reminder_assalam.log 2>&1
+*/5 7-19 * * * /opt/lampp/bin/php /opt/lampp/htdocs/dashboardassalam/api/process_reminder_queue.php >> /tmp/wa_reminder_assalam.log 2>&1
 ```
 Simpan dengan menekan `Ctrl + O` $\rightarrow$ `Enter`, lalu keluar dengan `Ctrl + X`.
 - Cek log pengiriman kapan saja tanpa `sudo`:
@@ -49,21 +49,22 @@ Simpan dengan menekan `Ctrl + O` $\rightarrow$ `Enter`, lalu keluar dengan `Ctrl
   tail -f /tmp/wa_reminder_assalam.log
   ```
 
-### Cara B (Alternatif dengan Jitter Acak 270–330 Detik): Menggunakan `systemd` Service
-Jika ingin memakai `process_reminder_queue.sh` yang memiliki jeda acak (`270–330` detik) dan otomatis hidup saat komputer Linux Mint menyala:
+### Cara B (Rekomendasi dengan Jitter Acak 270–330 Detik): Menggunakan `systemd` Service (XAMPP `/opt/lampp`)
+Jika menggunakan XAMPP Linux di `/opt/lampp/htdocs/dashboardassalam`:
 
-1. Buat file service satu kali saja dengan `sudo`:
+1. Buat/timpa file service dengan `sudo`:
    ```bash
    sudo tee /etc/systemd/system/assalam-wa-queue.service > /dev/null << 'EOF'
    [Unit]
-   Description=RSU Assalam WhatsApp Reminder Queue Worker
-   After=network.target mysql.service apache2.service
+   Description=Service Antrean WA Reminder Kontrol RS Assalam
+   After=network.target
 
    [Service]
    Type=simple
-   User=www-data
-   WorkingDirectory=/var/www/html/dashboardassalam
-   ExecStart=/bin/bash /var/www/html/dashboardassalam/process_reminder_queue.sh
+   User=server
+   Environment="PATH=/opt/lampp/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+   WorkingDirectory=/opt/lampp/htdocs/dashboardassalam
+   ExecStart=/bin/bash /opt/lampp/htdocs/dashboardassalam/process_reminder_queue.sh
    Restart=always
    RestartSec=15
 
@@ -71,21 +72,21 @@ Jika ingin memakai `process_reminder_queue.sh` yang memiliki jeda acak (`270–3
    WantedBy=multi-user.target
    EOF
    ```
-2. Aktifkan & jalankan service:
+2. Aktifkan & restart service:
    ```bash
+   sudo chmod +x /opt/lampp/htdocs/dashboardassalam/process_reminder_queue.sh
    sudo systemctl daemon-reload
-   sudo systemctl enable --now assalam-wa-queue.service
+   sudo systemctl restart assalam-wa-queue.service
    ```
-3. Cek status service:
+3. Cek status service (pastikan muncul hijau **`active (running)`**):
    ```bash
    systemctl status assalam-wa-queue.service
    ```
 
-### Uji Kirim Manual 1 Antrean dari Terminal Linux Mint:
+### Uji Kirim Manual 1 Antrean dari Terminal Linux Mint (XAMPP):
 ```bash
-php /var/www/html/dashboardassalam/api/process_reminder_queue.php --force
+/opt/lampp/bin/php /opt/lampp/htdocs/dashboardassalam/api/process_reminder_queue.php --force
 ```
-*(Pastikan paket `php-curl` dan `php-mysql` sudah terpasang di Linux Mint. Jika belum: `sudo apt install php-curl php-mysql`).*
 
 ---
 
