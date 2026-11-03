@@ -1,0 +1,38 @@
+<?php
+/*
+ * Konfigurasi Integrasi WhatsApp Gateway SaungWA (https://app.saungwa.com)
+ * Salin file ini menjadi config/saungwa.php lalu isi SAUNGWA_APP_KEY & SAUNGWA_AUTH_KEY.
+ *
+ * Cara mendapatkan kredensial di Dashboard SaungWA:
+ * 1. Pastikan perangkat WhatsApp berstatus TERSAMBUNG di menu "Device Broadcast".
+ * 2. Buka menu "Edit Profile -> Auth Key" (https://app.saungwa.com/user/auth-key) untuk menyalin SAUNGWA_AUTH_KEY.
+ * 3. Buka menu "Webhook App" di sidebar kiri -> klik "Create App / Buat App" ->
+ *    pilih Device WhatsApp yang aktif -> simpan -> buka detail Integration untuk menyalin SAUNGWA_APP_KEY.
+ */
+
+// Provider gateway aktif untuk worker antrean: 'saungwa' atau 'fonnte'
+define('WA_ACTIVE_PROVIDER', 'saungwa');
+
+// Nomor WA perangkat pengirim di SaungWA (hanya sebagai label/informasi monitoring)
+define('SAUNGWA_SENDER_PHONE', '628xxxxxxxxxx');
+
+// Kredensial API SaungWA (POST https://app.saungwa.com/api/create-message)
+define('SAUNGWA_APP_KEY', '');
+define('SAUNGWA_AUTH_KEY', '');
+define('SAUNGWA_API_URL', 'https://app.saungwa.com/api/create-message');
+
+// Pengaturan Koneksi & Keamanan Pengiriman
+define('SAUNGWA_SANDBOX', false);
+define('SAUNGWA_SSL_VERIFY', false);
+define('SAUNGWA_TEST_TARGET', ''); // Isi nomor WA khusus IT bila ingin mode uji coba tanpa kirim ke pasien asli
+
+// Pengaturan Jeda Antrean Service (~5 menit per pesan agar aman dari blokir WhatsApp)
+define('SAUNGWA_SEND_COOLDOWN_SECONDS', 120);
+define('SAUNGWA_QUEUE_DELAY_SECONDS', 300);
+define('SAUNGWA_QUEUE_MAX_ATTEMPTS', 2);
+
+// Jam sopan pengiriman otomatis ke pasien (07:00 s/d 20:00 WIB)
+define('WA_SAFE_HOUR_START', 7);
+define('WA_SAFE_HOUR_END', 20);
+?>
+
