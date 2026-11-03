@@ -536,7 +536,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
     @media (max-width: 640px) {
         .date-filter-form {
             flex-wrap: wrap;
-            justify-content: center;
+            justify-content: flex-start;
         }
     }
 
@@ -1133,8 +1133,8 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
 
 <!-- Filter Panel -->
 <div class="filter-panel mb-4">
-    <!-- Baris 1: Tanggal + Tombol Tampilkan Sejajar & Centered + Shortcut H-1 + Bulk Action -->
-    <div class="filter-row-top d-flex justify-content-center align-items-center gap-3 flex-wrap pb-3 mb-3">
+    <!-- Baris 1: Tanggal + Tombol Tampilkan Sejajar (Rata Kiri) + Shortcut H-1 + Bulk Action -->
+    <div class="filter-row-top d-flex justify-content-start align-items-center gap-3 flex-wrap pb-3 mb-3">
         <form method="get" id="dateFilterForm" class="date-filter-form">
             <input type="hidden" name="jenis_bayar" id="hiddenJenisBayar" value="<?php echo htmlspecialchars($jenis_bayar); ?>">
             <span class="filter-label"><i class="fas fa-calendar-alt text-primary me-1"></i> Jadwal Kontrol:</span>
@@ -1158,13 +1158,13 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
             </button>
         </div>
 
-        <button type="button" class="btn btn-sm btn-success fw-bold shadow-sm flex-shrink-0" id="btnOpenBulkModal">
+        <button type="button" class="btn btn-sm btn-success fw-bold shadow-sm flex-shrink-0 ms-xl-auto" id="btnOpenBulkModal">
             <i class="fas fa-layer-group me-1"></i> Preview &amp; Antrekan Massal
         </button>
     </div>
 
     <!-- Baris 2: Filter Penjamin (BPJS / Tunai / Asuransi) + Filter Status Antrean + Cari -->
-    <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap">
+    <div class="d-flex justify-content-start align-items-center gap-2 flex-wrap">
         <span class="filter-label me-1"><i class="fas fa-id-card text-success me-1"></i> Penjamin:</span>
         <button type="button" class="pay-filter-btn <?php echo $jenis_bayar === 'all' ? 'active' : ''; ?>" data-pay="all">
             Semua <span class="pill-count pill-neutral"><?php echo $total_all; ?></span>
@@ -1195,7 +1195,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
             Semua
         </button>
 
-        <div class="d-flex align-items-center ms-lg-2 mt-2 mt-xl-0">
+        <div class="d-flex align-items-center ms-xl-auto mt-2 mt-xl-0">
             <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Cari nama / RM / poli / dokter..." style="min-width: 225px; border-radius: 20px;">
         </div>
     </div>
@@ -1274,7 +1274,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                                 <?php elseif ($qStatus === 'failed'): ?>
                                     <i class="fas fa-exclamation-circle"></i> Gagal Kirim
                                 <?php else: ?>
-                                    <i class="fas fa-hourglass-start"></i> Belum Diantrekan
+                                    <i class="fas fa-hourglass-start"></i> Belum Diantrean
                                 <?php endif; ?>
                             </span>
                         </div>
