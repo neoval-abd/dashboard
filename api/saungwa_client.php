@@ -103,6 +103,10 @@ function ensure_wa_gateway_config_table($db = null)
             if ($colRes && $colRes->num_rows === 0) {
                 @$db->query("ALTER TABLE konfigurasi_wa_gateway ADD COLUMN last_dispatch_at DATETIME DEFAULT NULL AFTER test_target");
             }
+            $colToken = @$db->query("SHOW COLUMNS FROM konfigurasi_wa_gateway LIKE 'fonnte_token'");
+            if ($colToken && $colToken->num_rows === 0) {
+                @$db->query("ALTER TABLE konfigurasi_wa_gateway ADD COLUMN fonnte_token VARCHAR(100) NOT NULL DEFAULT '' AFTER auth_key");
+            }
             $colChecked = true;
         }
     }
@@ -113,7 +117,7 @@ function ensure_wa_gateway_config_table($db = null)
 /**
  * Ambil konfigurasi aktif dengan prioritas:
  * 1. Tabel database `konfigurasi_wa_gateway` (id = 1)
- * 2. Fallback konstanta `config/saungwa.php` (bila ada)
+ * 2. Fallback konstanta `config/saungwa.php` & `config/fonnte.php` (bila ada)
  */
 function get_saungwa_runtime_settings($db = null, $forceReload = false)
 {
@@ -126,33 +130,35 @@ function get_saungwa_runtime_settings($db = null, $forceReload = false)
         $db = $GLOBALS['koneksi'];
     }
 
-    // Nilai default dari file config/saungwa.php (jika ada di lokal) atau default standar RS Assalam
-    $provider   = defined('WA_ACTIVE_PROVIDER') ? strtolower(trim((string) WA_ACTIVE_PROVIDER)) : 'saungwa';
-    $senderRaw  = defined('SAUNGWA_SENDER_PHONE') ? trim((string) SAUNGWA_SENDER_PHONE) : '6289675463447';
-    $appKey     = defined('SAUNGWA_APP_KEY') ? trim((string) SAUNGWA_APP_KEY) : '';
-    $authKey    = defined('SAUNGWA_AUTH_KEY') ? trim((string) SAUNGWA_AUTH_KEY) : '';
-    $apiUrl     = defined('SAUNGWA_API_URL') && trim((string) SAUNGWA_API_URL) !== ''
+    // Nilai default dari file config/saungwa.php & config/fonnte.php (jika ada di lokal) atau default standar RS Assalam
+    $provider    = defined('WA_ACTIVE_PROVIDER') ? strtolower(trim((string) WA_ACTIVE_PROVIDER)) : 'saungwa';
+    $senderRaw   = defined('SAUNGWA_SENDER_PHONE') ? trim((string) SAUNGWA_SENDER_PHONE) : '6289675463447';
+    $appKey      = defined('SAUNGWA_APP_KEY') ? trim((string) SAUNGWA_APP_KEY) : '';
+    $authKey     = defined('SAUNGWA_AUTH_KEY') ? trim((string) SAUNGWA_AUTH_KEY) : '';
+    $fonnteToken = defined('FONNTE_TOKEN') ? trim((string) FONNTE_TOKEN) : '';
+    $apiUrl      = defined('SAUNGWA_API_URL') && trim((string) SAUNGWA_API_URL) !== ''
         ? trim((string) SAUNGWA_API_URL)
         : 'https://app.saungwa.com/api/create-message';
-    $testTarget = defined('SAUNGWA_TEST_TARGET') ? trim((string) SAUNGWA_TEST_TARGET) : '';
-    $source     = is_file(dirname(__DIR__) . '/config/saungwa.php') ? 'file' : 'default';
+    $testTarget  = defined('SAUNGWA_TEST_TARGET') ? trim((string) SAUNGWA_TEST_TARGET) : '';
+    $source      = is_file(dirname(__DIR__) . '/config/saungwa.php') ? 'file' : 'default';
 
     if ($db instanceof mysqli && ensure_wa_gateway_config_table($db)) {
-        $res = @$db->query("SELECT provider, sender_phone, app_key, auth_key, api_url, test_target FROM konfigurasi_wa_gateway WHERE id = 1 LIMIT 1");
+        $res = @$db->query("SELECT provider, sender_phone, app_key, auth_key, fonnte_token, api_url, test_target FROM konfigurasi_wa_gateway WHERE id = 1 LIMIT 1");
         if ($res && ($row = $res->fetch_assoc())) {
-            $provider   = strtolower(trim((string) ($row['provider'] ?: 'saungwa')));
-            $senderRaw  = trim((string) ($row['sender_phone'] !== '' ? $row['sender_phone'] : $senderRaw));
-            $appKey     = trim((string) $row['app_key']);
-            $authKey    = trim((string) ($row['auth_key'] !== '' ? $row['auth_key'] : $authKey));
-            $apiUrl     = trim((string) ($row['api_url'] !== '' ? $row['api_url'] : $apiUrl));
-            $testTarget = trim((string) $row['test_target']);
-            $source     = 'database';
-        } elseif ($appKey !== '' || $authKey !== '') {
+            $provider    = strtolower(trim((string) ($row['provider'] ?: 'saungwa')));
+            $senderRaw   = trim((string) ($row['sender_phone'] !== '' ? $row['sender_phone'] : $senderRaw));
+            $appKey      = trim((string) $row['app_key']);
+            $authKey     = trim((string) ($row['auth_key'] !== '' ? $row['auth_key'] : $authKey));
+            $fonnteToken = trim((string) (($row['fonnte_token'] ?? '') !== '' ? $row['fonnte_token'] : $fonnteToken));
+            $apiUrl      = trim((string) ($row['api_url'] !== '' ? $row['api_url'] : $apiUrl));
+            $testTarget  = trim((string) $row['test_target']);
+            $source      = 'database';
+        } elseif ($appKey !== '' || $authKey !== '' || $fonnteToken !== '') {
             // Seed otomatis baris pertama ke DB bila file lokal memiliki konfigurasi awal
-            $stmtSeed = @$db->prepare("INSERT IGNORE INTO konfigurasi_wa_gateway (id, provider, sender_phone, app_key, auth_key, api_url, test_target, updated_by) VALUES (1, ?, ?, ?, ?, ?, ?, 'auto-seed')");
+            $stmtSeed = @$db->prepare("INSERT IGNORE INTO konfigurasi_wa_gateway (id, provider, sender_phone, app_key, auth_key, fonnte_token, api_url, test_target, updated_by) VALUES (1, ?, ?, ?, ?, ?, ?, ?, 'auto-seed')");
             if ($stmtSeed) {
                 $normSender = normalize_wa_number($senderRaw);
-                $stmtSeed->bind_param("ssssss", $provider, $normSender, $appKey, $authKey, $apiUrl, $testTarget);
+                $stmtSeed->bind_param("sssssss", $provider, $normSender, $appKey, $authKey, $fonnteToken, $apiUrl, $testTarget);
                 @$stmtSeed->execute();
                 $stmtSeed->close();
                 $source = 'database';
@@ -173,16 +179,24 @@ function get_saungwa_runtime_settings($db = null, $forceReload = false)
     $cleanApp   = $parsedApp['valid'] ? $parsedApp['app_key'] : '';
     $hasAppKey  = ($cleanApp !== '');
     $hasAuthKey = ($authKey !== '');
+    $hasFonnte  = ($fonnteToken !== '');
     $isReady    = ($provider === 'fonnte')
-        ? (defined('FONNTE_TOKEN') && trim((string) FONNTE_TOKEN) !== '')
+        ? $hasFonnte
         : ($hasAppKey && $hasAuthKey);
 
     $cached = [
-        'provider'       => $provider,
-        'sender_phone'   => $senderNorm,
-        'sender_display' => $senderDisp,
-        'app_key'        => $cleanApp,
-        'auth_key'       => $authKey,
+        'provider'         => $provider,
+        'sender_phone'     => $senderNorm,
+        'sender_display'   => $senderDisp,
+        'app_key'          => $cleanApp,
+        'auth_key'         => $authKey,
+        'fonnte_token'     => $fonnteToken,
+        'has_app_key'      => $hasAppKey,
+        'has_auth_key'     => $hasAuthKey,
+        'has_fonnte_token' => $hasFonnte,
+        'api_url'          => $apiUrl,
+        'test_target'      => $testTarget,
+        'queue_delay'      => defined('SAUNGWA_QUEUE_DELAY_SECONDS') ? (int) SAUNGWA_QUEUE_DELAY_SECONDS : 300,
         'has_app_key'    => $hasAppKey,
         'has_auth_key'   => $hasAuthKey,
         'api_url'        => $apiUrl,
@@ -233,9 +247,10 @@ function save_saungwa_config_file(array $input, $db = null)
             'error'   => $parsedApp['error'],
         ];
     }
-    $appKey     = $parsedApp['app_key'];
-    $authKey    = trim((string) ($input['auth_key'] ?? $current['auth_key']));
-    $testTarget = trim((string) ($input['test_target'] ?? $current['test_target']));
+    $appKey      = $parsedApp['app_key'];
+    $authKey     = trim((string) ($input['auth_key'] ?? $current['auth_key']));
+    $fonnteToken = trim((string) ($input['fonnte_token'] ?? ($current['fonnte_token'] ?? '')));
+    $testTarget  = trim((string) ($input['test_target'] ?? $current['test_target']));
     if ($testTarget !== '') {
         $testTarget = normalize_wa_number($testTarget);
     }
@@ -247,19 +262,20 @@ function save_saungwa_config_file(array $input, $db = null)
 
     if ($db instanceof mysqli && ensure_wa_gateway_config_table($db)) {
         $sql = "INSERT INTO konfigurasi_wa_gateway
-                    (id, provider, sender_phone, app_key, auth_key, api_url, test_target, updated_by)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+                    (id, provider, sender_phone, app_key, auth_key, fonnte_token, api_url, test_target, updated_by)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     provider     = VALUES(provider),
                     sender_phone = VALUES(sender_phone),
                     app_key      = VALUES(app_key),
                     auth_key     = VALUES(auth_key),
+                    fonnte_token = VALUES(fonnte_token),
                     api_url      = VALUES(api_url),
                     test_target  = VALUES(test_target),
                     updated_by   = VALUES(updated_by)";
         $stmt = $db->prepare($sql);
         if ($stmt) {
-            $stmt->bind_param("sssssss", $provider, $senderPhone, $appKey, $authKey, $apiUrl, $testTarget, $updatedBy);
+            $stmt->bind_param("ssssssss", $provider, $senderPhone, $appKey, $authKey, $fonnteToken, $apiUrl, $testTarget, $updatedBy);
             if ($stmt->execute()) {
                 $savedToDb = true;
             } else {
@@ -711,7 +727,7 @@ function send_wa_gateway_message($phone, $message, array $options = [])
 {
     $provider = get_active_wa_provider();
     if ($provider === 'fonnte' && function_exists('send_fonnte_message')) {
-        $res = send_fonnte_message($phone, $message);
+        $res = send_fonnte_message($phone, $message, $options);
         $res['provider'] = 'fonnte';
         return $res;
     }

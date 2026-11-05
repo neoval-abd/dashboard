@@ -1009,13 +1009,9 @@ html.theme-light .kp-swal-filebox {
                     <!-- Kolom Khusus Upload SIP (Surat Izin Praktik) -->
                     <div id="kpUploadSipSection" class="p-3 mb-2 rounded border d-none kp-sip-input-card">
                         <div class="d-flex align-items-center gap-2 mb-2">
-                            <i class="fas fa-certificate text-warning"></i>
+                            <i class="fas fa-calendar-check text-warning"></i>
                             <strong class="small kp-sip-form-title">Masa Berlaku Surat Izin Praktik (SIP)</strong>
                             <span class="badge bg-warning text-dark ms-auto" style="font-size: .68rem;">Khusus SIP</span>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label small mb-1" for="kpUploadNoSip">Nomor SIP</label>
-                            <input type="text" class="form-control form-control-sm" name="no_sip" id="kpUploadNoSip" placeholder="Contoh: 503/012/SIP/DPMPTSP/2024" maxlength="100">
                         </div>
                         <div class="row g-2">
                             <div class="col-6">
@@ -1070,14 +1066,9 @@ html.theme-light .kp-swal-filebox {
                     <input type="hidden" name="nik" id="kpEditSipNik">
                     <input type="hidden" name="kode" id="kpEditSipKode">
                     
-                    <div class="mb-2">
+                    <div class="mb-3">
                         <label class="form-label small fw-bold mb-1">Pegawai Nakes</label>
                         <input type="text" class="form-control form-control-sm bg-light" id="kpEditSipNamaPegawai" readonly>
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold mb-1">Nomor SIP</label>
-                        <input type="text" class="form-control form-control-sm" name="no_sip" id="kpEditSipNo" placeholder="Contoh: 503/012/SIP/DPMPTSP/2024" maxlength="100">
                     </div>
 
                     <div class="row g-2 mb-2">

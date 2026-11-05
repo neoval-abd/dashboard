@@ -1,22 +1,24 @@
 <?php
 require_once(dirname(__DIR__) . '/config/fonnte.php');
 
-function normalize_wa_number($phone)
-{
-    $clean = preg_replace('/[^0-9]/', '', (string) $phone);
-    if ($clean === '') {
-        return '';
-    }
+if (!function_exists('normalize_wa_number')) {
+    function normalize_wa_number($phone)
+    {
+        $clean = preg_replace('/[^0-9]/', '', (string) $phone);
+        if ($clean === '') {
+            return '';
+        }
 
-    if (substr($clean, 0, 1) === '0') {
-        return '62' . substr($clean, 1);
-    }
+        if (substr($clean, 0, 1) === '0') {
+            return '62' . substr($clean, 1);
+        }
 
-    if (substr($clean, 0, 2) !== '62') {
-        return '62' . $clean;
-    }
+        if (substr($clean, 0, 2) !== '62') {
+            return '62' . $clean;
+        }
 
-    return $clean;
+        return $clean;
+    }
 }
 
 function clean_fonnte_message($message)
@@ -98,26 +100,42 @@ function release_fonnte_send_slot($lockHandle, $markSent)
     fclose($lockHandle);
 }
 
-function send_fonnte_message($phone, $message)
+function send_fonnte_message($phone, $message, array $options = [])
 {
-    $target = normalize_wa_number($phone);
+    $target         = normalize_wa_number($phone);
     $originalTarget = $target;
-    $message = clean_fonnte_message($message);
-    $rateLimitLock = null;
+    $message        = clean_fonnte_message($message);
+    $rateLimitLock  = null;
+    $bypassCooldown = !empty($options['bypass_cooldown']);
 
-    if (trim(FONNTE_TOKEN) === '') {
-        return ['success' => false, 'error' => 'Token Fonnte belum diisi di config/fonnte.php'];
+    $token = '';
+    if (!empty($options['token']) && trim((string) $options['token']) !== '') {
+        $token = trim((string) $options['token']);
+    } elseif (function_exists('get_saungwa_runtime_settings')) {
+        $cfg   = get_saungwa_runtime_settings();
+        $token = trim((string) ($cfg['fonnte_token'] ?? ''));
+    }
+    if ($token === '' && defined('FONNTE_TOKEN')) {
+        $token = trim((string) FONNTE_TOKEN);
+    }
+
+    if ($token === '') {
+        return [
+            'success'  => false,
+            'provider' => 'fonnte',
+            'error'    => 'Token Fonnte belum diisi. Salin token dari dashboard https://fonnte.com (menu Device) ke Pengaturan Gateway WhatsApp.',
+        ];
     }
 
     if ($target === '') {
-        return ['success' => false, 'error' => 'Nomor tujuan kosong'];
+        return ['success' => false, 'provider' => 'fonnte', 'error' => 'Nomor tujuan kosong'];
     }
 
     if ($message === '') {
-        return ['success' => false, 'error' => 'Pesan kosong'];
+        return ['success' => false, 'provider' => 'fonnte', 'error' => 'Pesan kosong'];
     }
 
-    if (defined('FONNTE_TEST_TARGET') && trim(FONNTE_TEST_TARGET) !== '') {
+    if (empty($options['ignore_test_redirect']) && defined('FONNTE_TEST_TARGET') && trim(FONNTE_TEST_TARGET) !== '') {
         $testTarget = normalize_wa_number(FONNTE_TEST_TARGET);
         if ($testTarget !== '') {
             $target = $testTarget;
@@ -126,57 +144,68 @@ function send_fonnte_message($phone, $message)
     }
 
     if (!function_exists('curl_init')) {
-        return ['success' => false, 'error' => 'Ekstensi cURL PHP belum aktif'];
+        return ['success' => false, 'provider' => 'fonnte', 'error' => 'Ekstensi cURL PHP belum aktif di server'];
     }
 
-    $slot = acquire_fonnte_send_slot($rateLimitLock);
-    if (empty($slot['success'])) {
-        return $slot;
+    if (!$bypassCooldown) {
+        $slot = acquire_fonnte_send_slot($rateLimitLock);
+        if (empty($slot['success'])) {
+            return $slot;
+        }
     }
 
     $payload = [
-        'target' => $target,
-        'message' => $message,
-        'countryCode' => FONNTE_COUNTRY_CODE,
+        'target'      => $target,
+        'message'     => $message,
+        'countryCode' => defined('FONNTE_COUNTRY_CODE') ? FONNTE_COUNTRY_CODE : '62',
     ];
 
-    $ch = curl_init(FONNTE_API_URL);
+    $apiUrl = defined('FONNTE_API_URL') && trim((string) FONNTE_API_URL) !== '' ? FONNTE_API_URL : 'https://api.fonnte.com/send';
+    $ch     = curl_init($apiUrl);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => http_build_query($payload),
-        CURLOPT_HTTPHEADER => [
-            'Authorization: ' . FONNTE_TOKEN,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => http_build_query($payload),
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: ' . $token,
         ],
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_SSL_VERIFYPEER => defined('FONNTE_SSL_VERIFY') ? FONNTE_SSL_VERIFY : true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_SSL_VERIFYPEER => defined('FONNTE_SSL_VERIFY') ? FONNTE_SSL_VERIFY : false,
         CURLOPT_SSL_VERIFYHOST => (defined('FONNTE_SSL_VERIFY') && FONNTE_SSL_VERIFY) ? 2 : 0,
     ]);
 
-    $raw = curl_exec($ch);
-    $err = curl_error($ch);
+    $raw  = curl_exec($ch);
+    $err  = curl_error($ch);
     $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
     if ($err) {
-        release_fonnte_send_slot($rateLimitLock, false);
-        return ['success' => false, 'error' => 'cURL error: ' . $err, 'http_code' => $http];
+        if (!$bypassCooldown) {
+            release_fonnte_send_slot($rateLimitLock, false);
+        }
+        return ['success' => false, 'provider' => 'fonnte', 'error' => 'cURL error: ' . $err, 'http_code' => $http];
     }
 
     $json = json_decode($raw, true);
     if (!is_array($json)) {
-        release_fonnte_send_slot($rateLimitLock, true);
-        return ['success' => false, 'error' => 'Respons Fonnte tidak valid', 'http_code' => $http, 'raw' => $raw];
+        if (!$bypassCooldown) {
+            release_fonnte_send_slot($rateLimitLock, true);
+        }
+        return ['success' => false, 'provider' => 'fonnte', 'error' => 'Respons Fonnte tidak valid (bukan JSON)', 'http_code' => $http, 'raw' => $raw];
     }
 
     $status = $json['status'] ?? false;
     if ($http >= 200 && $http < 300 && ($status === true || $status === 'true')) {
-        release_fonnte_send_slot($rateLimitLock, true);
-        return ['success' => true, 'http_code' => $http, 'response' => $json];
+        if (!$bypassCooldown) {
+            release_fonnte_send_slot($rateLimitLock, true);
+        }
+        return ['success' => true, 'provider' => 'fonnte', 'http_code' => $http, 'response' => $json];
     }
 
-    release_fonnte_send_slot($rateLimitLock, true);
+    if (!$bypassCooldown) {
+        release_fonnte_send_slot($rateLimitLock, true);
+    }
     $detail = $json['detail'] ?? ($json['reason'] ?? ($json['message'] ?? 'Gagal mengirim via Fonnte'));
-    return ['success' => false, 'error' => $detail, 'http_code' => $http, 'response' => $json];
+    return ['success' => false, 'provider' => 'fonnte', 'error' => $detail, 'http_code' => $http, 'response' => $json];
 }
 ?>

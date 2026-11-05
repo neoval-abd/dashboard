@@ -7,6 +7,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once(dirname(__DIR__) . '/config/koneksi.php');
 require_once(__DIR__ . '/saungwa_client.php');
+require_once(__DIR__ . '/fonnte_client.php');
 require_once(__DIR__ . '/reminder_queue_helpers.php');
 
 if (!isset($_SESSION['user_id'])) {
@@ -67,20 +68,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = trim((string) ($_POST['action'] ?? 'enqueue'));
 
-    // 0a. Simpan Konfigurasi Kredensial SaungWA ke Database (`konfigurasi_wa_gateway`)
+    // 0a. Simpan Konfigurasi Kredensial Gateway (SaungWA & Fonnte) ke Database (`konfigurasi_wa_gateway`)
     if ($action === 'save_saungwa_config') {
         $saveRes = save_saungwa_config_file([
             'provider'     => $_POST['provider'] ?? 'saungwa',
             'sender_phone' => $_POST['sender_phone'] ?? '',
             'app_key'      => $_POST['app_key'] ?? '',
             'auth_key'     => $_POST['auth_key'] ?? '',
+            'fonnte_token' => $_POST['fonnte_token'] ?? '',
             'test_target'  => $_POST['test_target'] ?? '',
         ], $koneksi);
 
         if (empty($saveRes['success'])) {
             echo json_encode([
                 'success' => false,
-                'error'   => $saveRes['error'] ?? 'Gagal menyimpan konfigurasi SaungWA.',
+                'error'   => $saveRes['error'] ?? 'Gagal menyimpan konfigurasi gateway WhatsApp.',
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -88,19 +90,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode([
             'success' => true,
             'config'  => $saveRes,
-            'message' => 'Konfigurasi SaungWA berhasil disimpan ke Database.',
+            'message' => 'Konfigurasi gateway WhatsApp berhasil disimpan ke Database.',
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    // 0b. Tes Kirim Pesan Langsung ke SaungWA (Uji Koneksi API)
+    // 0b. Tes Kirim Pesan Langsung (Uji Koneksi API SaungWA / Fonnte)
     if ($action === 'test_saungwa_send') {
+        $targetProvider = strtolower(trim((string) ($_POST['provider'] ?? 'saungwa')));
+        if (!in_array($targetProvider, ['saungwa', 'fonnte'], true)) {
+            $targetProvider = 'saungwa';
+        }
+
         $rawAppKey   = trim((string) ($_POST['app_key'] ?? ''));
         $authKey     = trim((string) ($_POST['auth_key'] ?? ''));
+        $fonnteToken = trim((string) ($_POST['fonnte_token'] ?? ''));
         $senderPhone = trim((string) ($_POST['sender_phone'] ?? ''));
         $testTarget  = trim((string) ($_POST['test_phone'] ?? ''));
         $testMsg     = trim((string) ($_POST['test_message'] ?? ''));
 
+        if ($testTarget === '') {
+            echo json_encode(['success' => false, 'error' => 'Nomor tujuan tes WhatsApp wajib diisi.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $phoneCheck = sanitize_patient_phone($testTarget);
+        if (!$phoneCheck['valid']) {
+            echo json_encode(['success' => false, 'error' => 'Nomor tujuan tes harus berupa nomor seluler WhatsApp aktif (08xx / 628xx).'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($targetProvider === 'fonnte') {
+            if ($fonnteToken === '') {
+                echo json_encode(['success' => false, 'error' => 'Token Fonnte wajib diisi (buka dashboard https://fonnte.com -> menu Device).'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            if ($testMsg === '') {
+                $testMsg = "✅ *TES KONEKSI FONNTE BERHASIL*\n\nSistem *Reminder Kontrol Pasien - RSU Assalam* telah terhubung ke WhatsApp Gateway Fonnte.\nWaktu tes: " . date('d-m-Y H:i:s') . " WIB";
+            }
+
+            $sendRes = send_fonnte_message($phoneCheck['phone_wa'], $testMsg, [
+                'token'                => $fonnteToken,
+                'bypass_cooldown'      => true,
+                'ignore_test_redirect' => true,
+            ]);
+
+            if (!empty($sendRes['success'])) {
+                $savedCfg = save_saungwa_config_file([
+                    'provider'     => 'fonnte',
+                    'sender_phone' => $senderPhone,
+                    'app_key'      => $rawAppKey,
+                    'auth_key'     => $authKey,
+                    'fonnte_token' => $fonnteToken,
+                ], $koneksi);
+
+                echo json_encode([
+                    'success'  => true,
+                    'provider' => 'fonnte',
+                    'config'   => $savedCfg,
+                    'message'  => 'Pesan tes berhasil dikirim ke ' . $phoneCheck['phone_display'] . ' melalui Fonnte!',
+                    'response' => $sendRes['response'] ?? null,
+                ], JSON_UNESCAPED_UNICODE);
+            } else {
+                echo json_encode([
+                    'success'   => false,
+                    'provider'  => 'fonnte',
+                    'error'     => $sendRes['error'] ?? 'Gagal mengirim pesan tes via Fonnte.',
+                    'http_code' => $sendRes['http_code'] ?? 0,
+                    'response'  => $sendRes['response'] ?? null,
+                ], JSON_UNESCAPED_UNICODE);
+            }
+            exit;
+        }
+
+        // Jalur SaungWA
         $parsedApp = parse_saungwa_appkey_input($rawAppKey);
         if (!$parsedApp['valid']) {
             echo json_encode([
@@ -111,14 +175,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $appKey = $parsedApp['app_key'];
 
-        if ($testTarget === '') {
-            echo json_encode(['success' => false, 'error' => 'Nomor tujuan tes WhatsApp wajib diisi.'], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-
-        $phoneCheck = sanitize_patient_phone($testTarget);
-        if (!$phoneCheck['valid']) {
-            echo json_encode(['success' => false, 'error' => 'Nomor tujuan tes harus berupa nomor seluler WhatsApp aktif (08xx / 628xx).'], JSON_UNESCAPED_UNICODE);
+        if ($authKey === '') {
+            echo json_encode(['success' => false, 'error' => 'Auth API Key SaungWA wajib diisi.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -135,16 +193,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
         if (!empty($sendRes['success'])) {
-            // Simpan permanen ke Database (tidak memerlukan izin tulis folder / sudo di Linux)
             $savedCfg = save_saungwa_config_file([
-                'provider'     => $_POST['provider'] ?? 'saungwa',
+                'provider'     => 'saungwa',
                 'sender_phone' => $senderPhone,
                 'app_key'      => $appKey,
                 'auth_key'     => $authKey,
+                'fonnte_token' => $fonnteToken,
             ], $koneksi);
 
             echo json_encode([
                 'success'       => true,
+                'provider'      => 'saungwa',
                 'clean_app_key' => $appKey,
                 'config'        => $savedCfg,
                 'message'       => 'Pesan tes berhasil dikirim ke ' . $phoneCheck['phone_display'] . ' melalui SaungWA!',
@@ -153,6 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             echo json_encode([
                 'success'       => false,
+                'provider'      => 'saungwa',
                 'clean_app_key' => $appKey,
                 'error'         => $sendRes['error'] ?? 'Gagal mengirim pesan tes via SaungWA.',
                 'http_code'     => $sendRes['http_code'] ?? 0,

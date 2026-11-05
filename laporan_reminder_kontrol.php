@@ -1538,42 +1538,67 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
         <div class="modal-content" style="border-radius:16px; overflow:hidden; border:none;">
             <div class="modal-header text-white" style="background: linear-gradient(135deg, #059669, #0d9488);">
                 <h5 class="modal-title fw-bold text-white">
-                    <i class="fab fa-whatsapp me-2"></i> Integrasi &amp; Tes Koneksi SaungWA
+                    <i class="fab fa-whatsapp me-2"></i> Integrasi &amp; Pengaturan Gateway WhatsApp (SaungWA &amp; Fonnte)
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body msg-editor p-4">
-                <div class="modal-meta-box mb-3">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
-                        <div class="small modal-field-label">
-                            <i class="fas fa-list-ol text-success me-1"></i> Cara Mendapatkan <code>AppKey</code> di Dashboard SaungWA (Bukan Link Device!):
-                        </div>
-                        <a href="https://app.saungwa.com/user/apps" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:0.76rem;">
-                            <i class="fas fa-external-link-alt me-1"></i> Buka Menu Webhook App
-                        </a>
-                    </div>
-                    <ol class="small text-muted mb-0 ps-3">
-                        <li>Buka menu <strong>Webhook App</strong> (ikon kotak kuning di atas <em>History Pesan</em> pada sidebar kiri SaungWA — <strong>bukan</strong> menu <em>Device Broadcast</em>).</li>
-                        <li>Klik tombol <strong>Create App / Buat App</strong> di kanan atas.</li>
-                        <li>Pilih Device <strong>RS ASSALAM (6289675463447)</strong>, isi App Name mis. <code>Dashboard Assalam</code> &amp; Website Link isi domain bebas berakhiran <code>.com</code>/<code>.id</code> mis. <code>https://rsassalam.com</code> (tetap jalan 100% walau aplikasi di <code>localhost</code>), lalu klik <strong>Create Now</strong>.</li>
-                        <li>Klik tombol <strong>Integration</strong> pada App tersebut, lalu salin hanya kode <strong><code>appkey</code></strong> (tanpa <code>https://...</code>, contoh: <code>a1b2c3d4-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code>).</li>
-                    </ol>
-                </div>
-
                 <div class="row g-3 mb-3">
-                    <div class="col-md-5">
-                        <label class="form-label small modal-field-label mb-1">Gateway Pengiriman Aktif:</label>
+                    <div class="col-md-6">
+                        <label class="form-label small modal-field-label mb-1">Pilih Gateway WhatsApp Aktif:</label>
                         <select id="cfgProvider" class="form-select form-select-sm modal-themed-input">
-                            <option value="saungwa" <?php echo $gw_config['provider'] === 'saungwa' ? 'selected' : ''; ?>>SaungWA (Utama)</option>
-                            <option value="fonnte" <?php echo $gw_config['provider'] === 'fonnte' ? 'selected' : ''; ?>>Fonnte (Cadangan)</option>
+                            <option value="saungwa" <?php echo $gw_config['provider'] === 'saungwa' ? 'selected' : ''; ?>>SaungWA (Utama / Scan QR)</option>
+                            <option value="fonnte" <?php echo $gw_config['provider'] === 'fonnte' ? 'selected' : ''; ?>>Fonnte (Cadangan / WhatsApp Official API)</option>
                         </select>
+                        <small class="text-muted d-block mt-1" style="font-size:0.75rem;">
+                            Bisa diganti fleksibel kapan saja. Worker antrean otomatis mengikuti gateway terpilih.
+                        </small>
                     </div>
-                    <div class="col-md-7">
-                        <label class="form-label small modal-field-label mb-1">Nomor WA Perangkat Pengirim (RS ASSALAM):</label>
+                    <div class="col-md-6" id="boxSenderPhone">
+                        <label class="form-label small modal-field-label mb-1">Nomor WA Perangkat RS ASSALAM:</label>
                         <input type="text" id="cfgSenderPhone" class="form-control form-control-sm modal-themed-input"
                                value="<?php echo htmlspecialchars($gw_config['sender_display'] ?: '089675463447'); ?>"
                                placeholder="Contoh: 089675463447">
+                        <small class="text-muted d-block mt-1" style="font-size:0.75rem;">Nomor pengirim resmi RS untuk identifikasi antrean.</small>
                     </div>
+                </div>
+
+                <!-- Panduan SaungWA -->
+                <div id="boxSaungwaGuide" class="modal-meta-box mb-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                        <div class="small modal-field-label text-success">
+                            <i class="fas fa-list-ol me-1"></i> Cara Mendapatkan <code>AppKey</code> di Dashboard SaungWA:
+                        </div>
+                        <a href="https://app.saungwa.com/user/apps" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:0.76rem;">
+                            <i class="fas fa-external-link-alt me-1"></i> Buka Webhook App SaungWA
+                        </a>
+                    </div>
+                    <ol class="small text-muted mb-0 ps-3">
+                        <li>Buka menu <strong>Webhook App</strong> (sidebar kiri SaungWA &mdash; <strong>bukan</strong> menu <em>Device Broadcast</em>).</li>
+                        <li>Klik <strong>Create App</strong>, pilih Device <strong>RS ASSALAM (6289675463447)</strong>, isi nama &amp; link bebas.</li>
+                        <li>Klik <strong>Integration</strong>, lalu salin kode <strong><code>appkey</code></strong> (format UUID) ke kolom di bawah.</li>
+                    </ol>
+                </div>
+
+                <!-- Panduan Fonnte -->
+                <div id="boxFonnteGuide" class="modal-meta-box mb-3 d-none">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                        <div class="small modal-field-label text-info">
+                            <i class="fas fa-key me-1"></i> Cara Mendapatkan <code>Token</code> di Dashboard Fonnte:
+                        </div>
+                        <a href="https://fonnte.com" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info py-0 px-2" style="font-size:0.76rem;">
+                            <i class="fas fa-external-link-alt me-1"></i> Buka Dashboard Fonnte
+                        </a>
+                    </div>
+                    <ol class="small text-muted mb-0 ps-3">
+                        <li>Buka dan login ke <strong>https://fonnte.com</strong>.</li>
+                        <li>Masuk ke menu <strong>Device</strong> (untuk Scan QR biasa) atau menu <strong>WhatsApp Official (WABA)</strong> jika memakai jalur Meta resmi.</li>
+                        <li>Salin <strong>Token</strong> perangkat Anda lalu tempelkan pada kolom Token Fonnte di bawah.</li>
+                    </ol>
+                </div>
+
+                <!-- Kolom Kredensial SaungWA -->
+                <div id="groupSaungwaFields" class="row g-3 mb-3">
                     <div class="col-12">
                         <label class="form-label small modal-field-label mb-1">
                             App Key (<code>appkey</code> dari menu <strong>Webhook App</strong> SaungWA): <span class="text-danger">*</span>
@@ -1597,9 +1622,29 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                     </div>
                 </div>
 
+                <!-- Kolom Kredensial Fonnte -->
+                <div id="groupFonnteFields" class="row g-3 mb-3 d-none">
+                    <div class="col-12">
+                        <label class="form-label small modal-field-label mb-1">
+                            Token Fonnte (Mendukung WhatsApp Web &amp; WhatsApp Official API / WABA): <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <input type="password" id="cfgFonnteToken" class="form-control modal-themed-input"
+                                   value="<?php echo htmlspecialchars($gw_config['fonnte_token'] ?? ''); ?>"
+                                   placeholder="Masukkan Token dari Fonnte.com (contoh: 1oFryxP8vVwKkaMWhaHM)">
+                            <button class="btn btn-outline-secondary" type="button" id="btnToggleFonnteToken" title="Tampilkan / Sembunyikan Token">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mt-1" style="font-size:0.75rem;">
+                            Token ini dapat berupa token perangkat Scan QR maupun token WhatsApp Official Business API Meta.
+                        </small>
+                    </div>
+                </div>
+
                 <div class="modal-meta-box">
                     <div class="small modal-field-label mb-1">
-                        <i class="fas fa-paper-plane text-primary me-1"></i> Uji Kirim Pesan Langsung (Tes Koneksi SaungWA)
+                        <i class="fas fa-paper-plane text-primary me-1"></i> Uji Kirim Pesan Langsung (<span id="testGwLabel">SaungWA</span>)
                     </div>
                     <small class="text-muted d-block mb-2">
                         Masukkan nomor WA pribadi/lain yang aktif (<strong>jangan</strong> diisi nomor pengirim <code><?php echo htmlspecialchars($gw_config['sender_display'] ?: '089675463447'); ?></code>).
@@ -1612,7 +1657,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                         </div>
                         <div class="col-sm-5 d-grid">
                             <button type="button" id="btnTestSaungwaSend" class="btn btn-sm btn-primary fw-bold">
-                                <i class="fas fa-bolt me-1"></i> Simpan &amp; Kirim Pesan Tes
+                                <i class="fas fa-bolt me-1"></i> <span id="btnTestLabel">Simpan &amp; Kirim Pesan Tes</span>
                             </button>
                         </div>
                     </div>
@@ -2129,8 +2174,36 @@ $(document).ready(function() {
         new bootstrap.Modal(document.getElementById('saungwaModal')).show();
     });
 
+    function syncGatewayProviderUI() {
+        const prov = $('#cfgProvider').val();
+        if (prov === 'fonnte') {
+            $('#boxSaungwaGuide').addClass('d-none');
+            $('#boxFonnteGuide').removeClass('d-none');
+            $('#groupSaungwaFields').addClass('d-none');
+            $('#groupFonnteFields').removeClass('d-none');
+            $('#testGwLabel').text('Fonnte');
+            $('#btnTestLabel').text('Simpan & Kirim Pesan Tes (Fonnte)');
+        } else {
+            $('#boxSaungwaGuide').removeClass('d-none');
+            $('#boxFonnteGuide').addClass('d-none');
+            $('#groupSaungwaFields').removeClass('d-none');
+            $('#groupFonnteFields').addClass('d-none');
+            $('#testGwLabel').text('SaungWA');
+            $('#btnTestLabel').text('Simpan & Kirim Pesan Tes (SaungWA)');
+        }
+    }
+    $('#cfgProvider').on('change', syncGatewayProviderUI);
+    syncGatewayProviderUI();
+
     $('#btnToggleAuthKey').on('click', function() {
         const $inp = $('#cfgAuthKey');
+        const isPwd = $inp.attr('type') === 'password';
+        $inp.attr('type', isPwd ? 'text' : 'password');
+        $(this).find('i').toggleClass('fa-eye fa-eye-slash');
+    });
+
+    $('#btnToggleFonnteToken').on('click', function() {
+        const $inp = $('#cfgFonnteToken');
         const isPwd = $inp.attr('type') === 'password';
         $inp.attr('type', isPwd ? 'text' : 'password');
         $(this).find('i').toggleClass('fa-eye fa-eye-slash');
@@ -2151,44 +2224,57 @@ $(document).ready(function() {
                 provider: $('#cfgProvider').val(),
                 sender_phone: $('#cfgSenderPhone').val().trim(),
                 app_key: $('#cfgAppKey').val().trim(),
-                auth_key: $('#cfgAuthKey').val().trim()
+                auth_key: $('#cfgAuthKey').val().trim(),
+                fonnte_token: $('#cfgFonnteToken').val().trim()
             }
         }).done(function(res) {
             if (!res || res.success !== true) {
-                alert((res && res.error) ? res.error : 'Gagal menyimpan konfigurasi SaungWA.');
+                alert((res && res.error) ? res.error : 'Gagal menyimpan konfigurasi WhatsApp Gateway.');
                 return;
             }
             if (res.config && res.config.app_key !== undefined) {
                 $('#cfgAppKey').val(res.config.app_key);
             }
             updateGatewayBadgeUI(res.config);
-            showToastNotification(res.message || 'Konfigurasi SaungWA tersimpan.', false);
+            showToastNotification(res.message || 'Konfigurasi WhatsApp Gateway tersimpan.', false);
             bootstrap.Modal.getInstance(document.getElementById('saungwaModal'))?.hide();
         }).fail(function(xhr) {
-            alert(getAjaxErrorMessage(xhr, 'Gagal menyimpan konfigurasi SaungWA.'));
+            alert(getAjaxErrorMessage(xhr, 'Gagal menyimpan konfigurasi WhatsApp Gateway.'));
         }).always(function() {
             $btn.prop('disabled', false).html(origHtml);
         });
     });
 
     $('#btnTestSaungwaSend').on('click', function() {
-        const appKey  = $('#cfgAppKey').val().trim();
-        const authKey = $('#cfgAuthKey').val().trim();
-        const testTo  = $('#cfgTestPhone').val().trim();
-        const $resBox = $('#saungwaTestResult');
+        const prov        = $('#cfgProvider').val();
+        const appKey      = $('#cfgAppKey').val().trim();
+        const authKey     = $('#cfgAuthKey').val().trim();
+        const fonnteToken = $('#cfgFonnteToken').val().trim();
+        const testTo      = $('#cfgTestPhone').val().trim();
+        const $resBox     = $('#saungwaTestResult');
 
-        if (!appKey) {
-            $resBox.removeClass('d-none alert-success').addClass('alert-danger')
-                   .html('<i class="fas fa-exclamation-circle me-1"></i> <strong>AppKey masih kosong!</strong> Buka menu <em>Webhook App</em> di SaungWA &rarr; Buat App untuk 089675463447 &rarr; salin AppKey ke atas.');
-            $('#cfgAppKey').focus();
-            return;
+        if (prov === 'fonnte') {
+            if (!fonnteToken) {
+                $resBox.removeClass('d-none alert-success').addClass('alert-danger')
+                       .html('<i class="fas fa-exclamation-circle me-1"></i> <strong>Token Fonnte masih kosong!</strong> Buka dashboard <em>https://fonnte.com</em> &rarr; menu Device &rarr; salin Token ke atas.');
+                $('#cfgFonnteToken').focus();
+                return;
+            }
+        } else {
+            if (!appKey) {
+                $resBox.removeClass('d-none alert-success').addClass('alert-danger')
+                       .html('<i class="fas fa-exclamation-circle me-1"></i> <strong>AppKey masih kosong!</strong> Buka menu <em>Webhook App</em> di SaungWA &rarr; Buat App untuk 089675463447 &rarr; salin AppKey ke atas.');
+                $('#cfgAppKey').focus();
+                return;
+            }
+            if (!authKey) {
+                $resBox.removeClass('d-none alert-success').addClass('alert-danger')
+                       .text('Auth API Key SaungWA wajib diisi.');
+                $('#cfgAuthKey').focus();
+                return;
+            }
         }
-        if (!authKey) {
-            $resBox.removeClass('d-none alert-success').addClass('alert-danger')
-                   .text('Auth API Key wajib diisi.');
-            $('#cfgAuthKey').focus();
-            return;
-        }
+
         if (!testTo) {
             $resBox.removeClass('d-none alert-success').addClass('alert-danger')
                    .text('Masukkan nomor WA tujuan tes terlebih dahulu.');
@@ -2203,7 +2289,7 @@ $(document).ready(function() {
             return c;
         };
         const senderNorm = normPhone($('#cfgSenderPhone').val());
-        if (senderNorm && normPhone(testTo) === senderNorm) {
+        if (prov === 'saungwa' && senderNorm && normPhone(testTo) === senderNorm) {
             $resBox.removeClass('d-none alert-success').addClass('alert-danger')
                    .html('<i class="fas fa-exclamation-triangle me-1"></i> Nomor tujuan tes <strong>tidak boleh sama</strong> dengan Nomor WA Perangkat Pengirim (<code>' + $('<div>').text($('#cfgSenderPhone').val().trim()).html() + '</code>). Masukkan nomor WA pribadi/lain yang aktif.');
             $('#cfgTestPhone').focus();
@@ -2223,10 +2309,11 @@ $(document).ready(function() {
             timeout: 40000,
             data: {
                 action: 'test_saungwa_send',
-                provider: $('#cfgProvider').val(),
+                provider: prov,
                 sender_phone: $('#cfgSenderPhone').val().trim(),
                 app_key: appKey,
                 auth_key: authKey,
+                fonnte_token: fonnteToken,
                 test_phone: testTo
             }
         }).done(function(res) {
@@ -2237,11 +2324,11 @@ $(document).ready(function() {
                 $resBox.removeClass('d-none alert-danger').addClass('alert-success')
                        .html('<i class="fas fa-check-circle me-1"></i> ' + $('<div>').text(res.message).html());
                 updateGatewayBadgeUI(res.config || {
-                    provider: $('#cfgProvider').val(),
+                    provider: prov,
                     sender_display: $('#cfgSenderPhone').val().trim(),
                     is_ready: true
                 });
-                showToastNotification('Tes kirim SaungWA berhasil!', false);
+                showToastNotification('Tes kirim ' + (prov === 'fonnte' ? 'Fonnte' : 'SaungWA') + ' berhasil!', false);
             } else {
                 const errMsg = (res && res.error) ? res.error : 'Gagal mengirim pesan tes.';
                 $resBox.removeClass('d-none alert-success').addClass('alert-danger')

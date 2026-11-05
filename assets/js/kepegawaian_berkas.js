@@ -470,10 +470,6 @@
 
                         sipMetaHtml = `
                             <div class="mt-1 d-inline-flex align-items-center flex-wrap gap-2 py-1 px-2 rounded kp-sip-inline-box" style="font-size: .72rem;">
-                                <span class="d-inline-flex align-items-center">
-                                    <i class="fas fa-certificate text-warning me-1"></i>
-                                    <strong>No. SIP:</strong>&nbsp;<span class="font-monospace">${esc(meta.no_sip || '-')}</span>
-                                </span>
                                 ${sisaBadge}
                                 <span class="kp-emp-subtext" style="font-size: .68rem;">
                                     <i class="fas fa-calendar-alt me-1"></i>${dateRangeText}
@@ -483,7 +479,6 @@
                                         data-nik="${esc(p.nik)}" 
                                         data-nama-pegawai="${esc(p.nama)}"
                                         data-kode="${esc(item.kode)}" 
-                                        data-nosip="${esc(meta.no_sip || '')}"
                                         data-terbit="${esc(meta.tgl_terbit || '')}"
                                         data-kadaluarsa="${esc(meta.tgl_kadaluarsa || '')}"
                                         title="Atur Masa Berlaku SIP">
@@ -643,15 +638,16 @@
             if (sipSection) {
                 sipSection.classList.toggle('d-none', !isSip);
                 if (isSip) {
-                    // Pre-fill jika SIP meta sudah ada di selectedDetail
                     const existingMeta = selectedDetail && selectedDetail.sip_meta ? selectedDetail.sip_meta : null;
-                    document.getElementById('kpUploadNoSip').value = existingMeta && existingMeta.no_sip ? existingMeta.no_sip : '';
-                    document.getElementById('kpUploadTglTerbit').value = existingMeta && existingMeta.tgl_terbit ? existingMeta.tgl_terbit : '';
-                    document.getElementById('kpUploadTglKadaluarsa').value = existingMeta && existingMeta.tgl_kadaluarsa ? existingMeta.tgl_kadaluarsa : '';
+                    const elTerbit = document.getElementById('kpUploadTglTerbit');
+                    if (elTerbit) elTerbit.value = existingMeta && existingMeta.tgl_terbit ? existingMeta.tgl_terbit : '';
+                    const elKadaluarsa = document.getElementById('kpUploadTglKadaluarsa');
+                    if (elKadaluarsa) elKadaluarsa.value = existingMeta && existingMeta.tgl_kadaluarsa ? existingMeta.tgl_kadaluarsa : '';
                 } else {
-                    document.getElementById('kpUploadNoSip').value = '';
-                    document.getElementById('kpUploadTglTerbit').value = '';
-                    document.getElementById('kpUploadTglKadaluarsa').value = '';
+                    const elTerbit = document.getElementById('kpUploadTglTerbit');
+                    if (elTerbit) elTerbit.value = '';
+                    const elKadaluarsa = document.getElementById('kpUploadTglKadaluarsa');
+                    if (elKadaluarsa) elKadaluarsa.value = '';
                 }
             }
         };
@@ -702,7 +698,7 @@
 
         // Validasi khusus berkas SIP
         if (isSipCode(kode)) {
-            const tglKadaluarsa = document.getElementById('kpUploadTglKadaluarsa').value;
+            const tglKadaluarsa = document.getElementById('kpUploadTglKadaluarsa')?.value;
             if (!tglKadaluarsa) {
                 errBox.textContent = 'Tanggal kadaluarsa / masa berlaku SIP wajib diisi untuk monitoring dashboard.';
                 errBox.classList.remove('d-none');
@@ -764,7 +760,8 @@
         document.getElementById('kpEditSipNik').value = nik;
         document.getElementById('kpEditSipKode').value = kode;
         document.getElementById('kpEditSipNamaPegawai').value = namaPegawai || nik;
-        document.getElementById('kpEditSipNo').value = noSip || '';
+        const elNo = document.getElementById('kpEditSipNo');
+        if (elNo) elNo.value = noSip || '';
         document.getElementById('kpEditSipTglTerbit').value = tglTerbit || '';
         document.getElementById('kpEditSipTglKadaluarsa').value = tglKadaluarsa || '';
         document.getElementById('kpEditSipError').classList.add('d-none');
@@ -777,7 +774,7 @@
         e.preventDefault();
         const nik = document.getElementById('kpEditSipNik').value;
         const kode = document.getElementById('kpEditSipKode').value;
-        const noSip = document.getElementById('kpEditSipNo').value;
+        const noSip = document.getElementById('kpEditSipNo')?.value || '';
         const tglTerbit = document.getElementById('kpEditSipTglTerbit').value;
         const tglKadaluarsa = document.getElementById('kpEditSipTglKadaluarsa').value;
         const errBox = document.getElementById('kpEditSipError');
