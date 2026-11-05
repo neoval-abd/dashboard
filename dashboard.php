@@ -12,6 +12,8 @@ require_once('includes/header.php');
 
 <style>
     .card-metric { transition: transform .2s; cursor: pointer; }
+    .card-metric.no-pointer { cursor: default !important; }
+    .card-metric.no-pointer:hover { transform: none !important; }
     .card-metric:hover { transform: scale(1.03); }
     .icon-circle {
         height: 3rem; width: 3rem; border-radius: 50%; display: flex; 
@@ -281,7 +283,8 @@ require_once('includes/header.php');
         
         <!-- CARD 1: OMZET HARI INI -->
         <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-start border-4 border-primary shadow h-100 py-2 card-metric" onclick="window.location.href='laporan_billing_global.php?action=cari&tgl_awal=<?php echo date('Y-m-d'); ?>&jam_awal=00:00:00&tgl_akhir=<?php echo date('Y-m-d'); ?>&jam_akhir=23:59:59'">
+            <?php $canKeu = !empty($sidebar_keuangan_access); ?>
+            <div class="card border-start border-4 border-primary shadow h-100 py-2 card-metric<?php echo $canKeu ? '' : ' no-pointer'; ?>" <?php if ($canKeu): ?>onclick="window.location.href='laporan_billing_global.php?action=cari&tgl_awal=<?php echo date('Y-m-d'); ?>&jam_awal=00:00:00&tgl_akhir=<?php echo date('Y-m-d'); ?>&jam_akhir=23:59:59'"<?php endif; ?>>
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="me-2" style="min-width: 0;">
@@ -379,12 +382,14 @@ require_once('includes/header.php');
                     <h6 class="m-0 font-weight-bold text-primary">Sumber Omzet Hari Ini</h6>
                 </div>
                 <div class="card-body">
-                    <div class="chart-pie pt-4 pb-2" style="height: 250px; cursor: pointer;" onclick="window.location.href='laporan_billing_global.php?action=cari&tgl_awal=<?php echo date('Y-m-d'); ?>&jam_awal=00:00:00&tgl_akhir=<?php echo date('Y-m-d'); ?>&jam_akhir=23:59:59'">
+                    <div class="chart-pie pt-4 pb-2" style="height: 250px; <?php echo $canKeu ? 'cursor: pointer;' : ''; ?>" <?php if ($canKeu): ?>onclick="window.location.href='laporan_billing_global.php?action=cari&tgl_awal=<?php echo date('Y-m-d'); ?>&jam_awal=00:00:00&tgl_akhir=<?php echo date('Y-m-d'); ?>&jam_akhir=23:59:59'"<?php endif; ?>>
                         <canvas id="chartOmzet"></canvas>
                     </div>
+                    <?php if ($canKeu): ?>
                     <div class="mt-4 text-center small text-muted">
                         *Klik chart untuk laporan detail
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

@@ -91,6 +91,7 @@ if ($res_admin->num_rows === 1) {
         $_SESSION['nama_user'] = 'Super Admin';
         $_SESSION['is_admin']  = true;
         $_SESSION['role']      = 'Super Admin';
+        $_SESSION['keuangan']  = true;
 
         // Normal Flow
         header("Location: ../dashboard.php");
@@ -108,7 +109,8 @@ $sql_user = "
         AES_DECRYPT(password, 'windi') as password,
         harian_menejemen,
         bulanan_menejemen,
-        pegawai_admin
+        pegawai_admin,
+        keuangan
     FROM user
     WHERE AES_DECRYPT(id_user, 'nur') = ?
 ";
@@ -137,6 +139,7 @@ if ($res_user->num_rows === 1) {
             // Set role menjadi Manajemen jika lolos otentikasi
             $_SESSION['role']     = 'Manajemen';
             $_SESSION['is_admin'] = false;
+            $_SESSION['keuangan'] = ($row_user['keuangan'] === 'true');
 
             // --- FIX KRITIS: Query nama pakai Prepared Statement (no SQL Injection) ---
             // Cek dari tabel petugas

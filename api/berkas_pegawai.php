@@ -12,6 +12,7 @@ function kpb_respond($code, $payload, $raw)
     echo json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE);
 }
 
+
 if (!$kpb_raw) {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, max-age=0');

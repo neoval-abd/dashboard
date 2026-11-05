@@ -90,11 +90,24 @@ function ensure_wa_gateway_config_table($db = null)
         auth_key VARCHAR(160) NOT NULL DEFAULT '',
         api_url VARCHAR(255) NOT NULL DEFAULT 'https://app.saungwa.com/api/create-message',
         test_target VARCHAR(30) NOT NULL DEFAULT '',
+        last_dispatch_at DATETIME DEFAULT NULL,
         updated_by VARCHAR(100) DEFAULT NULL,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
-    return (bool) @$db->query($sql);
+    $ok = (bool) @$db->query($sql);
+    if ($ok) {
+        static $colChecked = false;
+        if (!$colChecked) {
+            $colRes = @$db->query("SHOW COLUMNS FROM konfigurasi_wa_gateway LIKE 'last_dispatch_at'");
+            if ($colRes && $colRes->num_rows === 0) {
+                @$db->query("ALTER TABLE konfigurasi_wa_gateway ADD COLUMN last_dispatch_at DATETIME DEFAULT NULL AFTER test_target");
+            }
+            $colChecked = true;
+        }
+    }
+
+    return $ok;
 }
 
 /**
@@ -318,31 +331,50 @@ function get_saungwa_send_cooldown()
     return defined('SAUNGWA_SEND_COOLDOWN_SECONDS') ? max(0, (int) SAUNGWA_SEND_COOLDOWN_SECONDS) : 120;
 }
 
-function get_saungwa_cooldown_remaining()
+function get_saungwa_cooldown_remaining($db = null)
 {
     $cooldown = get_saungwa_send_cooldown();
     if ($cooldown <= 0) {
         return 0;
     }
 
+    $remaining = 0;
+
+    // 1. Cek jeda global lintas-server di Database (mencegah bentrok jika worker Linux & Windows jalan bersamaan)
+    if (!$db && isset($GLOBALS['koneksi']) && ($GLOBALS['koneksi'] instanceof mysqli)) {
+        $db = $GLOBALS['koneksi'];
+    }
+    if ($db instanceof mysqli && ensure_wa_gateway_config_table($db)) {
+        $res = @$db->query("SELECT TIMESTAMPDIFF(SECOND, last_dispatch_at, NOW()) AS elapsed FROM konfigurasi_wa_gateway WHERE id = 1 AND last_dispatch_at IS NOT NULL LIMIT 1");
+        if ($res && ($row = $res->fetch_assoc()) && $row['elapsed'] !== null) {
+            $elapsed = (int) $row['elapsed'];
+            if ($elapsed >= 0 && $elapsed < $cooldown) {
+                $remaining = max($remaining, $cooldown - $elapsed);
+            }
+        }
+    }
+
+    // 2. Cek file lock lokal sebagai cadangan
     $lockFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dashboard_saungwa_send.lock';
-    if (!is_file($lockFile)) {
-        return 0;
+    if (is_file($lockFile)) {
+        $lastSentAt = (int) trim((string) @file_get_contents($lockFile));
+        if ($lastSentAt > 0) {
+            $remaining = max($remaining, $cooldown - (time() - $lastSentAt));
+        }
     }
 
-    $lastSentAt = (int) trim((string) @file_get_contents($lockFile));
-    if ($lastSentAt <= 0) {
-        return 0;
-    }
-
-    return max(0, $cooldown - (time() - $lastSentAt));
+    return max(0, $remaining);
 }
 
-function acquire_saungwa_send_slot(&$lockHandle)
+function acquire_saungwa_send_slot(&$lockHandle, $db = null)
 {
     $cooldown = get_saungwa_send_cooldown();
     if ($cooldown <= 0) {
         return ['success' => true];
+    }
+
+    if (!$db && isset($GLOBALS['koneksi']) && ($GLOBALS['koneksi'] instanceof mysqli)) {
+        $db = $GLOBALS['koneksi'];
     }
 
     $lockFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dashboard_saungwa_send.lock';
@@ -371,11 +403,53 @@ function acquire_saungwa_send_slot(&$lockHandle)
         ];
     }
 
+    // Pengunci atomik lintas-server di Database (mencegah 2 service di PC berbeda menembak bersamaan)
+    if ($db instanceof mysqli && ensure_wa_gateway_config_table($db)) {
+        $stmtClaim = @$db->prepare("UPDATE konfigurasi_wa_gateway
+                                    SET last_dispatch_at = NOW()
+                                    WHERE id = 1
+                                      AND (last_dispatch_at IS NULL OR TIMESTAMPDIFF(SECOND, last_dispatch_at, NOW()) >= ?)");
+        if ($stmtClaim) {
+            $stmtClaim->bind_param("i", $cooldown);
+            @$stmtClaim->execute();
+            $claimed = $stmtClaim->affected_rows;
+            $stmtClaim->close();
+
+            if ($claimed === 0) {
+                $dbRem = get_saungwa_cooldown_remaining($db);
+                if ($dbRem > 0) {
+                    flock($lockHandle, LOCK_UN);
+                    fclose($lockHandle);
+                    $lockHandle = null;
+                    return [
+                        'success'     => false,
+                        'error'       => 'Jeda pengaman lintas-server aktif: tunggu ' . $dbRem . ' detik (pastikan tidak menjalankan 2 service worker sekaligus di Windows & Linux).',
+                        'retry_after' => $dbRem,
+                    ];
+                }
+            }
+        }
+    }
+
     return ['success' => true];
 }
 
-function release_saungwa_send_slot($lockHandle, $markSent)
+function release_saungwa_send_slot($lockHandle, $markSent, $db = null)
 {
+    if (!$db && isset($GLOBALS['koneksi']) && ($GLOBALS['koneksi'] instanceof mysqli)) {
+        $db = $GLOBALS['koneksi'];
+    }
+
+    if ($markSent) {
+        if ($db instanceof mysqli) {
+            @$db->query("UPDATE konfigurasi_wa_gateway SET last_dispatch_at = NOW() WHERE id = 1");
+        }
+    } else {
+        if ($db instanceof mysqli) {
+            @$db->query("UPDATE konfigurasi_wa_gateway SET last_dispatch_at = NULL WHERE id = 1");
+        }
+    }
+
     if (!$lockHandle) {
         return;
     }
@@ -415,6 +489,9 @@ function send_saungwa_message($phone, $message, array $options = [])
     $authKey         = (isset($options['authkey']) && trim((string) $options['authkey']) !== '')
         ? trim((string) $options['authkey'])
         : $runtimeCfg['auth_key'];
+    $senderCompare   = (isset($options['sender_phone']) && trim((string) $options['sender_phone']) !== '')
+        ? normalize_wa_number($options['sender_phone'])
+        : $runtimeCfg['sender_phone'];
     $apiUrl          = $runtimeCfg['api_url'] ?: 'https://app.saungwa.com/api/create-message';
     $bypassCooldown  = !empty($options['bypass_cooldown']);
     $ignoreTestRedir = !empty($options['ignore_test_redirect']);
@@ -449,6 +526,14 @@ function send_saungwa_message($phone, $message, array $options = [])
         }
     }
 
+    if ($senderCompare !== '' && $target === $senderCompare) {
+        $dispSender = (substr($senderCompare, 0, 2) === '62') ? ('0' . substr($senderCompare, 2)) : $senderCompare;
+        return [
+            'success' => false,
+            'error'   => 'Nomor tujuan (' . $dispSender . ') sama dengan Nomor WA Perangkat Pengirim RS ASSALAM. Gunakan nomor WhatsApp lain yang aktif sebagai tujuan.',
+        ];
+    }
+
     if (!function_exists('curl_init')) {
         return ['success' => false, 'error' => 'Ekstensi PHP cURL belum aktif di server Apache/PHP (di Linux Mint jalankan: sudo apt install php-curl).'];
     }
@@ -461,16 +546,18 @@ function send_saungwa_message($phone, $message, array $options = [])
         }
     }
 
-    $sandboxFlag = (defined('SAUNGWA_SANDBOX') && SAUNGWA_SANDBOX) ? 'true' : 'false';
-    $sslVerify   = defined('SAUNGWA_SSL_VERIFY') ? (bool) SAUNGWA_SSL_VERIFY : false;
+    $sslVerify = defined('SAUNGWA_SSL_VERIFY') ? (bool) SAUNGWA_SSL_VERIFY : false;
 
+    // Sesuai spesifikasi resmi cURL SaungWA (Text Message Only): hanya kirim appkey, authkey, to, message
     $postFields = [
         'appkey'  => $appKey,
         'authkey' => $authKey,
         'to'      => $target,
         'message' => $cleanMsg,
-        'sandbox' => $sandboxFlag,
     ];
+    if (defined('SAUNGWA_SANDBOX') && SAUNGWA_SANDBOX === true) {
+        $postFields['sandbox'] = 'true';
+    }
 
     $ch = curl_init($apiUrl);
     curl_setopt_array($ch, [
@@ -545,7 +632,8 @@ function send_saungwa_message($phone, $message, array $options = [])
     }
 
     if (!$bypassCooldown) {
-        $markCooldown = ($http >= 500 || $http === 429);
+        // Tetap aktifkan jeda pengaman setelah panggilan API ke SaungWA agar tidak terjadi tembakan beruntun
+        $markCooldown = ($http >= 500 || $http === 429 || $http === 401);
         release_saungwa_send_slot($rateLimitLock, $markCooldown);
     }
 
@@ -585,8 +673,18 @@ function send_saungwa_message($phone, $message, array $options = [])
         }
     }
 
+    $senderLabel = $runtimeCfg['sender_display'] ?: '089675463447';
     if ($http === 401) {
-        $errDetail .= ' — Periksa kecocokan AppKey (menu Webhook App) & AuthKey, serta pastikan perangkat 089675463447 berstatus TERSAMBUNG.';
+        if (stripos($errDetail, 'Invalid Auth') !== false) {
+            $errDetail .= ' — AppKey (menu Webhook App) atau AuthKey tidak cocok, atau masa aktif akun SaungWA telah berakhir.';
+        } elseif (stripos($errDetail, 'Request Failed') !== false) {
+            $errDetail .= ' (AppKey & AuthKey sudah benar, namun pengiriman gagal di sisi WhatsApp SaungWA) — Cek: '
+                . '(1) Buka menu Device Broadcast SaungWA lalu klik tombol biru "CEK KONEKSI" pada perangkat ' . $senderLabel . ' (jika putus, klik titik tiga -> Scan ulang QR), '
+                . '(2) Pastikan nomor tujuan terdaftar aktif di WhatsApp, '
+                . '(3) Cek sisa kuota pesan paket SaungWA.';
+        } else {
+            $errDetail .= ' — Periksa koneksi perangkat ' . $senderLabel . ' di SaungWA (klik tombol "CEK KONEKSI").';
+        }
     }
 
     return [

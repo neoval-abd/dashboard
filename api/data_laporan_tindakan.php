@@ -16,6 +16,13 @@ require_once(dirname(__DIR__) . '/config/koneksi.php');
 if (!isset($_SESSION['user_id'])) {
     http_response_code(403); echo json_encode(['error' => 'Akses ditolak.']); exit;
 }
+require_once(dirname(__DIR__) . '/includes/keuangan.php');
+if (!keu_can_access($koneksi)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Akses Laporan Keuangan ditolak. Hak akses keuangan diperlukan.']);
+    exit;
+}
+
 
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');

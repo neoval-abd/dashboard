@@ -22,6 +22,13 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['error' => 'Akses ditolak.']);
     exit;
 }
+require_once(dirname(__DIR__) . '/includes/keuangan.php');
+if (!keu_can_access($koneksi)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Akses Laporan Keuangan ditolak. Hak akses keuangan diperlukan.']);
+    exit;
+}
+
 
 // 4. Ambil Parameter
 $no_rawat = isset($_GET['no_rawat']) ? trim($_GET['no_rawat']) : '';

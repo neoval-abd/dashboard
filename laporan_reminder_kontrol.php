@@ -101,6 +101,7 @@ if ($stmtBpjs = $koneksi->prepare($sql_bpjs)) {
                 'no_surat'      => trim((string) $row['no_surat']),
                 'tgl_surat'     => trim((string) $row['tgl_surat']),
                 'tgl_rencana'   => $tglRencana,
+                'kd_dokter_bpjs'=> trim((string) ($row['kd_dokter_bpjs'] ?? '')),
                 'nm_poli'       => trim((string) ($row['nm_poli_bpjs'] ?: '-')),
                 'nm_dokter'     => trim((string) ($row['nm_dokter_bpjs'] ?: '-')),
                 'catatan'       => '',
@@ -209,6 +210,7 @@ if ($stmtSkdp = $koneksi->prepare($sql_skdp)) {
                 'ref_key'       => $refKey,
                 'legacy_no_sep' => '',
                 'sumber_tabel'  => 'skdp_bpjs',
+                'kd_dokter'     => trim((string) ($row['kd_dokter'] ?? '')),
                 'jenis_bayar'   => $kategoriBayar, // 'tunai' atau 'asuransi'
                 'penjamin_nama' => $penjaminLabel,
                 'nomr'          => $nomr,
@@ -232,6 +234,42 @@ if ($stmtSkdp = $koneksi->prepare($sql_skdp)) {
 }
 
 // Urutkan gabungan data berdasarkan tanggal kontrol lalu nama pasien
+// Pre-fetch jadwal praktik dokter untuk resolusi otomatis jam kontrol
+$jadwal_map = [];
+$rJadwal = $koneksi->query("SELECT kd_dokter, hari_kerja, jam_mulai, jam_selesai FROM jadwal");
+if ($rJadwal) {
+    while ($rowJ = $rJadwal->fetch_assoc()) {
+        $key = trim($rowJ['kd_dokter']) . '|' . trim($rowJ['hari_kerja']);
+        if (!isset($jadwal_map[$key])) {
+            $jadwal_map[$key] = date('H:i', strtotime($rowJ['jam_mulai'])) . ' - ' . date('H:i', strtotime($rowJ['jam_selesai'])) . ' WIB';
+        }
+    }
+}
+
+$dokter_bpjs_map = [];
+$rMapBpjs = $koneksi->query("SELECT kd_dokter, kd_dokter_bpjs FROM maping_dokter_dpjpvclaim");
+if ($rMapBpjs) {
+    while ($rowM = $rMapBpjs->fetch_assoc()) {
+        $dokter_bpjs_map[trim($rowM['kd_dokter_bpjs'])] = trim($rowM['kd_dokter']);
+    }
+}
+
+if (!function_exists('get_hari_kontrol_indonesia')) {
+    function get_hari_kontrol_indonesia($dateStr) {
+        $dayNum = (int) date('N', strtotime($dateStr));
+        $map = [
+            1 => 'SENIN',
+            2 => 'SELASA',
+            3 => 'RABU',
+            4 => 'KAMIS',
+            5 => 'JUMAT',
+            6 => 'SABTU',
+            7 => 'AKHAD',
+        ];
+        return $map[$dayNum] ?? 'SENIN';
+    }
+}
+
 $kontrol_patients = array_values($items_by_ref);
 usort($kontrol_patients, function ($a, $b) {
     $cmp = strcmp($a['tgl_rencana'], $b['tgl_rencana']);
@@ -283,6 +321,10 @@ $unqueued_count  = 0;
 $has_phone_count = 0;
 
 foreach ($kontrol_patients as &$p) {
+    $hariIndo = get_hari_kontrol_indonesia($p['tgl_rencana']);
+    $kdDok = !empty($p['kd_dokter']) ? $p['kd_dokter'] : ($dokter_bpjs_map[$p['kd_dokter_bpjs'] ?? ''] ?? ($p['kd_dokter_bpjs'] ?? ''));
+    $jamPraktek = $jadwal_map[$kdDok . '|' . $hariIndo] ?? ($jadwal_map[($p['kd_dokter_bpjs'] ?? '') . '|' . $hariIndo] ?? 'Sesuai Jadwal Praktik Dokter');
+    $p['jam_praktek'] = $jamPraktek;
     if ($p['jenis_bayar'] === 'bpjs') {
         $count_bpjs++;
     } elseif ($p['jenis_bayar'] === 'tunai') {
@@ -1280,7 +1322,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                         </div>
 
                         <div class="kontrol-info mt-2">
-                            <div><span class="label"><i class="fas fa-calendar-day me-1 text-primary"></i> Kontrol</span>: <strong class="text-primary"><?php echo $tgl_rencana; ?></strong></div>
+                            <div><span class="label"><i class="fas fa-calendar-day me-1 text-primary"></i> Kontrol</span>: <strong class="text-primary"><?php echo $tgl_rencana; ?></strong> <?php if (!empty($p['jam_praktek']) && $p['jam_praktek'] !== 'Sesuai Jadwal Praktik Dokter'): ?><span class="badge bg-secondary ms-1" style="font-size:0.73rem;"><i class="fas fa-clock me-1"></i><?php echo htmlspecialchars($p['jam_praktek']); ?></span><?php endif; ?></div>
                             <div class="mt-1"><span class="label"><i class="fas fa-stethoscope me-1"></i> Poli</span>: <strong><?php echo $poli; ?></strong></div>
                             <div class="mt-1"><span class="label"><i class="fas fa-user-md me-1"></i> Dokter</span>: <strong><?php echo $dokter; ?></strong></div>
                             <div class="mt-1"><span class="label"><i class="fas fa-file-alt me-1"></i> <?php echo $suratLabel; ?></span>: <strong><?php echo $no_surat; ?></strong> <span class="sub-muted">(<?php echo $tgl_surat; ?>)</span></div>
@@ -1323,6 +1365,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                                 data-poli="<?php echo $poli; ?>"
                                 data-dokter="<?php echo $dokter; ?>"
                                 data-tanggal="<?php echo $tgl_rencana; ?>"
+                                data-jam="<?php echo htmlspecialchars($p['jam_praktek'] ?: 'Sesuai Jadwal Praktik Dokter'); ?>"
                                 data-no-surat="<?php echo $no_surat; ?>"
                                 data-catatan="<?php echo $catatan; ?>"
                                 data-saved-msg="<?php echo htmlspecialchars($p['saved_msg']); ?>"
@@ -1468,7 +1511,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                     </div>
                     <textarea id="bulkTemplateText" class="form-control" style="min-height:150px;"></textarea>
                     <small class="text-muted d-block mt-1">
-                        Variabel otomatis: <code>{nama}</code>, <code>{tanggal}</code>, <code>{poli}</code>, <code>{dokter}</code>, <code>{penjamin}</code>, <code>{no_surat}</code>
+                        Variabel otomatis: <code>{nama}</code>, <code>{tanggal}</code>, <code>{jam}</code>, <code>{poli}</code>, <code>{dokter}</code>, <code>{penjamin}</code>, <code>{no_surat}</code> (atau format <code>[Nama Pasien]</code>, <code>[Tanggal]</code>, <code>[Jam]</code>, dll)
                     </small>
                 </div>
 
@@ -1555,14 +1598,17 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                 </div>
 
                 <div class="modal-meta-box">
-                    <div class="small modal-field-label mb-2">
+                    <div class="small modal-field-label mb-1">
                         <i class="fas fa-paper-plane text-primary me-1"></i> Uji Kirim Pesan Langsung (Tes Koneksi SaungWA)
                     </div>
+                    <small class="text-muted d-block mb-2">
+                        Masukkan nomor WA pribadi/lain yang aktif (<strong>jangan</strong> diisi nomor pengirim <code><?php echo htmlspecialchars($gw_config['sender_display'] ?: '089675463447'); ?></code>).
+                    </small>
                     <div class="row g-2 align-items-center">
                         <div class="col-sm-7">
                             <input type="text" id="cfgTestPhone" class="form-control form-control-sm modal-themed-input"
-                                   value="<?php echo htmlspecialchars($gw_config['sender_display'] ?: '089675463447'); ?>"
-                                   placeholder="Nomor WA tujuan tes (contoh: 0812xxxxxxxx)">
+                                   value=""
+                                   placeholder="Nomor WA tujuan tes (contoh: 0857xxxxxxxx)">
                         </div>
                         <div class="col-sm-5 d-grid">
                             <button type="button" id="btnTestSaungwaSend" class="btn btn-sm btn-primary fw-bold">
@@ -1598,16 +1644,17 @@ $(document).ready(function() {
     let currentStatusFilter = 'unsent'; // unsent (none + failed) | pending | sent | all
     let currentPayFilter    = <?php echo json_encode($jenis_bayar); ?>;
 
-    const DEFAULT_TEMPLATE = `Yth. Bapak/Ibu *{nama}*,\n\nKami dari *RSU Assalam* mengingatkan jadwal *KONTROL* Anda pada:\n📅 Tanggal : *{tanggal}*\n🏥 Poliklinik : *{poli}*\n👨‍⚕️ Dokter : *{dokter}*\n💳 Penjamin : {penjamin}\n\nMohon hadir sesuai jadwal yang telah ditentukan. Balas *HADIR* untuk konfirmasi kehadiran, atau hubungi kami bila ada perubahan jadwal.\n\nTerima kasih, semoga sehat selalu.\nSalam hangat,\n*RSU Assalam*`;
+    const DEFAULT_TEMPLATE = `Assalamu’alaikum Wr. Wb.\n\nYth. Bapak/Ibu *{nama}*,\n\nKami dari *Rumah Sakit Assalam* mengingatkan jadwal kontrol Bapak/Ibu:\n\n📅 Tanggal: *{tanggal}*\n⏰ Jam: *{jam}*\n👨‍⚕️ Dokter: *{dokter}*\n🏥 Poliklinik: *{poli}*\n\nMohon hadir sesuai jadwal yang telah ditentukan. Balas *HADIR* untuk konfirmasi kehadiran, atau hubungi kami di 0812-2345-7995 bila ada perubahan jadwal.\n\nMohon memastikan:\n✅ Surat rujukan masih berlaku pada tanggal kunjungan jika jaminan menggunakan BPJS Kesehatan\n✅ Surat rujukan sesuai dengan poli tujuan.\n✅ Mendaftar Melalui Aplikasi MJKN\n\nApabila surat rujukan telah habis masa berlaku atau terdapat kendala administrasi, silakan menghubungi fasilitas kesehatan penerbit rujukan untuk mendapatkan informasi lebih lanjut.\n\nTerima kasih.\n\n*Rumah Sakit Assalam*\n_Ihsan Dalam Pelayanan_`;
 
     function buildMessageFromTemplate(tpl, data) {
         return String(tpl || DEFAULT_TEMPLATE)
-            .replace(/\{nama\}/gi, data.name || '-')
-            .replace(/\{tanggal\}/gi, data.tanggal || '-')
-            .replace(/\{poli\}/gi, data.poli || '-')
-            .replace(/\{dokter\}/gi, data.dokter || '-')
-            .replace(/\{penjamin\}/gi, data.penjamin || '-')
-            .replace(/\{no_surat\}/gi, data.noSurat || '-');
+            .replace(/\{nama\}|\[nama\s*pasien\]/gi, data.name || '-')
+            .replace(/\{tanggal\}|\[tanggal\]/gi, data.tanggal || '-')
+            .replace(/\{jam\}|\[jam\]/gi, data.jam || 'Sesuai Jadwal Praktik Dokter')
+            .replace(/\{poli\}|\[nama\s*poli\]|\[poliklinik\]/gi, data.poli || '-')
+            .replace(/\{dokter\}|\[nama\s*dokter\]/gi, data.dokter || '-')
+            .replace(/\{penjamin\}|\[penjamin\]/gi, data.penjamin || '-')
+            .replace(/\{no_surat\}|\[no\s*surat\]/gi, data.noSurat || '-');
     }
 
     function getDefaultMsg(data) {
@@ -1796,6 +1843,7 @@ $(document).ready(function() {
             poli:     String($btn.attr('data-poli') || '-'),
             dokter:   String($btn.attr('data-dokter') || '-'),
             tanggal:  String($btn.attr('data-tanggal') || '-'),
+            jam:      String($btn.attr('data-jam') || 'Sesuai Jadwal Praktik Dokter'),
             noSurat:  String($btn.attr('data-no-surat') || '-'),
             savedMsg: String($btn.attr('data-saved-msg') || ''),
             status:   String($btn.attr('data-status') || 'none')
@@ -1920,6 +1968,7 @@ $(document).ready(function() {
             poli:     $(this).data('poli'),
             dokter:   $(this).data('dokter'),
             tanggal:  $(this).data('tanggal'),
+            jam:      $(this).data('jam') || 'Sesuai Jadwal Praktik Dokter',
             penjamin: $(this).closest('.kontrol-col').find('.kontrol-badge-pay').text().trim()
         });
         window.open('https://wa.me/' + encodeURIComponent(phone) + '?text=' + encodeURIComponent(message), '_blank', 'noopener');
@@ -1950,6 +1999,7 @@ $(document).ready(function() {
                 poli:     String($btn.attr('data-poli') || '-'),
                 dokter:   String($btn.attr('data-dokter') || '-'),
                 tanggal:  String($btn.attr('data-tanggal') || '-'),
+            jam:      String($btn.attr('data-jam') || 'Sesuai Jadwal Praktik Dokter'),
                 noSurat:  String($btn.attr('data-no-surat') || '-')
             });
         });
@@ -2142,6 +2192,20 @@ $(document).ready(function() {
         if (!testTo) {
             $resBox.removeClass('d-none alert-success').addClass('alert-danger')
                    .text('Masukkan nomor WA tujuan tes terlebih dahulu.');
+            $('#cfgTestPhone').focus();
+            return;
+        }
+
+        const normPhone = function(v) {
+            let c = String(v || '').replace(/[^0-9]/g, '');
+            if (c.startsWith('0')) c = '62' + c.slice(1);
+            else if (c && !c.startsWith('62')) c = '62' + c;
+            return c;
+        };
+        const senderNorm = normPhone($('#cfgSenderPhone').val());
+        if (senderNorm && normPhone(testTo) === senderNorm) {
+            $resBox.removeClass('d-none alert-success').addClass('alert-danger')
+                   .html('<i class="fas fa-exclamation-triangle me-1"></i> Nomor tujuan tes <strong>tidak boleh sama</strong> dengan Nomor WA Perangkat Pengirim (<code>' + $('<div>').text($('#cfgSenderPhone').val().trim()).html() + '</code>). Masukkan nomor WA pribadi/lain yang aktif.');
             $('#cfgTestPhone').focus();
             return;
         }

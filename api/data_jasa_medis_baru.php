@@ -11,6 +11,13 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Akses ditolak.', 'data' => []]);
     exit;
 }
+require_once(dirname(__DIR__) . '/includes/keuangan.php');
+if (!keu_can_access($koneksi)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Akses Laporan Keuangan ditolak. Hak akses keuangan diperlukan.']);
+    exit;
+}
+
 
 function jm_valid_date($value) {
     return is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value);

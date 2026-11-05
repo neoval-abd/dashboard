@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . '/config/koneksi.php';
+require_once __DIR__ . '/includes/keuangan.php';
+keu_require_access($koneksi);
+
 $page_title = "Jasa Medis";
 require_once('includes/header.php');
 

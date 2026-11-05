@@ -3,6 +3,10 @@
  * File: laporan_tindakan.php (UPDATE V5 - +Widget Jasmed)
  */
 
+require_once __DIR__ . '/config/koneksi.php';
+require_once __DIR__ . '/includes/keuangan.php';
+keu_require_access($koneksi);
+
 $page_title = "Laporan Analisa Tindakan Medis";
 require_once('includes/header.php');
 require_once('includes/functions.php');

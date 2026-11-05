@@ -17,6 +17,13 @@ require_once(dirname(__DIR__) . '/includes/functions.php');
 if (!isset($_SESSION['user_id'])) {
     http_response_code(403); echo json_encode(['error' => 'Akses ditolak.']); exit;
 }
+require_once(dirname(__DIR__) . '/includes/keuangan.php');
+if (!keu_can_access($koneksi)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Akses Laporan Keuangan ditolak. Hak akses keuangan diperlukan.']);
+    exit;
+}
+
 
 // 1. Ambil Parameter
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-d');

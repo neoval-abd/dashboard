@@ -51,6 +51,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $msg = "<div class='alert alert-danger'>Gagal mencabut: " . $koneksi->error . "</div>";
         }
+    } elseif ($act == 'toggle_keuangan') {
+        $username = $koneksi->real_escape_string($_POST['username_keu'] ?? '');
+        $id_user_hex = isset($_POST['id_user_hex']) ? $koneksi->real_escape_string($_POST['id_user_hex']) : '';
+        $setVal = (isset($_POST['set_val']) && $_POST['set_val'] === 'true') ? 'true' : 'false';
+
+        if (!empty($id_user_hex)) {
+            $sql = "UPDATE user SET keuangan = '$setVal' WHERE id_user = UNHEX('$id_user_hex')";
+        } else {
+            $sql = "UPDATE user SET keuangan = '$setVal' WHERE id_user = AES_ENCRYPT('$username', 'nur')";
+        }
+
+        if ($koneksi->query($sql)) {
+            $statusLabel = ($setVal === 'true') ? 'diberikan' : 'dicabut';
+            $msg = "<div class='alert alert-info'><i class='fas fa-check-circle me-1'></i> Hak akses Laporan Keuangan untuk <b>" . htmlspecialchars($username) . "</b> berhasil $statusLabel.</div>";
+        } else {
+            $msg = "<div class='alert alert-danger'>Gagal memperbarui hak akses keuangan: " . $koneksi->error . "</div>";
+        }
     }
 }
 
@@ -116,7 +133,7 @@ require_once('includes/header.php');
                                 <?php
                                 // Mengambil data user yang memiliki harian_menejemen & bulanan_menejemen = 'true'
                                 $sql_list = "
-                                    SELECT HEX(u.id_user) as id_user_hex, AES_DECRYPT(u.id_user, 'nur') as id_user_dec, p.nama 
+                                    SELECT HEX(u.id_user) as id_user_hex, AES_DECRYPT(u.id_user, 'nur') as id_user_dec, p.nama, u.keuangan, u.pegawai_admin
                                     FROM user u 
                                     LEFT JOIN pegawai p ON AES_DECRYPT(u.id_user, 'nur') = p.nik 
                                     WHERE u.harian_menejemen = 'true' AND u.bulanan_menejemen = 'true'
@@ -130,15 +147,45 @@ require_once('includes/header.php');
                                     <td><?= $username_esc ?></td>
                                     <td><?= $nama_esc ?></td>
                                     <td>
-                                        <span class="badge bg-success">Harian & Bulanan Menejemen (native)</span>
+                                        <div class="d-flex flex-wrap gap-1 align-items-center">
+                                            <span class="badge bg-success">Eksekutif</span>
+                                            <?php if (($row['keuangan'] ?? '') === 'true'): ?>
+                                                <span class="badge bg-primary"><i class="fas fa-file-invoice-dollar me-1"></i>Keuangan: Aktif</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-secondary text-light"><i class="fas fa-lock me-1"></i>Keuangan: Nonaktif</span>
+                                            <?php endif; ?>
+                                            <?php if (($row['pegawai_admin'] ?? '') === 'true'): ?>
+                                                <span class="badge bg-info text-dark"><i class="fas fa-id-card me-1"></i>Kepegawaian: Aktif</span>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                     <td class="text-center">
-                                        <form method="POST" onsubmit="return confirm('Cabut akses Eksekutif untuk user ini? Status harian & bulanan menejemen akan di-set menjadi false.');" style="display:inline;">
-                                            <input type="hidden" name="act" value="delete">
-                                            <input type="hidden" name="username_del" value="<?= $username_esc ?>">
-                                            <input type="hidden" name="id_user_hex" value="<?= htmlspecialchars($row['id_user_hex']) ?>">
-                                            <button type="submit" class="btn btn-sm btn-danger" title="Cabut Akses"><i class="fas fa-trash-alt me-1"></i> Cabut</button>
-                                        </form>
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <?php if (($row['keuangan'] ?? '') === 'true'): ?>
+                                                <form method="POST" onsubmit="return confirm('Cabut hak akses Laporan Keuangan untuk user ini?');" style="display:inline;">
+                                                    <input type="hidden" name="act" value="toggle_keuangan">
+                                                    <input type="hidden" name="set_val" value="false">
+                                                    <input type="hidden" name="username_keu" value="<?= $username_esc ?>">
+                                                    <input type="hidden" name="id_user_hex" value="<?= htmlspecialchars($row['id_user_hex']) ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Kunci Laporan Keuangan"><i class="fas fa-lock me-1"></i>Kunci Keu</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <form method="POST" onsubmit="return confirm('Berikan hak akses Laporan Keuangan untuk user ini?');" style="display:inline;">
+                                                    <input type="hidden" name="act" value="toggle_keuangan">
+                                                    <input type="hidden" name="set_val" value="true">
+                                                    <input type="hidden" name="username_keu" value="<?= $username_esc ?>">
+                                                    <input type="hidden" name="id_user_hex" value="<?= htmlspecialchars($row['id_user_hex']) ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Buka Akses Laporan Keuangan"><i class="fas fa-unlock me-1"></i>Buka Keu</button>
+                                                </form>
+                                            <?php endif; ?>
+
+                                            <form method="POST" onsubmit="return confirm('Cabut akses Eksekutif untuk user ini? Status harian & bulanan menejemen akan di-set menjadi false.');" style="display:inline;">
+                                                <input type="hidden" name="act" value="delete">
+                                                <input type="hidden" name="username_del" value="<?= $username_esc ?>">
+                                                <input type="hidden" name="id_user_hex" value="<?= htmlspecialchars($row['id_user_hex']) ?>">
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Cabut Akses Eksekutif"><i class="fas fa-trash-alt me-1"></i> Cabut</button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php } ?>

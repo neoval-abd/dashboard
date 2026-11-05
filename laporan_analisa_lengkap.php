@@ -5,6 +5,10 @@
  * - Tabel menggunakan scroll horizontal (scrollX).
  */
 
+require_once __DIR__ . '/config/koneksi.php';
+require_once __DIR__ . '/includes/keuangan.php';
+keu_require_access($koneksi);
+
 $page_title = "Analisa Data Lengkap (Deep Dive)";
 require_once('includes/header.php');
 require_once('includes/functions.php');

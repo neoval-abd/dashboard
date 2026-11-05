@@ -8,6 +8,10 @@
  */
 
 // 1. Set Judul & Sertakan Header
+require_once __DIR__ . '/config/koneksi.php';
+require_once __DIR__ . '/includes/keuangan.php';
+keu_require_access($koneksi);
+
 $page_title = "Laporan Detail Piutang per Shift";
 require_once('includes/header.php');
 require_once('includes/functions.php');

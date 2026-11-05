@@ -1123,7 +1123,7 @@ function get_arrow_class($pages, $current) {
         $sidebar_menus = json_decode($json_data, true);
     }
 
-    require_once __DIR__ . '/kepegawaian.php';
+        require_once __DIR__ . '/kepegawaian.php';
     $sidebar_pegawai_access = false;
     try {
         $sidebar_pegawai_access = kp_can_access($koneksi);
@@ -1131,6 +1131,15 @@ function get_arrow_class($pages, $current) {
         error_log('[Kepegawaian Akses] ' . $error->getMessage());
     }
     $sidebar_menus = kp_filter_sidebar($sidebar_menus, $sidebar_pegawai_access);
+
+    require_once __DIR__ . '/keuangan.php';
+    $sidebar_keuangan_access = false;
+    try {
+        $sidebar_keuangan_access = keu_can_access($koneksi);
+    } catch (Throwable $error) {
+        error_log('[Keuangan Akses] ' . $error->getMessage());
+    }
+    $sidebar_menus = keu_filter_sidebar($sidebar_menus, $sidebar_keuangan_access);
 
     // LOOPING MENU DARI JSON
     if (!empty($sidebar_menus)) {

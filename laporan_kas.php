@@ -6,6 +6,10 @@
  * PHP 7.3 compatible.
  */
 
+require_once __DIR__ . '/config/koneksi.php';
+require_once __DIR__ . '/includes/keuangan.php';
+keu_require_access($koneksi);
+
 // ... (Header & Setup awal sama) ...
 $page_title = "Dashboard Keuangan";
 require_once('includes/header.php');

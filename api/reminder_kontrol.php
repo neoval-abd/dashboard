@@ -129,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $sendRes = send_saungwa_message($phoneCheck['phone_wa'], $testMsg, [
             'appkey'               => $appKey !== '' ? $appKey : (defined('SAUNGWA_APP_KEY') ? SAUNGWA_APP_KEY : ''),
             'authkey'              => $authKey !== '' ? $authKey : (defined('SAUNGWA_AUTH_KEY') ? SAUNGWA_AUTH_KEY : ''),
+            'sender_phone'         => $senderPhone,
             'bypass_cooldown'      => true,
             'ignore_test_redirect' => true,
         ]);
