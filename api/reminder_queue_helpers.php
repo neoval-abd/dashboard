@@ -58,7 +58,7 @@ function get_wa_queue_delay()
     if (defined('SAUNGWA_QUEUE_DELAY_SECONDS')) {
         return max(60, (int) SAUNGWA_QUEUE_DELAY_SECONDS);
     }
-    return defined('FONNTE_QUEUE_DELAY_SECONDS') ? max(60, (int) FONNTE_QUEUE_DELAY_SECONDS) : 300;
+    return defined('FONNTE_QUEUE_DELAY_SECONDS') ? max(60, (int) FONNTE_QUEUE_DELAY_SECONDS) : 600;
 }
 
 function get_fonnte_queue_delay()

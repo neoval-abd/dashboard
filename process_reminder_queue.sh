@@ -14,7 +14,10 @@ fi
 while true; do
     printf '[%s] Memeriksa antrean WhatsApp (%s)...\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$PHP_BIN"
     "$PHP_BIN" api/process_reminder_queue.php
-    WAIT_SEC=$((270 + RANDOM % 61))
-    printf 'Menunggu %d detik sebelum siklus berikutnya...\n' "$WAIT_SEC"
+    # Jeda acak 10 s/d 20 menit (600 s/d 1200 detik) agar pola pengiriman sangat alami & aman dari blokir WhatsApp
+    WAIT_SEC=$((600 + RANDOM % 601))
+    WAIT_MIN=$((WAIT_SEC / 60))
+    WAIT_REM=$((WAIT_SEC % 60))
+    printf 'Menunggu %d detik (%d menit %d detik) sebelum siklus berikutnya...\n' "$WAIT_SEC" "$WAIT_MIN" "$WAIT_REM"
     sleep "$WAIT_SEC"
 done
