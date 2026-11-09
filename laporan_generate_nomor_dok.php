@@ -113,6 +113,32 @@ $alert = null;
 $table_ready = dok_ensure_table($koneksi);
 $is_super_admin = isset($_SESSION['role']) && $_SESSION['role'] === 'Super Admin';
 
+// AJAX endpoint for live next number & preview
+if (isset($_GET['ajax_next_number'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    $req_tahun = (int) ($_GET['tahun'] ?? $current_year);
+    if ($req_tahun < 2000 || $req_tahun > 2100) $req_tahun = $current_year;
+    $req_jenis = $_GET['jenis_kode'] ?? 'SK';
+    if (!isset($types[$req_jenis])) $req_jenis = 'SK';
+    $req_bulan = (int) ($_GET['bulan'] ?? $current_month);
+    if (!isset($months[$req_bulan])) $req_bulan = $current_month;
+
+    $next_no = $table_ready ? dok_next_number($koneksi, $req_tahun, $req_jenis) : 1;
+    $bulan_romawi = $months[$req_bulan]['roman'] ?? 'I';
+    $preview_nomor = dok_build_number($next_no, $req_jenis, $bulan_romawi, $req_tahun, 'RSA');
+
+    echo json_encode([
+        'status' => 'success',
+        'tahun' => $req_tahun,
+        'jenis_kode' => $req_jenis,
+        'bulan' => $req_bulan,
+        'bulan_romawi' => $bulan_romawi,
+        'nomor_urut' => $next_no,
+        'preview' => $preview_nomor
+    ]);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $table_ready) {
     $action = $_POST['action'] ?? 'create';
 
@@ -145,11 +171,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $table_ready && ($_POST['action'] ?
     $pokja_kode = $_POST['pokja_kode'] ?? '';
     $keterangan = strtoupper(trim($_POST['keterangan'] ?? ''));
     $bulan = (int) ($_POST['bulan'] ?? $current_month);
-    $tahun = $current_year;
+    $tahun = (int) ($_POST['tahun'] ?? $current_year);
+    if ($tahun < 2000 || $tahun > 2100) $tahun = $current_year;
     $kode_instansi = 'RSA';
 
     if (!isset($types[$jenis_kode]) || !isset($pokja[$pokja_kode]) || !isset($months[$bulan]) || $keterangan === '') {
-        $alert = ['type' => 'danger', 'text' => 'Lengkapi jenis dokumen, POKJA/BAB, keterangan, dan bulan terlebih dahulu.'];
+        $alert = ['type' => 'danger', 'text' => 'Lengkapi jenis dokumen, POKJA/BAB, keterangan, bulan, dan tahun terlebih dahulu.'];
     } else {
         $koneksi->begin_transaction();
         $nomor_dok = '';
@@ -190,7 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $table_ready && ($_POST['action'] ?
 
         if ($inserted) {
             $koneksi->commit();
-            header('Location: laporan_generate_nomor_dok.php?saved=' . urlencode($nomor_dok));
+            header('Location: laporan_generate_nomor_dok.php?tahun=' . $tahun . '&saved=' . urlencode($nomor_dok));
             exit;
         }
 
@@ -203,11 +230,30 @@ $saved_number = $_GET['saved'] ?? '';
 $deleted = isset($_GET['deleted']) && $_GET['deleted'] === '1';
 $year_filter = (int) ($_GET['tahun'] ?? $current_year);
 if ($year_filter < 2000 || $year_filter > 2100) $year_filter = $current_year;
+
+$available_years = [];
+if ($table_ready) {
+    $q_years = $koneksi->query("SELECT DISTINCT tahun FROM generate_nomor_dok ORDER BY tahun DESC");
+    if ($q_years) {
+        while ($r_year = $q_years->fetch_assoc()) {
+            if (!empty($r_year['tahun'])) {
+                $available_years[] = (int) $r_year['tahun'];
+            }
+        }
+    }
+}
+for ($y = $current_year - 2; $y <= $current_year + 4; $y++) {
+    $available_years[] = $y;
+}
+$available_years[] = $year_filter;
+$available_years = array_values(array_unique($available_years));
+rsort($available_years);
+
 $next_numbers = [];
 foreach ($types as $type_code => $type_label) {
-    $next_numbers[$type_code] = $table_ready ? dok_next_number($koneksi, $current_year, $type_code) : 1;
+    $next_numbers[$type_code] = $table_ready ? dok_next_number($koneksi, $year_filter, $type_code) : 1;
 }
-$next_preview = dok_build_number($next_numbers['SK'] ?? 1, 'SK', $months[$current_month]['roman'], $current_year);
+$next_preview = dok_build_number($next_numbers['SK'] ?? 1, 'SK', $months[$current_month]['roman'], $year_filter);
 
 $documents = [];
 $summary = [
@@ -493,12 +539,21 @@ require_once('includes/header.php');
     }
 </style>
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom gap-2">
     <div>
         <h4 class="mb-0"><i class="fas fa-file-signature text-primary me-2"></i>Generate Nomor DOK</h4>
         <small class="text-muted">Penomoran dokumen akreditasi SK, Pedoman, dan SPO</small>
     </div>
-    <span class="badge bg-primary fs-6 px-3 py-2">Tahun <?php echo $year_filter; ?></span>
+    <form method="get" class="d-flex align-items-center gap-2 m-0">
+        <label for="filterTahun" class="form-label mb-0 fw-bold text-nowrap"><i class="fas fa-calendar-alt text-primary me-1"></i>Filter Tahun:</label>
+        <select name="tahun" id="filterTahun" class="form-select form-select-sm fw-bold border-primary shadow-sm" style="min-width: 130px;" onchange="this.form.submit()">
+            <?php foreach ($available_years as $y): ?>
+                <option value="<?php echo $y; ?>" <?php echo $y === $year_filter ? 'selected' : ''; ?>>
+                    Tahun <?php echo $y; ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </form>
 </div>
 
 <?php if (!$table_ready): ?>
@@ -584,7 +639,13 @@ require_once('includes/header.php');
                         </div>
                         <div class="col-5">
                             <label class="form-label">Tahun</label>
-                            <input type="text" class="form-control" value="<?php echo $current_year; ?>" readonly>
+                            <select class="form-select" name="tahun" id="tahunDok" required>
+                                <?php foreach ($available_years as $y): ?>
+                                    <option value="<?php echo $y; ?>" <?php echo $y === $year_filter ? 'selected' : ''; ?>>
+                                        <?php echo $y; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
                     <div class="dok-preview mb-3">
@@ -723,17 +784,50 @@ require_once('includes/header.php');
 
 <?php ob_start(); ?>
 <script>
-const nextUrutByJenis = <?php echo json_encode($next_numbers, JSON_UNESCAPED_SLASHES); ?>;
-const yearDok = <?php echo (int) $current_year; ?>;
+const nextUrutCache = {
+    '<?php echo (int) $year_filter; ?>': <?php echo json_encode($next_numbers, JSON_UNESCAPED_SLASHES); ?>
+};
 let pendingDokForm = null;
 let dokConfirmModal = null;
+let previewAjaxTimer = null;
 
 function updatePreviewNomor() {
     const jenis = $('#jenisKode').val() || 'SK';
     const roman = $('#bulanDok option:selected').data('roman') || 'I';
-    const nextUrut = nextUrutByJenis[jenis] || 1;
-    const nomor = String(nextUrut).padStart(3, '0') + '/RSA/' + jenis + '/' + roman + '/' + yearDok;
-    $('#previewNomor').text(nomor);
+    const tahun = parseInt($('#tahunDok').val(), 10) || <?php echo (int) $year_filter; ?>;
+    const bulan = parseInt($('#bulanDok').val(), 10) || 1;
+
+    // Fast local preview first
+    let nextUrut = 1;
+    if (nextUrutCache[tahun] && typeof nextUrutCache[tahun][jenis] !== 'undefined') {
+        nextUrut = nextUrutCache[tahun][jenis];
+    }
+    const localNomor = String(nextUrut).padStart(3, '0') + '/RSA/' + jenis + '/' + roman + '/' + tahun;
+    $('#previewNomor').text(localNomor);
+
+    // Debounced AJAX check to query database for the exact next number of that year
+    clearTimeout(previewAjaxTimer);
+    previewAjaxTimer = setTimeout(function() {
+        $.getJSON('laporan_generate_nomor_dok.php', {
+            ajax_next_number: 1,
+            tahun: tahun,
+            jenis_kode: jenis,
+            bulan: bulan
+        }).done(function(res) {
+            if (res && res.status === 'success') {
+                if (!nextUrutCache[res.tahun]) {
+                    nextUrutCache[res.tahun] = {};
+                }
+                nextUrutCache[res.tahun][res.jenis_kode] = res.nomor_urut;
+
+                const curJenis = $('#jenisKode').val() || 'SK';
+                const curTahun = parseInt($('#tahunDok').val(), 10);
+                if (curJenis === res.jenis_kode && curTahun === res.tahun) {
+                    $('#previewNomor').text(res.preview);
+                }
+            }
+        });
+    }, 150);
 }
 
 function openDokConfirm(options) {
@@ -882,7 +976,7 @@ $(document).ready(function() {
         }
     });
 
-    $('#jenisKode, #bulanDok').on('change', updatePreviewNomor);
+    $('#jenisKode, #bulanDok, #tahunDok').on('change', updatePreviewNomor);
     $('#keteranganDok').on('input', function() {
         const start = this.selectionStart;
         const end = this.selectionEnd;
