@@ -1137,7 +1137,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                 <div>
                     <h2 class="mb-0 fw-bold" id="queuedCount"><?php echo $queued_count; ?></h2>
                     <small class="opacity-90 d-block">Dalam Antrean Service</small>
-                    <small class="opacity-75" style="font-size:0.73rem;">Menunggu giliran kirim (~5 mnt/pesan)</small>
+                    <small class="opacity-75" style="font-size:0.73rem;">Menunggu giliran kirim (~10-20 mnt/pesan)</small>
                 </div>
             </div>
         </div>
@@ -1149,7 +1149,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                 <div>
                     <h2 class="mb-0 fw-bold" id="sentCount"><?php echo $sent_count; ?></h2>
                     <small class="opacity-90 d-block">Sudah Terkirim</small>
-                    <small class="opacity-75" style="font-size:0.73rem;">Tersimpan permanen di log antrean</small>
+                    <small class="opacity-75" style="font-size:0.73rem;">Tersimpan di log antrean</small>
                 </div>
             </div>
         </div>

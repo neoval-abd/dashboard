@@ -23,7 +23,7 @@ Dokumen ini menjelaskan cara menyiapkan kredensial **SaungWA (`https://app.saung
    - **Nomor WA Perangkat Pengirim:** `089675463447`
    - **App Key (`appkey`):** Kode UUID dari menu **Webhook App** SaungWA (contoh: `2403ea28-ec52-4a9b-8d95-2d8bcacd123d`)
    - **Auth API Key (`authkey`):** Kode dari menu **Edit Profile $\rightarrow$ Auth Key** SaungWA
-4. Klik **`Simpan Konfigurasi`** (atau **`Simpan & Kirim Pesan Tes`**). Data langsung tersimpan permanen di tabel database `konfigurasi_wa_gateway` tanpa error izin tulis file.
+4. Klik **`Simpan Konfigurasi`** (atau **`Simpan & Kirim Pesan Tes`**). Data langsung permanen di tabel database `konfigurasi_wa_gateway` tanpa error izin tulis file.
 
 ---
 
