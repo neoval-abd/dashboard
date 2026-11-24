@@ -14,7 +14,7 @@
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `konfigurasi_wa_gateway` (
     `id` TINYINT UNSIGNED NOT NULL PRIMARY KEY DEFAULT 1,
-    `provider` VARCHAR(20) NOT NULL DEFAULT 'saungwa' COMMENT 'Provider aktif: saungwa / fonnte',
+    `provider` VARCHAR(20) NOT NULL DEFAULT 'saungwa' COMMENT 'Provider aktif: saungwa / fonnte / rocketsend',
     `sender_phone` VARCHAR(30) NOT NULL DEFAULT '' COMMENT 'Nomor WA pengirim RS Assalam (contoh: 6289675463447)',
     `app_key` VARCHAR(120) NOT NULL DEFAULT '' COMMENT 'AppKey SaungWA dari menu Webhook App',
     `auth_key` VARCHAR(160) NOT NULL DEFAULT '' COMMENT 'AuthKey SaungWA dari menu Edit Profile',

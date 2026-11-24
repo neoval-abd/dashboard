@@ -242,7 +242,7 @@ if ($table_ready) {
         }
     }
 }
-for ($y = $current_year - 2; $y <= $current_year + 4; $y++) {
+for ($y = $current_year - 5; $y <= $current_year + 5; $y++) {
     $available_years[] = $y;
 }
 $available_years[] = $year_filter;

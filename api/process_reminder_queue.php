@@ -22,6 +22,11 @@ $argvList  = isset($argv) && is_array($argv) ? $argv : [];
 $forceMode = in_array('--force', $argvList, true);
 $activeGw  = strtoupper(get_active_wa_provider());
 
+if ($activeGw === 'ROCKETSEND') {
+    echo 'Gateway aktif saat ini: ROCKETSEND (Ekstensi Chrome / Manual CSV). Pengiriman otomatis latar belakang dinonaktifkan sementara.' . PHP_EOL;
+    exit(0);
+}
+
 if (!ensure_kontrol_queue_table($koneksi)) {
     echo 'Gagal memastikan tabel antrean reminder kontrol: ' . $koneksi->error . PHP_EOL;
     exit(1);

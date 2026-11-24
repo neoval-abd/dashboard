@@ -182,7 +182,7 @@ function get_saungwa_runtime_settings($db = null, $forceReload = false)
     $hasFonnte  = ($fonnteToken !== '');
     $isReady    = ($provider === 'fonnte')
         ? $hasFonnte
-        : ($hasAppKey && $hasAuthKey);
+        : (($provider === 'rocketsend') ? true : ($hasAppKey && $hasAuthKey));
 
     $cached = [
         'provider'         => $provider,
@@ -234,7 +234,7 @@ function save_saungwa_config_file(array $input, $db = null)
 
     $current  = get_saungwa_runtime_settings($db);
     $provider = strtolower(trim((string) ($input['provider'] ?? $current['provider'])));
-    if (!in_array($provider, ['saungwa', 'fonnte'], true)) {
+    if (!in_array($provider, ['saungwa', 'fonnte', 'rocketsend'], true)) {
         $provider = 'saungwa';
     }
 
@@ -726,6 +726,14 @@ function get_wa_gateway_cooldown_remaining()
 function send_wa_gateway_message($phone, $message, array $options = [])
 {
     $provider = get_active_wa_provider();
+    if ($provider === 'rocketsend') {
+        return [
+            'success'   => false,
+            'provider'  => 'rocketsend',
+            'error'     => 'Gateway aktif adalah RocketSend.io (Ekstensi Chrome). Pengiriman dilakukan melalui WhatsApp Web dengan upload CSV dari dashboard.',
+        ];
+    }
+
     if ($provider === 'fonnte' && function_exists('send_fonnte_message')) {
         $res = send_fonnte_message($phone, $message, $options);
         $res['provider'] = 'fonnte';

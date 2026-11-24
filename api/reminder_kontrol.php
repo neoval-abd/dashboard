@@ -95,10 +95,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // 0b. Tes Kirim Pesan Langsung (Uji Koneksi API SaungWA / Fonnte)
+    // 0b. Tes Kirim Pesan Langsung (Uji Koneksi API SaungWA / Fonnte / RocketSend)
     if ($action === 'test_saungwa_send') {
         $targetProvider = strtolower(trim((string) ($_POST['provider'] ?? 'saungwa')));
-        if (!in_array($targetProvider, ['saungwa', 'fonnte'], true)) {
+        if (!in_array($targetProvider, ['saungwa', 'fonnte', 'rocketsend'], true)) {
             $targetProvider = 'saungwa';
         }
 
@@ -108,6 +108,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $senderPhone = trim((string) ($_POST['sender_phone'] ?? ''));
         $testTarget  = trim((string) ($_POST['test_phone'] ?? ''));
         $testMsg     = trim((string) ($_POST['test_message'] ?? ''));
+
+        if ($targetProvider === 'rocketsend') {
+            $savedCfg = save_saungwa_config_file([
+                'provider'     => 'rocketsend',
+                'sender_phone' => $senderPhone,
+                'app_key'      => $rawAppKey,
+                'auth_key'     => $authKey,
+                'fonnte_token' => $fonnteToken,
+                'test_target'  => $testTarget,
+            ], $koneksi);
+
+            echo json_encode([
+                'success'  => true,
+                'provider' => 'rocketsend',
+                'config'   => $savedCfg,
+                'message'  => 'Gateway RocketSend.io berhasil diaktifkan! RocketSend bekerja sebagai ekstensi Google Chrome di WhatsApp Web (web.whatsapp.com). Silakan klik tombol "Ekspor CSV RocketSend" untuk mengunduh daftar pasien lalu unggah pada panel RocketSend di browser Anda.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
 
         if ($testTarget === '') {
             echo json_encode(['success' => false, 'error' => 'Nomor tujuan tes WhatsApp wajib diisi.'], JSON_UNESCAPED_UNICODE);

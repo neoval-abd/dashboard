@@ -1080,8 +1080,11 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
         <button type="button"
                 id="btnOpenSaungwaConfig"
                 class="btn-gw-status <?php echo $gw_config['is_ready'] ? 'btn-gw-ready' : 'btn-gw-warn'; ?>"
-                title="Klik untuk pengaturan kredensial & tes kirim SaungWA">
-            <?php if ($gw_config['provider'] === 'fonnte'): ?>
+                title="Klik untuk pengaturan kredensial & tes kirim Gateway WhatsApp">
+            <?php if ($gw_config['provider'] === 'rocketsend'): ?>
+                <i class="fas fa-rocket text-info"></i>
+                <span id="gwStatusLabel">Gateway: RocketSend (Ekstensi Chrome)</span>
+            <?php elseif ($gw_config['provider'] === 'fonnte'): ?>
                 <i class="fas fa-plug"></i>
                 <span id="gwStatusLabel">Gateway: Fonnte<?php echo $gw_config['is_ready'] ? ' (Aktif)' : ' (Token Kosong)'; ?></span>
             <?php elseif ($gw_config['is_ready']): ?>
@@ -1237,7 +1240,10 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
             Semua
         </button>
 
-        <div class="d-flex align-items-center ms-xl-auto mt-2 mt-xl-0">
+        <div class="d-flex align-items-center gap-2 ms-xl-auto mt-2 mt-xl-0 flex-wrap">
+            <button type="button" class="btn btn-sm btn-outline-info fw-bold" id="btnExportRocketsendCsv" title="Download daftar pasien kontrol dalam format CSV untuk di-blast menggunakan ekstensi RocketSend di WhatsApp Web">
+                <i class="fas fa-file-csv me-1"></i> Ekspor CSV RocketSend
+            </button>
             <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Cari nama / RM / poli / dokter..." style="min-width: 225px; border-radius: 20px;">
         </div>
     </div>
@@ -1538,7 +1544,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
         <div class="modal-content" style="border-radius:16px; overflow:hidden; border:none;">
             <div class="modal-header text-white" style="background: linear-gradient(135deg, #059669, #0d9488);">
                 <h5 class="modal-title fw-bold text-white">
-                    <i class="fab fa-whatsapp me-2"></i> Integrasi &amp; Pengaturan Gateway WhatsApp (SaungWA &amp; Fonnte)
+                    <i class="fab fa-whatsapp me-2"></i> Integrasi &amp; Pengaturan Gateway WhatsApp (SaungWA, Fonnte &amp; RocketSend)
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -1549,6 +1555,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                         <select id="cfgProvider" class="form-select form-select-sm modal-themed-input">
                             <option value="saungwa" <?php echo $gw_config['provider'] === 'saungwa' ? 'selected' : ''; ?>>SaungWA (Utama / Scan QR)</option>
                             <option value="fonnte" <?php echo $gw_config['provider'] === 'fonnte' ? 'selected' : ''; ?>>Fonnte (Cadangan / WhatsApp Official API)</option>
+                            <option value="rocketsend" <?php echo $gw_config['provider'] === 'rocketsend' ? 'selected' : ''; ?>>RocketSend.io (Ekstensi Chrome &amp; Upload CSV)</option>
                         </select>
                         <small class="text-muted d-block mt-1" style="font-size:0.75rem;">
                             Bisa diganti fleksibel kapan saja. Worker antrean otomatis mengikuti gateway terpilih.
@@ -1597,6 +1604,39 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                     </ol>
                 </div>
 
+                <!-- Panduan RocketSend -->
+                <div id="boxRocketsendGuide" class="modal-meta-box mb-3 d-none">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <div class="small modal-field-label text-warning fw-bold">
+                            <i class="fas fa-rocket me-1"></i> Panduan Pemakaian RocketSend.io (Ekstensi Google Chrome):
+                        </div>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <a href="https://app.rocketsend.io" target="_blank" rel="noopener" class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size:0.76rem;">
+                                <i class="fas fa-external-link-alt me-1"></i> Buka app.rocketsend.io
+                            </a>
+                            <a href="https://web.whatsapp.com" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:0.76rem;">
+                                <i class="fab fa-whatsapp me-1"></i> Buka WhatsApp Web
+                            </a>
+                        </div>
+                    </div>
+                    <div class="small text-muted mb-2">
+                        <strong>Cara Kerja:</strong> RocketSend.io berjalan sebagai ekstensi Google Chrome di atas antarmuka WhatsApp Web (tidak memerlukan token/API server). Pengiriman dilakukan secara semi-otomatis melalui browser admin menggunakan file CSV dari dashboard ini.
+                    </div>
+                    <ol class="small text-muted mb-3 ps-3">
+                        <li>Pasang ekstensi <strong>RocketSend</strong> dari Chrome Web Store di Google Chrome Anda.</li>
+                        <li>Buka dan login di <strong><a href="https://app.rocketsend.io" target="_blank" class="text-info">app.rocketsend.io</a></strong>.</li>
+                        <li>Buka <strong>WhatsApp Web</strong> (<a href="https://web.whatsapp.com" target="_blank" class="text-success">web.whatsapp.com</a>) di tab Chrome yang sama dan scan QR WhatsApp RS.</li>
+                        <li>Klik tombol <strong>"Ekspor CSV RocketSend"</strong> di bawah untuk mengunduh daftar pasien kontrol beserta template pesannya.</li>
+                        <li>Pada WhatsApp Web, klik tombol <strong>Sender</strong> (panel RocketSend di pojok antarmuka) &rarr; klik <strong>Upload CSV</strong> &rarr; pilih file CSV yang baru diunduh &rarr; klik <strong>Send WhatsApp</strong>.</li>
+                    </ol>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-2 border-top">
+                        <small class="text-warning"><i class="fas fa-shield-alt me-1"></i>Tips: Atur jeda 15-30 detik di panel RocketSend agar aman dari pembatasan WhatsApp.</small>
+                        <button type="button" class="btn btn-sm btn-info text-white fw-bold" onclick="exportRocketSendCsv()">
+                            <i class="fas fa-file-csv me-1"></i> Download File CSV Pasien Hari Ini
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Kolom Kredensial SaungWA -->
                 <div id="groupSaungwaFields" class="row g-3 mb-3">
                     <div class="col-12">
@@ -1642,7 +1682,7 @@ $day_after    = date('Y-m-d', strtotime('+2 days'));
                     </div>
                 </div>
 
-                <div class="modal-meta-box">
+                <div class="modal-meta-box" id="boxDirectTestSection">
                     <div class="small modal-field-label mb-1">
                         <i class="fas fa-paper-plane text-primary me-1"></i> Uji Kirim Pesan Langsung (<span id="testGwLabel">SaungWA</span>)
                     </div>
@@ -2153,6 +2193,13 @@ $(document).ready(function() {
         const $notice = $('#saungwaAppKeyNotice');
 
         $btn.removeClass('btn-gw-ready btn-gw-warn');
+        if (cfg.provider === 'rocketsend') {
+            $btn.addClass('btn-gw-ready');
+            $btn.html('<i class="fas fa-rocket text-info"></i> <span id="gwStatusLabel">Gateway: RocketSend (Ekstensi Chrome)</span>');
+            $notice.addClass('d-none');
+            return;
+        }
+
         if (cfg.is_ready) {
             $btn.addClass('btn-gw-ready');
             if (cfg.provider === 'fonnte') {
@@ -2176,18 +2223,34 @@ $(document).ready(function() {
 
     function syncGatewayProviderUI() {
         const prov = $('#cfgProvider').val();
-        if (prov === 'fonnte') {
+        if (prov === 'rocketsend') {
+            $('#boxSaungwaGuide').addClass('d-none');
+            $('#boxFonnteGuide').addClass('d-none');
+            $('#boxRocketsendGuide').removeClass('d-none');
+            $('#groupSaungwaFields').addClass('d-none');
+            $('#groupFonnteFields').addClass('d-none');
+            $('#boxSenderPhone').addClass('d-none');
+            $('#boxDirectTestSection').addClass('d-none');
+            $('#testGwLabel').text('RocketSend');
+            $('#btnTestLabel').text('Simpan Konfigurasi RocketSend');
+        } else if (prov === 'fonnte') {
             $('#boxSaungwaGuide').addClass('d-none');
             $('#boxFonnteGuide').removeClass('d-none');
+            $('#boxRocketsendGuide').addClass('d-none');
             $('#groupSaungwaFields').addClass('d-none');
             $('#groupFonnteFields').removeClass('d-none');
+            $('#boxSenderPhone').removeClass('d-none');
+            $('#boxDirectTestSection').removeClass('d-none');
             $('#testGwLabel').text('Fonnte');
             $('#btnTestLabel').text('Simpan & Kirim Pesan Tes (Fonnte)');
         } else {
             $('#boxSaungwaGuide').removeClass('d-none');
             $('#boxFonnteGuide').addClass('d-none');
+            $('#boxRocketsendGuide').addClass('d-none');
             $('#groupSaungwaFields').removeClass('d-none');
             $('#groupFonnteFields').addClass('d-none');
+            $('#boxSenderPhone').removeClass('d-none');
+            $('#boxDirectTestSection').removeClass('d-none');
             $('#testGwLabel').text('SaungWA');
             $('#btnTestLabel').text('Simpan & Kirim Pesan Tes (SaungWA)');
         }
@@ -2252,6 +2315,41 @@ $(document).ready(function() {
         const fonnteToken = $('#cfgFonnteToken').val().trim();
         const testTo      = $('#cfgTestPhone').val().trim();
         const $resBox     = $('#saungwaTestResult');
+
+        if (prov === 'rocketsend') {
+            const $btn = $(this);
+            const origHtml = $btn.html();
+            $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Menyimpan...');
+            $resBox.addClass('d-none');
+
+            $.ajax({
+                url: 'api/reminder_kontrol.php',
+                method: 'POST',
+                dataType: 'json',
+                global: false,
+                data: {
+                    action: 'test_saungwa_send',
+                    provider: 'rocketsend',
+                    test_phone: '628000000000'
+                }
+            }).done(function(res) {
+                if (res && res.success) {
+                    $resBox.removeClass('d-none alert-danger').addClass('alert-success')
+                           .html('<i class="fas fa-check-circle me-1"></i> ' + $('<div>').text(res.message).html());
+                    updateGatewayBadgeUI(res.config || { provider: 'rocketsend', is_ready: true });
+                    showToastNotification('Gateway aktif dialihkan ke RocketSend.io (Ekstensi Chrome).', false);
+                } else {
+                    $resBox.removeClass('d-none alert-success').addClass('alert-danger')
+                           .text(res && res.error ? res.error : 'Gagal menyimpan gateway RocketSend.');
+                }
+            }).fail(function(xhr) {
+                $resBox.removeClass('d-none alert-success').addClass('alert-danger')
+                       .text(getAjaxErrorMessage(xhr, 'Gagal menyimpan konfigurasi RocketSend.'));
+            }).always(function() {
+                $btn.prop('disabled', false).html(origHtml);
+            });
+            return;
+        }
 
         if (prov === 'fonnte') {
             if (!fonnteToken) {
@@ -2341,6 +2439,89 @@ $(document).ready(function() {
             $btn.prop('disabled', false).html(origHtml);
         });
     });
+
+    // ============================================================
+    // EKSPOR CSV KHUSUS ROCKETSEND.IO
+    // ============================================================
+    window.exportRocketSendCsv = function() {
+        const rows = [];
+        rows.push(['phone', 'name', 'message', 'poli', 'dokter', 'tanggal', 'jam']);
+
+        const $cards = $('.kontrol-col:not(.hidden-card)');
+        if (!$cards.length) {
+            alert('Tidak ada data pasien yang tampil pada filter saat ini.');
+            return;
+        }
+
+        let validCount = 0;
+        $cards.each(function() {
+            const $btn = $(this).find('.btn-open-preview');
+            if (!$btn.length) return;
+
+            let phone = String($btn.attr('data-phone') || '').trim();
+            if (!phone || phone === '-' || phone === 'null' || phone === '0') return;
+
+            let cleanPhone = phone.replace(/[^0-9]/g, '');
+            if (cleanPhone.startsWith('0')) cleanPhone = '62' + cleanPhone.substring(1);
+            else if (cleanPhone && !cleanPhone.startsWith('62')) cleanPhone = '62' + cleanPhone;
+
+            if (cleanPhone.length < 9) return;
+
+            const d = {
+                refKey:   String($btn.attr('data-ref-key') || ''),
+                phone:    cleanPhone,
+                name:     String($btn.attr('data-name') || ''),
+                nomr:     String($btn.attr('data-nomr') || ''),
+                penjamin: String($btn.attr('data-penjamin') || '-'),
+                poli:     String($btn.attr('data-poli') || '-'),
+                dokter:   String($btn.attr('data-dokter') || '-'),
+                tanggal:  String($btn.attr('data-tanggal') || '-'),
+                jam:      String($btn.attr('data-jam') || 'Sesuai Jadwal Praktik Dokter'),
+                noSurat:  String($btn.attr('data-no-surat') || '-')
+            };
+
+            const savedMsg = String($btn.attr('data-saved-msg') || '').trim();
+            const msg = savedMsg ? savedMsg : (typeof getDefaultMsg === 'function' ? getDefaultMsg(d) : buildMessageFromTemplate(DEFAULT_TEMPLATE, d));
+
+            rows.push([
+                cleanPhone,
+                d.name || '',
+                msg,
+                d.poli || '',
+                d.dokter || '',
+                d.tanggal || '',
+                d.jam || ''
+            ]);
+            validCount++;
+        });
+
+        if (validCount === 0) {
+            alert('Tidak ada data pasien dengan nomor WhatsApp valid untuk diekspor pada filter saat ini.');
+            return;
+        }
+
+        let csvContent = '\uFEFF';
+        rows.forEach(function(row) {
+            const escaped = row.map(function(val) {
+                let str = String(val == null ? '' : val).replace(/"/g, '""');
+                return `"${str}"`;
+            });
+            csvContent += escaped.join(',') + '\r\n';
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        const tgl  = $('#inputTglAwal').val() || 'export';
+        a.href     = url;
+        a.download = `RocketSend_Reminder_Kontrol_${tgl}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    $('#btnExportRocketsendCsv').on('click', window.exportRocketSendCsv);
 
     refreshCountersAndFilter();
 });
